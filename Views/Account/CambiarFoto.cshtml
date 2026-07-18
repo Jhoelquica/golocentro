@@ -1,0 +1,323 @@
+﻿@{
+    ViewData["Title"] = "Cambiar Foto";
+    var fotoActual = User.FindFirst("FotoUrl")?.Value ?? "";
+    var nombre = User.FindFirst("NombreCompleto")?.Value ?? "";
+    var initials = string.Concat(nombre.Split(' ')
+                        .Where(w => w.Length > 0).Take(2)
+                        .Select(w => w[0].ToString().ToUpper()));
+}
+
+<style>
+    .foto-wrap {
+        max-width: 480px;
+        margin: 2rem auto;
+    }
+
+    .foto-card {
+        background: #fff;
+        border: 1px solid rgba(121,174,146,0.2);
+        border-radius: 14px;
+        padding: 2rem;
+    }
+
+        .foto-card h5 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #001F36;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+            .foto-card h5 i {
+                color: #1C5560;
+                font-size: 20px;
+            }
+
+    /* Avatar preview */
+    .avatar-preview {
+        width: 110px;
+        height: 110px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 3px solid #1C5560;
+        display: block;
+        margin: 0 auto 1.25rem;
+    }
+
+    .avatar-placeholder {
+        width: 110px;
+        height: 110px;
+        border-radius: 50%;
+        background: #1C5560;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 36px;
+        font-weight: 600;
+        color: #FBFFCD;
+        border: 3px solid rgba(28,85,96,0.3);
+        margin: 0 auto 1.25rem;
+    }
+
+    .foto-nombre {
+        text-align: center;
+        font-size: 15px;
+        font-weight: 600;
+        color: #001F36;
+        margin-bottom: 0.25rem;
+    }
+
+    .foto-sub {
+        text-align: center;
+        font-size: 12px;
+        color: #79AE92;
+        margin-bottom: 1.5rem;
+    }
+
+    /* Drop zone */
+    .drop-zone {
+        border: 2px dashed rgba(28,85,96,0.35);
+        border-radius: 10px;
+        padding: 1.5rem;
+        text-align: center;
+        cursor: pointer;
+        transition: border-color 0.18s, background 0.18s;
+        position: relative;
+        background: #f8fbfa;
+    }
+
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: #1C5560;
+            background: rgba(28,85,96,0.05);
+        }
+
+        .drop-zone input[type=file] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+            width: 100%;
+            height: 100%;
+        }
+
+        .drop-zone i {
+            font-size: 28px;
+            color: #79AE92;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .drop-zone .dz-text {
+            font-size: 13px;
+            color: #5a7d6e;
+        }
+
+        .drop-zone .dz-hint {
+            font-size: 11px;
+            color: #79AE92;
+            margin-top: 4px;
+        }
+
+    /* Preview nueva foto */
+    .new-preview-wrap {
+        display: none;
+        text-align: center;
+        margin-top: 1rem;
+    }
+
+        .new-preview-wrap img {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid #1C5560;
+        }
+
+        .new-preview-wrap .new-name {
+            font-size: 12px;
+            color: #1C5560;
+            margin-top: 6px;
+            font-weight: 500;
+        }
+
+    /* Alerts */
+    .alert-g {
+        border-radius: 8px;
+        padding: 10px 14px;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 1rem;
+    }
+
+        .alert-g.success {
+            background: rgba(28,85,96,0.1);
+            color: #1C5560;
+        }
+
+        .alert-g.error {
+            background: rgba(192,57,43,0.1);
+            color: #c0392b;
+        }
+
+    /* Botones */
+    .btn-row {
+        display: flex;
+        gap: 10px;
+        margin-top: 1.25rem;
+    }
+
+    .btn-g-primary {
+        flex: 1;
+        padding: 10px;
+        background: #1C5560;
+        color: #FBFFCD;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        font-family: inherit;
+        transition: background 0.18s;
+    }
+
+        .btn-g-primary:hover {
+            background: #17464f;
+        }
+
+    .btn-g-outline {
+        flex: 1;
+        padding: 10px;
+        background: transparent;
+        color: #1C5560;
+        border: 1px solid #1C5560;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        font-family: inherit;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.18s;
+    }
+
+        .btn-g-outline:hover {
+            background: #1C5560;
+            color: #FBFFCD;
+        }
+</style>
+
+<div class="foto-wrap">
+    <div class="foto-card">
+
+        <h5><i class="bi bi-camera-fill"></i> Cambiar Foto de Perfil</h5>
+
+        @* Mensajes *@
+        @if (TempData["Success"] != null)
+        {
+            <div class="alert-g success">
+                <i class="bi bi-check-circle-fill"></i> @TempData["Success"]
+            </div>
+        }
+        @if (TempData["Error"] != null)
+        {
+            <div class="alert-g error">
+                <i class="bi bi-exclamation-circle-fill"></i> @TempData["Error"]
+            </div>
+        }
+
+        @* Avatar actual *@
+        @if (!string.IsNullOrEmpty(fotoActual))
+        {
+            <img src="@Url.Content("~/uploads/perfiles/" + fotoActual)"
+                 alt="Foto actual" class="avatar-preview" id="avatarActual" />
+        }
+        else
+        {
+            <div class="avatar-placeholder" id="avatarActual">@initials</div>
+        }
+        <p class="foto-nombre">@nombre</p>
+        <p class="foto-sub">Foto de perfil actual</p>
+
+        @* Formulario *@
+        <form method="post" enctype="multipart/form-data"
+              asp-controller="Account" asp-action="CambiarFoto">
+            @Html.AntiForgeryToken()
+
+            <div class="drop-zone" id="dropZone">
+                <input type="file" name="foto" id="fotoInput"
+                       accept=".jpg,.jpeg,.png,.webp" />
+                <i class="bi bi-cloud-arrow-up"></i>
+                <div class="dz-text">Arrastra tu foto aquí o haz clic para seleccionar</div>
+                <div class="dz-hint">JPG, PNG o WEBP · Máximo 2 MB</div>
+            </div>
+
+            @* Preview de nueva foto seleccionada *@
+            <div class="new-preview-wrap" id="newPreview">
+                <img id="newPreviewImg" src="#" alt="Nueva foto" />
+                <div class="new-name" id="newPreviewName"></div>
+            </div>
+
+            <div class="btn-row">
+                <a href="@Url.Action("Perfil", "Account")" class="btn-g-outline">
+                    <i class="bi bi-arrow-left" style="margin-right:6px"></i> Cancelar
+                </a>
+                <button type="submit" class="btn-g-primary" id="btnGuardar" disabled>
+                    <i class="bi bi-check-lg" style="margin-right:6px"></i> Guardar Foto
+                </button>
+            </div>
+        </form>
+
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const input     = document.getElementById('fotoInput');
+        const dropZone  = document.getElementById('dropZone');
+        const preview   = document.getElementById('newPreview');
+        const previewImg= document.getElementById('newPreviewImg');
+        const previewNm = document.getElementById('newPreviewName');
+        const btnGuardar= document.getElementById('btnGuardar');
+
+        input.addEventListener('change', mostrarPreview);
+
+        // Drag & drop visual
+        dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', e => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) {
+                input.files = e.dataTransfer.files;
+                mostrarPreview();
+            }
+        });
+
+        function mostrarPreview() {
+            const file = input.files[0];
+            if (!file) return;
+
+            // Validar tamaño en el cliente
+            if (file.size > 2 * 1024 * 1024) {
+                alert('La imagen supera los 2 MB. Elige una más pequeña.');
+                input.value = '';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = e => {
+                previewImg.src = e.target.result;
+                previewNm.textContent = file.name;
+                preview.style.display = 'block';
+                btnGuardar.disabled = false;
+            };
+            reader.readAsDataURL(file);
+        }
+    </script>
+}

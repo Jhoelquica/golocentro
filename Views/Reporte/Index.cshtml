@@ -1,0 +1,45 @@
+﻿@{
+    ViewData["Title"] = "Reportes";
+}
+
+<div class="container">
+    <h2 class="mb-4"><i class="bi bi-file-pdf"></i> Generar Reportes</h2>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-3">
+                <div class="card-header bg-danger text-white">Movimientos</div>
+                <div class="card-body">
+                    <form asp-action="Movimientos" method="get">
+                        <div class="mb-2">
+                            <label>Desde:</label>
+                            <input type="date" name="desde" class="form-control">
+                        </div>
+                        <div class="mb-2">
+                            <label>Hasta:</label>
+                            <input type="date" name="hasta" class="form-control">
+                        </div>
+                        <div class="mb-2">
+                            <label>Tipo:</label>
+                            <select name="tipo" class="form-select">
+                                <option value="">Todos</option>
+                                <option value="Entrada">Entrada</option>
+                                <option value="Salida">Salida</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-danger w-100"><i class="bi bi-file-pdf"></i> Descargar PDF</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card mb-3">
+                <div class="card-header bg-success text-white">Stock Actual</div>
+                <div class="card-body">
+                    <p>Exporta el inventario actual en Excel.</p>
+                    <a asp-action="Stock" class="btn btn-success w-100"><i class="bi bi-file-excel"></i> Descargar Excel</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

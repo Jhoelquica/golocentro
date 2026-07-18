@@ -1,0 +1,134 @@
+﻿@model GestionAlmacen_Golocentro.ViewModels.MovimientoEntradaViewModel
+@{
+    ViewData["Title"] = "Registrar Entrada";
+}
+
+<div class="container">
+    <h2 class="mb-4"><i class="bi bi-box-arrow-in-down"></i> Registrar Entrada de Productos</h2>
+
+    @if (!ViewData.ModelState.IsValid)
+    {
+        <div class="alert alert-danger">
+            <ul>
+                @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                {
+                    <li>@error.ErrorMessage</li>
+                }
+            </ul>
+        </div>
+    }
+
+    <form method="post" asp-action="Entrada" enctype="multipart/form-data">
+        @Html.AntiForgeryToken()
+        <!-- nuevo producto -->
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span></span>
+            <a href="/Producto/Create" target="_blank" class="btn btn-sm btn-outline-success">
+                <i class="bi bi-plus-circle"></i> Nuevo producto (nueva pestaña)
+            </a>
+        </div>
+        <!-- Tabla dinámica de productos -->
+        <div class="card mb-3">
+            <div class="card-header bg-primary text-white">
+                <i class="bi bi-cart-plus"></i> Productos
+            </div>
+            <div class="card-body">
+                <table class="table table-bordered" id="tablaProductos">
+                    <thead>
+                        <tr>
+                            <th>Producto</th>
+                            <th>Ubicación</th>
+                            <th>Cantidad</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Las filas se agregan dinámicamente -->
+                    </tbody>
+                </table>
+                <button type="button" class="btn btn-outline-primary btn-sm" id="btnAgregarFila">
+                    <i class="bi bi-plus-circle"></i> Agregar producto
+                </button>
+            </div>
+        </div>
+
+        <!-- Datos generales -->
+        <div class="row">
+            <div class="col-md-4 mb-3">
+                <label asp-for="ProveedorId" class="form-label fw-bold">Proveedor (opcional)</label>
+                <select asp-for="ProveedorId" class="form-select">
+                    <option value="">-- Sin proveedor --</option>
+                    @foreach (var item in ViewBag.Proveedores as IEnumerable<SelectListItem>)
+                    {
+                        <option value="@item.Value">@item.Text</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-4 mb-3">
+                <label asp-for="NumeroFactura" class="form-label fw-bold">Nº Factura / Guía</label>
+                <input asp-for="NumeroFactura" class="form-control" placeholder="Opcional" />
+            </div>
+            <div class="col-md-4 mb-3">
+                <label asp-for="Evidencia" class="form-label fw-bold">Evidencia (foto)</label>
+                <input asp-for="Evidencia" type="file" class="form-control" accept="image/*" />
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between">
+            <a asp-action="Index" class="btn btn-secondary"><i class="bi bi-arrow-left"></i> Volver</a>
+            <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Registrar Entrada</button>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <script>
+        // Serializar los SelectListItem a JSON de forma segura
+        var productos = @Html.Raw(JsonConvert.SerializeObject(
+                    ((IEnumerable<SelectListItem>)ViewBag.Productos).Select(p => new { value = p.Value, text = p.Text })));
+        var ubicaciones = @Html.Raw(JsonConvert.SerializeObject(
+                    ((IEnumerable<SelectListItem>)ViewBag.Ubicaciones).Select(u => new { value = u.Value, text = u.Text })));
+
+        let contadorFila = 0;
+
+        function agregarFila() {
+            const tbody = document.querySelector('#tablaProductos tbody');
+            const fila = document.createElement('tr');
+            fila.innerHTML = `
+                <td>
+                    <select name="Detalles[${contadorFila}].ProductoId" class="form-select" required>
+                        <option value="">-- Seleccione producto --</option>
+                        ${productos.map(p => `<option value="${p.value}">${p.text}</option>`).join('')}
+                    </select>
+                </td>
+                <td>
+                    <select name="Detalles[${contadorFila}].UbicacionId" class="form-select" required>
+                        <option value="">-- Seleccione ubicación --</option>
+                        ${ubicaciones.map(u => `<option value="${u.value}">${u.text}</option>`).join('')}
+                    </select>
+                </td>
+                <td>
+                    <input type="number" name="Detalles[${contadorFila}].Cantidad" class="form-control" min="1" required>
+                </td>
+                <td>
+                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="eliminarFila(this)">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(fila);
+            contadorFila++;
+        }
+
+        function eliminarFila(boton) {
+            boton.closest('tr').remove();
+        }
+
+        document.getElementById('btnAgregarFila').addEventListener('click', agregarFila);
+
+        // Agregar una fila inicial al cargar la página
+        window.addEventListener('DOMContentLoaded', () => {
+            agregarFila();
+        });
+    </script>
+}

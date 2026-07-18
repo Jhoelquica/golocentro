@@ -1,0 +1,57 @@
+## Ignorar carpetas de compilación
+bin/
+obj/
+packages/
+*.user
+*.suo
+*.cache
+*.bak
+
+## Ignorar archivos de Visual Studio
+.vs/
+*.tmp
+*.tmp_proj
+*.sln.ide
+*.sln.docstates
+*.ide
+_ReSharper.*
+*.resharper
+*.dbmdl
+*.dbproj.schema
+*.publishsettings
+*.pubxml
+*.pdb
+*.dll
+*.exe
+
+## Ignorar dependencias de cliente
+node_modules/
+bower_components/
+lib/
+wwwroot/lib/
+
+## Ignorar configuraciones sensibles (descomenta si aplica)
+# appsettings.json
+# appsettings.*.json
+
+## Ignorar logs y temporales
+logs/
+*.log
+*.tmp
+*.temp
+*.nupkg
+
+## Ignorar resultados de pruebas
+TestResults/
+*.coverage
+*.trx
+*.TestResult.xml
+
+## Ignorar archivos de publicación
+*.publishproj
+*.deploy
+*.deploy.cmd
+*.deploy.ps1
+*.deploy.targets
+*Deploy.bat
+*Deploy.ps1

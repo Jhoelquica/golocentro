@@ -1,0 +1,433 @@
+﻿@{
+    ViewData["Title"] = "Iniciar Sesión - Golocentro";
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"]</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+            *, *::before, *::after {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+
+            body {
+                font-family: 'Plus Jakarta Sans', sans-serif;
+                min-height: 100vh;
+                background: #001F36;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 1rem;
+                position: relative;
+                overflow: hidden;
+            }
+
+                /* Decoración de fondo */
+                body::before {
+                    content: '';
+                    position: absolute;
+                    width: 500px;
+                    height: 500px;
+                    background: radial-gradient(circle, rgba(28,85,96,0.4) 0%, transparent 70%);
+                    top: -150px;
+                    right: -100px;
+                    border-radius: 50%;
+                }
+
+                body::after {
+                    content: '';
+                    position: absolute;
+                    width: 400px;
+                    height: 400px;
+                    background: radial-gradient(circle, rgba(121,174,146,0.15) 0%, transparent 70%);
+                    bottom: -100px;
+                    left: -80px;
+                    border-radius: 50%;
+                }
+
+            /* Tarjeta principal */
+            .login-card {
+                background: #ffffff;
+                border-radius: 20px;
+                width: 100%;
+                max-width: 400px;
+                overflow: hidden;
+                position: relative;
+                z-index: 1;
+                box-shadow: 0 24px 60px rgba(0,0,0,0.35);
+            }
+
+            /* Cabecera */
+            .login-header {
+                background: #001F36;
+                padding: 2rem 2rem 1.75rem;
+                text-align: center;
+                border-bottom: 3px solid #1C5560;
+            }
+
+            .login-logo-wrap {
+                width: 72px;
+                height: 72px;
+                background: #1C5560;
+                border-radius: 18px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 0 auto 1rem;
+                box-shadow: 0 8px 20px rgba(28,85,96,0.5);
+            }
+
+                .login-logo-wrap i {
+                    font-size: 34px;
+                    color: #FBFFCD;
+                }
+
+            .login-header h1 {
+                font-size: 22px;
+                font-weight: 600;
+                color: #FBFFCD;
+                letter-spacing: 0.02em;
+                margin-bottom: 4px;
+            }
+
+            .login-header p {
+                font-size: 12px;
+                color: #79AE92;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 4px;
+            }
+
+            /* Cuerpo */
+            .login-body {
+                padding: 2rem;
+                background: #fff;
+            }
+
+                .login-body h2 {
+                    font-size: 15px;
+                    font-weight: 600;
+                    color: #001F36;
+                    margin-bottom: 1.5rem;
+                    text-align: center;
+                }
+
+            /* Alerta error */
+            .alert-error {
+                background: rgba(192,57,43,0.08);
+                border: 1px solid rgba(192,57,43,0.25);
+                border-radius: 10px;
+                padding: 10px 14px;
+                font-size: 13px;
+                color: #c0392b;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin-bottom: 1.25rem;
+            }
+
+                .alert-error i {
+                    font-size: 16px;
+                    flex-shrink: 0;
+                }
+
+                .alert-error .btn-close-error {
+                    margin-left: auto;
+                    background: none;
+                    border: none;
+                    color: #c0392b;
+                    cursor: pointer;
+                    font-size: 16px;
+                    padding: 0;
+                }
+
+            /* Campos */
+            .field-group {
+                margin-bottom: 1rem;
+            }
+
+                .field-group label {
+                    display: block;
+                    font-size: 12px;
+                    font-weight: 600;
+                    color: #5a7d6e;
+                    letter-spacing: 0.06em;
+                    text-transform: uppercase;
+                    margin-bottom: 6px;
+                }
+
+            .field-input-wrap {
+                position: relative;
+            }
+
+                .field-input-wrap i {
+                    position: absolute;
+                    left: 12px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    font-size: 17px;
+                    color: #79AE92;
+                    pointer-events: none;
+                }
+
+                .field-input-wrap input {
+                    width: 100%;
+                    padding: 11px 12px 11px 40px;
+                    border: 1.5px solid rgba(121,174,146,0.35);
+                    border-radius: 10px;
+                    font-size: 14px;
+                    color: #001F36;
+                    font-family: inherit;
+                    outline: none;
+                    transition: border-color 0.18s, box-shadow 0.18s;
+                    background: #f8fbfa;
+                }
+
+                    .field-input-wrap input:focus {
+                        border-color: #1C5560;
+                        background: #fff;
+                        box-shadow: 0 0 0 3px rgba(28,85,96,0.1);
+                    }
+
+                    .field-input-wrap input::placeholder {
+                        color: #b0c4bb;
+                    }
+
+            /* Toggle contraseña */
+            .toggle-pass {
+                position: absolute;
+                right: 12px;
+                top: 50%;
+                transform: translateY(-50%);
+                background: none;
+                border: none;
+                color: #79AE92;
+                cursor: pointer;
+                font-size: 17px;
+                padding: 0;
+                pointer-events: all;
+            }
+
+                .toggle-pass:hover {
+                    color: #1C5560;
+                }
+
+            /* Sede */
+            .field-group select {
+                width: 100%;
+                padding: 11px 12px 11px 40px;
+                border: 1.5px solid rgba(121,174,146,0.35);
+                border-radius: 10px;
+                font-size: 14px;
+                color: #001F36;
+                font-family: inherit;
+                outline: none;
+                transition: border-color 0.18s;
+                background: #f8fbfa;
+                appearance: none;
+                cursor: pointer;
+            }
+
+                .field-group select:focus {
+                    border-color: #1C5560;
+                    background: #fff;
+                    box-shadow: 0 0 0 3px rgba(28,85,96,0.1);
+                }
+
+            .select-wrap {
+                position: relative;
+            }
+
+                .select-wrap i.icon-left {
+                    position: absolute;
+                    left: 12px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    font-size: 17px;
+                    color: #79AE92;
+                    pointer-events: none;
+                    z-index: 1;
+                }
+
+                .select-wrap i.icon-right {
+                    position: absolute;
+                    right: 12px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    font-size: 14px;
+                    color: #79AE92;
+                    pointer-events: none;
+                }
+
+            /* Botón */
+            .btn-login {
+                width: 100%;
+                padding: 12px;
+                background: #1C5560;
+                color: #FBFFCD;
+                border: none;
+                border-radius: 10px;
+                font-size: 15px;
+                font-weight: 600;
+                font-family: inherit;
+                cursor: pointer;
+                margin-top: 1.25rem;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+                transition: background 0.18s, transform 0.1s;
+            }
+
+                .btn-login:hover {
+                    background: #17464f;
+                }
+
+                .btn-login:active {
+                    transform: scale(0.98);
+                }
+
+                .btn-login i {
+                    font-size: 18px;
+                }
+
+            /* Footer */
+            .login-footer {
+                background: #f8fbfa;
+                border-top: 1px solid rgba(121,174,146,0.2);
+                padding: 12px;
+                text-align: center;
+                font-size: 11px;
+                color: #79AE92;
+            }
+
+                .login-footer strong {
+                    color: #1C5560;
+                }
+    </style>
+</head>
+<body>
+
+    <div class="login-card">
+
+        <!-- Cabecera -->
+        <div class="login-header">
+            <div class="login-logo-wrap">
+                <i class="bi bi-boxes"></i>
+            </div>
+            <h1>Golocentro</h1>
+            <p><i class="bi bi-geo-alt-fill"></i> Ayacucho, Perú</p>
+        </div>
+
+        <!-- Cuerpo -->
+        <div class="login-body">
+            <h2>Acceso al Sistema</h2>
+
+            @* Mensaje de error — mismo ViewBag.Error que tenías *@
+            @if (ViewBag.Error != null)
+            {
+                <div class="alert-error" id="alertError">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <span>@ViewBag.Error</span>
+                    <button class="btn-close-error" onclick="document.getElementById('alertError').remove()"
+                            type="button" aria-label="Cerrar">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </div>
+            }
+
+            @* Formulario — mismos name que tenías: nombreUsuario, contraseña *@
+            <form method="post" asp-controller="Account" asp-action="Login">
+                @Html.AntiForgeryToken()
+
+                @* Usuario *@
+                <div class="field-group">
+                    <label for="nombreUsuario">Usuario</label>
+                    <div class="field-input-wrap">
+                        <i class="bi bi-person"></i>
+                        <input type="text"
+                               id="nombreUsuario"
+                               name="nombreUsuario"
+                               placeholder="Ingresa tu usuario"
+                               required autofocus
+                               autocomplete="username" />
+                    </div>
+                </div>
+
+                @* Contraseña *@
+                <div class="field-group">
+                    <label for="contraseña">Contraseña</label>
+                    <div class="field-input-wrap">
+                        <i class="bi bi-lock"></i>
+                        <input type="password"
+                               id="contraseña"
+                               name="contraseña"
+                               placeholder="••••••••"
+                               required
+                               autocomplete="current-password" />
+                        <button type="button" class="toggle-pass" id="togglePass"
+                                aria-label="Ver contraseña">
+                            <i class="bi bi-eye" id="toggleIcon"></i>
+                        </button>
+                    </div>
+                </div>
+
+                @* Sede *@
+                <div class="field-group">
+                    <label for="idSede">Sede</label>
+                    <div class="select-wrap">
+                        <i class="bi bi-building icon-left"></i>
+                        <select id="idSede" name="idSede" required>
+                            <option value="" disabled selected>Selecciona tu sede</option>
+                            @if (ViewBag.Sedes != null)
+                            {
+                                foreach (var sede in ViewBag.Sedes)
+                                {
+                                    <option value="@sede.IdSede">@sede.Nombre</option>
+                                }
+                            }
+                        </select>
+                        <i class="bi bi-chevron-down icon-right"></i>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-login">
+                    <i class="bi bi-box-arrow-in-right"></i>
+                    Ingresar al Sistema
+                </button>
+
+            </form>
+        </div>
+
+        <!-- Footer -->
+        <div class="login-footer">
+            © 2025 <strong>Distribuidora Golocentro</strong> · Todos los derechos reservados
+        </div>
+
+    </div>
+
+    <script>
+            // Toggle mostrar/ocultar contraseña
+            document.getElementById('togglePass').addEventListener('click', function () {
+                const input = document.getElementById('contraseña');
+                const icon  = document.getElementById('toggleIcon');
+                if (input.type === 'password') {
+                    input.type = 'text';
+                    icon.className = 'bi bi-eye-slash';
+                } else {
+                    input.type = 'password';
+                    icon.className = 'bi bi-eye';
+                }
+            });
+    </script>
+
+</body>
+</html>

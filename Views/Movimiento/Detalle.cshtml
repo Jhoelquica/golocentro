@@ -1,0 +1,100 @@
+﻿@model GestionAlmacen_Golocentro.Models.Movimiento
+@{
+    ViewData["Title"] = $"Movimiento #{Model.IdMovimiento}";
+}
+
+<div class="container">
+    <a asp-action="Index" class="btn btn-outline-secondary mb-3">
+        <i class="bi bi-arrow-left"></i> Volver a lista
+    </a>
+
+    <div class="card shadow mb-4">
+        <div class="card-header bg-dark text-white">
+            <h4 class="mb-0"><i class="bi bi-box-arrow-@(Model.Tipo == "Entrada" ? "in" : "up")"></i> Movimiento de @Model.Tipo</h4>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>ID Movimiento:</strong> @Model.IdMovimiento</p>
+                    <p><strong>Fecha:</strong> @Model.Fecha.ToString("dd/MM/yyyy HH:mm")</p>
+                    <p><strong>Tipo:</strong> <span class="badge bg-@(Model.Tipo == "Entrada" ? "success" : "warning")">@Model.Tipo</span></p>
+                    <p><strong>Usuario:</strong> @Model.IdUsuarioNavigation?.Nombre</p>
+                    <p><strong>Sede:</strong> @Model.IdSedeNavigation?.Nombre</p>
+                </div>
+                <div class="col-md-6">
+                    @if (Model.Tipo == "Entrada")
+                    {
+                        <p><strong>Proveedor:</strong> @Model.IdProveedorNavigation?.Nombre</p>
+                        <p><strong>Factura:</strong> @(Model.ComprobanteEmitido ? "Emitida" : "No emitida")</p>
+                    }
+                    else
+                    {
+                        <p><strong>Cliente:</strong> @Model.IdClienteNavigation?.Nombre</p>
+                        <p><strong>Pedido:</strong> @(Model.ComprobanteEmitido ? "Emitido" : "No emitido")</p>
+                    }
+                    <p><strong>Observaciones:</strong> @(string.IsNullOrEmpty(Model.Observaciones) ? "Ninguna" : Model.Observaciones)</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detalle de productos -->
+    <h5 class="mb-3"><i class="bi bi-list-ul"></i> Productos incluidos</h5>
+    @if (Model.DetalleMovimientos != null && Model.DetalleMovimientos.Any())
+    {
+        <table class="table table-striped table-bordered">
+            <thead class="table-secondary">
+                <tr>
+                    <th>Producto</th>
+                    <th>Cantidad</th>
+                    <th>Ubicación</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var detalle in Model.DetalleMovimientos)
+                {
+                    <tr>
+                        <td>@detalle.IdProductoNavigation?.Nombre</td>
+                        <td>@detalle.Cantidad</td>
+                        <td>@detalle.IdUbicacionNavigation?.CodigoEstante</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    else
+    {
+        <div class="alert alert-info">No hay productos registrados en este movimiento.</div>
+    }
+
+    <!-- Evidencias -->
+    <h5 class="mb-3 mt-4"><i class="bi bi-images"></i> Evidencias</h5>
+    @if (Model.Evidencia != null && Model.Evidencia.Any())
+    {
+        <div class="row">
+            @foreach (var ev in Model.Evidencia)
+            {
+                <div class="col-md-3 mb-3">
+                    <div class="card">
+                        <a href="@ev.UrlArchivo" target="_blank">
+                            <img src="@ev.UrlArchivo" class="card-img-top" alt="Evidencia" style="max-height:200px; object-fit:cover;">
+                        </a>
+                        <div class="card-body p-2 text-center">
+                            <small class="text-muted">@ev.Fecha.ToString("dd/MM/yyyy HH:mm")</small>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info">No hay evidencias adjuntas.</div>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        // Opcional: ampliar imagen al hacer clic
+    </script>
+}

@@ -1,0 +1,74 @@
+﻿@model IEnumerable<GestionAlmacen_Golocentro.ViewModels.AlertaViewModel>
+@{
+    ViewData["Title"] = "Panel de Alertas";
+}
+
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-exclamation-triangle-fill text-warning"></i> @ViewData["Title"]</h2>
+        <form method="post" asp-action="GenerarAlertas">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-arrow-repeat"></i> Actualizar Alertas
+            </button>
+        </form>
+    </div>
+
+    @if (TempData["Mensaje"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            @TempData["Mensaje"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <p class="text-muted mb-3">
+        Sede: <strong>@ViewBag.SedeNombre</strong>
+    </p>
+
+    @if (!Model.Any())
+    {
+        <div class="alert alert-info"><i class="bi bi-check-circle"></i> No hay alertas activas en este momento.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Tipo</th>
+                        <th>Mensaje</th>
+                        <th>Producto</th>
+                        <th>Fecha</th>
+                        <th>Sede</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var alerta in Model)
+                    {
+                        string icono = alerta.Tipo switch
+                        {
+                            "stock_minimo" => "bi bi-exclamation-triangle text-danger",
+                            "vencimiento" => "bi bi-calendar-x text-warning",
+                            "sobrestock" => "bi bi-arrow-up-circle text-info",
+                            _ => "bi bi-bell"
+                        };
+                        <tr>
+                            <td><i class="@icono fs-5"></i> @alerta.Tipo</td>
+                            <td>@alerta.Mensaje</td>
+                            <td>@alerta.ProductoNombre</td>
+                            <td>@alerta.Fecha?.ToString("dd/MM/yyyy HH:mm")</td>
+                            <td>@alerta.SedeNombre</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        // Funcionalidad adicional (marcar resueltas, etc.)
+    </script>
+}
