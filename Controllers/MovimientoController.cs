@@ -18,6 +18,23 @@ namespace GestionAlmacen_Golocentro.Controllers
             _context = context;
         }
 
+        // Extrae el UsuarioId del claim de forma segura.
+        // Devuelve un IActionResult (redirect a Login) si el claim falta o está vacío;
+        // si devuelve null, usuarioId ya quedó seteado y es seguro continuar.
+        [NonAction]
+        private IActionResult? ObtenerUsuarioIdOFallar(out int usuarioId)
+        {
+            var usuarioIdClaim = User.FindFirst("UsuarioId")?.Value;
+            if (string.IsNullOrEmpty(usuarioIdClaim))
+            {
+                usuarioId = 0;
+                return RedirectToAction("Login", "Account");
+            }
+
+            usuarioId = int.Parse(usuarioIdClaim);
+            return null;
+        }
+
         // GET: Movimiento/ObtenerStock
         [HttpGet]
         public async Task<IActionResult> ObtenerStock(int productoId, int ubicacionId)
@@ -69,7 +86,10 @@ namespace GestionAlmacen_Golocentro.Controllers
         {
             string sedeIdClaim = User.FindFirst("SedeId")?.Value;
             int? sedeId = string.IsNullOrEmpty(sedeIdClaim) ? (int?)null : int.Parse(sedeIdClaim);
-            int usuarioId = int.Parse(User.FindFirst("UsuarioId").Value);
+
+            var redirectSiFalla = ObtenerUsuarioIdOFallar(out int usuarioId);
+            if (redirectSiFalla != null)
+                return redirectSiFalla;
 
             // 1. Validar que haya al menos un detalle
             if (model.Detalles == null || !model.Detalles.Any())
@@ -310,7 +330,10 @@ namespace GestionAlmacen_Golocentro.Controllers
         {
             string sedeIdClaim = User.FindFirst("SedeId")?.Value;
             int? sedeId = string.IsNullOrEmpty(sedeIdClaim) ? (int?)null : int.Parse(sedeIdClaim);
-            int usuarioId = int.Parse(User.FindFirst("UsuarioId").Value);
+
+            var redirectSiFalla = ObtenerUsuarioIdOFallar(out int usuarioId);
+            if (redirectSiFalla != null)
+                return redirectSiFalla;
 
             // Validaciones
             if (model.Items == null || !model.Items.Any())

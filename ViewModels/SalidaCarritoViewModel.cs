@@ -35,7 +35,7 @@ namespace GestionAlmacen_Golocentro.ViewModels
         public decimal PrecioUnitario { get; set; }
         public decimal Subtotal => Cantidad * PrecioUnitario;
         public string NombreProducto { get; set; }
-        public string CodigoUbicacion { get; set; }
+        public string? CodigoUbicacion { get; set; }
         public int StockDisponible { get; set; }
     }
 }

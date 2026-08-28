@@ -23,7 +23,11 @@ namespace GestionAlmacen_Golocentro.Controllers
         [Authorize]
         public async Task<IActionResult> Perfil()
         {
-            var idUsuario = int.Parse(User.FindFirst("UsuarioId")?.Value ?? "0");
+            var idUsuarioClaim = User.FindFirst("UsuarioId")?.Value;
+            if (string.IsNullOrEmpty(idUsuarioClaim))
+                return RedirectToAction("Login", "Account");
+
+            var idUsuario = int.Parse(idUsuarioClaim);
             var usuario = await _context.Usuarios.FindAsync(idUsuario);
             if (usuario == null) return NotFound();
             return View(usuario);
@@ -64,7 +68,11 @@ namespace GestionAlmacen_Golocentro.Controllers
                 return View();
             }
 
-            var idUsuario = int.Parse(User.FindFirst("UsuarioId")?.Value ?? "0");
+            var idUsuarioClaim = User.FindFirst("UsuarioId")?.Value;
+            if (string.IsNullOrEmpty(idUsuarioClaim))
+                return RedirectToAction("Login", "Account");
+
+            var idUsuario = int.Parse(idUsuarioClaim);
             var usuario = await _context.Usuarios.FindAsync(idUsuario);
             if (usuario == null) return NotFound();
 
