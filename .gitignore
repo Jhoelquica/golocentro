@@ -40,6 +40,10 @@ appsettings.Production.json
 wwwroot/uploads/*
 !wwwroot/uploads/.gitkeep
 
+## Ignorar evidencias de movimientos (fotos reales subidas por usuarios, no versionar)
+wwwroot/evidencias/*
+!wwwroot/evidencias/.gitkeep
+
 ## Ignorar logs y temporales
 logs/
 *.log
