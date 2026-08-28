@@ -218,7 +218,21 @@ namespace GestionAlmacen_Golocentro.Controllers
             var ubicacionesQuery = _context.Ubicaciones.AsQueryable();
             if (sedeId.HasValue)
                 ubicacionesQuery = ubicacionesQuery.Where(u => u.IdSede == sedeId.Value);
-            ViewBag.Ubicaciones = new SelectList(ubicacionesQuery.ToList(), "IdUbicacion", "Nombre");
+
+            // SelectList no soporta texto combinado directamente, así que proyectamos
+            // a un objeto con "Texto" calculado: "CodigoEstante — Descripcion" si hay
+            // descripción, o solo "CodigoEstante" si es null/vacía.
+            var ubicacionesParaLista = ubicacionesQuery
+                .ToList()
+                .Select(u => new
+                {
+                    u.IdUbicacion,
+                    Texto = string.IsNullOrEmpty(u.Descripcion)
+                        ? u.CodigoEstante
+                        : $"{u.CodigoEstante} — {u.Descripcion}"
+                });
+            ViewBag.Ubicaciones = new SelectList(ubicacionesParaLista, "IdUbicacion", "Texto");
+
             ViewBag.Proveedores = new SelectList(_context.Proveedores, "IdProveedor", "Nombre");
             return View("Entrada");
         }
