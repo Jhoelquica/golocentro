@@ -134,10 +134,11 @@ namespace GestionAlmacen_Golocentro.Controllers
 
             // Buscar usuario en la base de datos
             // OJO: la propiedad se llama "Usuario1", no "NombreUsuario"
+            // Primero buscamos solo por usuario (no por contraseña, porque ahora está hasheada)
             var usuario = await _context.Usuarios
-                .FirstOrDefaultAsync(u => u.Usuario1 == nombreUsuario && u.Contrasena == contraseña);
+                .FirstOrDefaultAsync(u => u.Usuario1 == nombreUsuario);
 
-            if (usuario == null)
+            if (usuario == null || !BCrypt.Net.BCrypt.Verify(contraseña, usuario.Contrasena))
             {
                 ViewBag.Error = "Usuario o contraseña incorrectos.";
                 return View();
