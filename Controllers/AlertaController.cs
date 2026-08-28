@@ -60,9 +60,10 @@ namespace GestionAlmacen_Golocentro.Controllers
         [HttpGet]
         public IActionResult ConteoActivas()
         {
-            var idSede = int.Parse(User.FindFirst("SedeId")?.Value ?? "0");
-            var total = _context.Alerta
-                .Count(a => a.IdSede == idSede && a.Estado == "pendiente");
+            var sedeIdClaim = User.FindFirst("SedeId")?.Value;
+            int? idSede = string.IsNullOrEmpty(sedeIdClaim) ? (int?)null : int.Parse(sedeIdClaim);
+            var total = _context.Alerta.Count(a =>
+                (!idSede.HasValue || a.IdSede == idSede.Value) && a.Estado == "pendiente");
             return Json(new { total });
         }
 
@@ -85,25 +86,33 @@ namespace GestionAlmacen_Golocentro.Controllers
                     .Select(pu => pu.IdUbicacionNavigation.IdSede)
                     .Distinct();
 
+                // Stock real por sede: suma de ProductoUbicacion.CantidadActual
+                // agrupado por sede (fuente de verdad; Producto.StockActual ya no se usa aquí).
+                var stockPorSede = producto.ProductoUbicacions
+                    .GroupBy(pu => pu.IdUbicacionNavigation.IdSede)
+                    .ToDictionary(g => g.Key, g => g.Sum(pu => pu.CantidadActual));
+
                 foreach (int sedeProducto in sedesDelProducto)
                 {
                     if (sedeId.HasValue && sedeProducto != sedeId.Value)
                         continue;
 
-                    // ---- Alerta por stock mínimo ----
-                    if (producto.StockActual <= producto.StockMinimo)
-                    {
-                        bool existeAlerta = _context.Alerta.Any(a =>
-                            a.IdProducto == producto.IdProducto &&
-                            a.Tipo == "stock_minimo" &&
-                            a.Estado == "pendiente" &&
-                            a.IdSede == sedeProducto);
+                    int stockEnSede = stockPorSede.GetValueOrDefault(sedeProducto, 0);
 
-                        if (!existeAlerta)
+                    // ---- Alerta por stock mínimo ----
+                    var alertaStockExistente = _context.Alerta.FirstOrDefault(a =>
+                        a.IdProducto == producto.IdProducto &&
+                        a.Tipo == "stock_minimo" &&
+                        a.Estado == "pendiente" &&
+                        a.IdSede == sedeProducto);
+
+                    if (stockEnSede <= producto.StockMinimo)
+                    {
+                        if (alertaStockExistente == null)
                         {
                             var alerta = new Alertum
                             {
-                                Mensaje = $"Stock bajo: {producto.Nombre} ({producto.StockActual} unidades, mínimo {producto.StockMinimo})",
+                                Mensaje = $"Stock bajo: {producto.Nombre} ({stockEnSede} unidades, mínimo {producto.StockMinimo})",
                                 FechaGenerada = DateTime.Now,
                                 Tipo = "stock_minimo",
                                 IdProducto = producto.IdProducto,
@@ -112,34 +121,58 @@ namespace GestionAlmacen_Golocentro.Controllers
                             };
                             _context.Alerta.Add(alerta);
                         }
+                        else
+                        {
+                            // Ya existe pendiente: refrescar el mensaje con el stock actual,
+                            // sin tocar FechaGenerada ni duplicar.
+                            alertaStockExistente.Mensaje = $"Stock bajo: {producto.Nombre} ({stockEnSede} unidades, mínimo {producto.StockMinimo})";
+                        }
+                    }
+                    else if (alertaStockExistente != null)
+                    {
+                        // El stock se recuperó: la alerta pendiente ya no aplica.
+                        alertaStockExistente.Estado = "atendida";
+                        alertaStockExistente.FechaAtendida = DateTime.Now;
                     }
 
                     // ---- Alerta por vencimiento próximo ----
+                    var alertaVencimientoExistente = _context.Alerta.FirstOrDefault(a =>
+                        a.IdProducto == producto.IdProducto &&
+                        a.Tipo == "vencimiento" &&
+                        a.Estado == "pendiente" &&
+                        a.IdSede == sedeProducto);
+
+                    bool vencimientoProximo = false;
                     if (producto.FechaVencimiento.HasValue)
                     {
                         var diasRestantes = producto.FechaVencimiento.Value.ToDateTime(TimeOnly.MinValue) - DateTime.Today;
-                        if (diasRestantes.TotalDays <= 30)
-                        {
-                            bool existeAlerta = _context.Alerta.Any(a =>
-                                a.IdProducto == producto.IdProducto &&
-                                a.Tipo == "vencimiento" &&
-                                a.Estado == "pendiente" &&
-                                a.IdSede == sedeProducto);
+                        vencimientoProximo = diasRestantes.TotalDays <= 30;
+                    }
 
-                            if (!existeAlerta)
+                    if (vencimientoProximo)
+                    {
+                        if (alertaVencimientoExistente == null)
+                        {
+                            var alerta = new Alertum
                             {
-                                var alerta = new Alertum
-                                {
-                                    Mensaje = $"Próximo a vencer: {producto.Nombre} (lote {producto.Lote}) – {producto.FechaVencimiento:dd/MM/yyyy}",
-                                    FechaGenerada = DateTime.Now,
-                                    Tipo = "vencimiento",
-                                    IdProducto = producto.IdProducto,
-                                    IdSede = sedeProducto,
-                                    Estado = "pendiente"
-                                };
-                                _context.Alerta.Add(alerta);
-                            }
+                                Mensaje = $"Próximo a vencer: {producto.Nombre} (lote {producto.Lote}) – {producto.FechaVencimiento:dd/MM/yyyy}",
+                                FechaGenerada = DateTime.Now,
+                                Tipo = "vencimiento",
+                                IdProducto = producto.IdProducto,
+                                IdSede = sedeProducto,
+                                Estado = "pendiente"
+                            };
+                            _context.Alerta.Add(alerta);
                         }
+                        else
+                        {
+                            alertaVencimientoExistente.Mensaje = $"Próximo a vencer: {producto.Nombre} (lote {producto.Lote}) – {producto.FechaVencimiento:dd/MM/yyyy}";
+                        }
+                    }
+                    else if (alertaVencimientoExistente != null)
+                    {
+                        alertaVencimientoExistente.Estado = "atendida";
+                        alertaVencimientoExistente.FechaAtendida = DateTime.Now;
                     }
                 }
             }

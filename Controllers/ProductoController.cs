@@ -20,11 +20,31 @@ namespace GestionAlmacen_Golocentro.Controllers
         // GET: Producto/Index (lista)
         public async Task<IActionResult> Index(int? pagina, int tamanoPagina = 10)
         {
+            string sedeIdClaim = User.FindFirst("SedeId")?.Value;
+            int? sedeId = string.IsNullOrEmpty(sedeIdClaim) ? (int?)null : int.Parse(sedeIdClaim);
+
             var query = _context.Productos.OrderBy(p => p.Nombre).AsQueryable();
             int total = await query.CountAsync();
             int paginaActual = pagina ?? 1;
             int totalPaginas = (int)Math.Ceiling(total / (double)tamanoPagina);
-            var productos = await query.Skip((paginaActual - 1) * tamanoPagina).Take(tamanoPagina).ToListAsync();
+
+            var productos = await query
+                .Skip((paginaActual - 1) * tamanoPagina)
+                .Take(tamanoPagina)
+                .Select(p => new ProductoListViewModel
+                {
+                    IdProducto = p.IdProducto,
+                    Nombre = p.Nombre,
+                    Tipo = p.Tipo,
+                    Codigo = p.Codigo,
+                    UnidadMedida = p.UnidadMedida,
+                    PrecioUnitario = p.PrecioUnitario,
+                    StockMinimo = p.StockMinimo,
+                    StockActual = p.ProductoUbicacions
+                        .Where(pu => !sedeId.HasValue || pu.IdUbicacionNavigation.IdSede == sedeId.Value)
+                        .Sum(pu => (int?)pu.CantidadActual) ?? 0
+                })
+                .ToListAsync();
 
             ViewBag.PaginaActual = paginaActual;
             ViewBag.TotalPaginas = totalPaginas;
@@ -76,6 +96,14 @@ namespace GestionAlmacen_Golocentro.Controllers
             {
                 try
                 {
+                    // El formulario de Edit no envía StockActual (fuente de verdad real:
+                    // ProductoUbicacion.CantidadActual). Sin esto, el binder lo deja en 0
+                    // y _context.Update(producto) lo sobrescribiría en la BD.
+                    producto.StockActual = await _context.Productos
+                        .Where(p => p.IdProducto == id)
+                        .Select(p => p.StockActual)
+                        .FirstOrDefaultAsync();
+
                     _context.Update(producto);
                     await _context.SaveChangesAsync();
                     TempData["Mensaje"] = $"Producto '{producto.Nombre}' actualizado.";
