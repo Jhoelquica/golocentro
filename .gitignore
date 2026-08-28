@@ -30,9 +30,15 @@ bower_components/
 lib/
 wwwroot/lib/
 
-## Ignorar configuraciones sensibles (descomenta si aplica)
-# appsettings.json
-# appsettings.*.json
+## Ignorar configuraciones sensibles
+appsettings.json
+appsettings.Development.json
+appsettings.Production.json
+!appsettings.Example.json
+
+## Ignorar uploads de usuario (fotos/evidencias reales, no versionar)
+wwwroot/uploads/*
+!wwwroot/uploads/.gitkeep
 
 ## Ignorar logs y temporales
 logs/
