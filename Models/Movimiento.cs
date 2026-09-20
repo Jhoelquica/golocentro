@@ -31,7 +31,7 @@ public partial class Movimiento
 
     public virtual Proveedor? IdProveedorNavigation { get; set; }
 
-    public virtual Sede IdSedeNavigation { get; set; } = null!;
+    public virtual Sede? IdSedeNavigation { get; set; }
 
     public virtual Usuario IdUsuarioNavigation { get; set; } = null!;
 }
