@@ -11,23 +11,27 @@
     <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
             /* =============================================
-               VARIABLES — Paleta Golocentro
+               VARIABLES — Paleta Golocentro v2 (Inventory & Stock Management)
+               Migrado desde navy/teal/sage/cream. Nombres de variable conservados
+               por compatibilidad (usados en ~90 sitios), pero ahora mapean a la
+               paleta slate + verde stock. Contraste verificado contra WCAG AA
+               (4.5:1 texto normal) para cada par fondo/texto real del archivo.
             ============================================= */
             :root {
-                --g-black:  #000000;
-                --g-navy:   #001F36;
-                --g-teal:   #1C5560;
-                --g-sage:   #79AE92;
-                --g-cream:  #FBFFCD;
-                --g-white:  #FFFFFF;
-                --g-bg:     #F0F4F7;
-                --g-border: rgba(121,174,146,0.2);
-                --g-text:   #001F36;
-                --g-muted:  #5a7d6e;
+                --g-navy:   #334155;   /* antes #001F36 — fondo sidebar, texto oscuro sobre blanco */
+                --g-teal:   #047857;   /* antes #1C5560 — acento/verde stock, ajustado a 5.48:1 (el #059669 "puro" del design system falla AA con texto blanco encima) */
+                --g-sage:   #CBD5E1;   /* antes #79AE92 — texto secundario sobre fondo oscuro, 6.97:1 */
+                --g-cream:  #FFFFFF;   /* antes #FBFFCD — texto de alto énfasis sobre sidebar/acento */
+                --g-white:  #FFFFFF;   /* sin cambio — superficies/tarjetas */
+                --g-bg:     #F8FAFC;   /* antes #F0F4F7 — fondo de página */
+                --g-border: #E6E8EA;   /* antes rgba(121,174,146,0.2) — ahora sólido */
+                --g-text:   #0F172A;   /* antes #001F36 — texto de cuerpo */
+                --g-muted:  #475569;   /* antes #5a7d6e — texto secundario sobre blanco, 7.58:1 */
+                --g-danger: #DC2626;   /* nuevo — unifica los rojos sueltos (#e74c3c/#c0392b) que había antes */
                 --sidebar-w: 230px;
                 --topbar-h:  62px;
                 --radius:    10px;
@@ -37,7 +41,7 @@
             * { box-sizing: border-box; margin: 0; padding: 0; }
 
             body {
-                font-family: 'Plus Jakarta Sans', sans-serif;
+                font-family: 'Inter', sans-serif;
                 background: var(--g-bg);
                 color: var(--g-text);
                 min-height: 100vh;
@@ -64,7 +68,7 @@
                 align-items: center;
                 gap: 10px;
                 padding: 1.25rem 1.2rem;
-                border-bottom: 1px solid rgba(121,174,146,0.15);
+                border-bottom: 1px solid rgba(255,255,255,0.12);
                 text-decoration: none;
             }
             .g-brand-icon {
@@ -90,7 +94,7 @@
 
             .g-nav-section {
                 font-size: 10px; font-weight: 600;
-                color: rgba(121,174,146,0.5);
+                color: var(--g-sage);
                 letter-spacing: 0.1em;
                 text-transform: uppercase;
                 padding: 0.6rem 0.6rem 0.3rem;
@@ -101,7 +105,7 @@
                 display: flex; align-items: center; gap: 10px;
                 padding: 9px 12px;
                 border-radius: var(--radius);
-                color: rgba(251,255,205,0.65);
+                color: rgba(255,255,255,0.65);
                 text-decoration: none;
                 font-size: 13px; font-weight: 500;
                 transition: background var(--transition), color var(--transition);
@@ -110,7 +114,7 @@
             }
             .g-nav-link i { font-size: 17px; flex-shrink: 0; }
             .g-nav-link:hover {
-                background: rgba(28,85,96,0.5);
+                background: rgba(4,120,87,0.5);
                 color: var(--g-cream);
             }
             .g-nav-link.active {
@@ -119,7 +123,7 @@
             }
             .g-nav-link .badge-alert {
                 margin-left: auto;
-                background: #e74c3c;
+                background: var(--g-danger);
                 color: #fff;
                 font-size: 10px; font-weight: 600;
                 padding: 1px 6px;
@@ -130,7 +134,7 @@
             /* Sidebar footer */
             .g-sidebar-footer {
                 padding: 1rem;
-                border-top: 1px solid rgba(121,174,146,0.15);
+                border-top: 1px solid rgba(255,255,255,0.12);
             }
             .g-sidebar-user {
                 display: flex; align-items: center; gap: 10px;
@@ -146,7 +150,7 @@
                 width: 36px; height: 36px;
                 border-radius: 50%;
                 background: var(--g-teal);
-                border: 2px solid rgba(121,174,146,0.4);
+                border: 2px solid rgba(255,255,255,0.35);
                 display: flex; align-items: center; justify-content: center;
                 flex-shrink: 0;
                 font-size: 14px; font-weight: 600;
@@ -202,12 +206,12 @@
             /* Sede badge */
             .g-sede-badge {
                 display: flex; align-items: center; gap: 5px;
-                background: rgba(28,85,96,0.08);
+                background: rgba(4,120,87,0.08);
                 color: var(--g-teal);
                 font-size: 12px; font-weight: 500;
                 padding: 5px 12px;
                 border-radius: 20px;
-                border: 1px solid rgba(28,85,96,0.2);
+                border: 1px solid rgba(4,120,87,0.2);
             }
             .g-sede-badge i { font-size: 13px; }
 
@@ -227,7 +231,7 @@
             .g-topbar-btn .dot {
                 position: absolute; top: 7px; right: 7px;
                 width: 7px; height: 7px;
-                background: #e74c3c;
+                background: var(--g-danger);
                 border-radius: 50%;
                 border: 1.5px solid var(--g-white);
             }
@@ -257,7 +261,7 @@
                 display: flex; align-items: center; justify-content: center;
                 font-size: 12px; font-weight: 600;
                 color: var(--g-cream);
-                border: 2px solid rgba(28,85,96,0.3);
+                border: 2px solid rgba(4,120,87,0.3);
             }
             .g-profile-name {
                 font-size: 13px; font-weight: 500;
@@ -276,7 +280,7 @@
                 background: var(--g-white);
                 border: 1px solid var(--g-border);
                 border-radius: var(--radius);
-                box-shadow: 0 8px 24px rgba(0,31,54,0.1);
+                box-shadow: 0 8px 24px rgba(15,23,42,0.1);
                 display: none;
                 z-index: 2000;
                 overflow: hidden;
@@ -302,8 +306,8 @@
             }
             .g-dropdown-item:hover { background: var(--g-bg); }
             .g-dropdown-item i { font-size: 15px; color: var(--g-teal); }
-            .g-dropdown-item.danger { color: #c0392b; }
-            .g-dropdown-item.danger i { color: #c0392b; }
+            .g-dropdown-item.danger { color: var(--g-danger); }
+            .g-dropdown-item.danger i { color: var(--g-danger); }
             .g-dropdown-divider {
                 height: 1px; background: var(--g-border); margin: 2px 0;
             }
@@ -370,7 +374,7 @@
                 transition: background var(--transition);
                 font-family: inherit;
             }
-            .btn-g-primary:hover { background: #17464f; color: var(--g-cream); }
+            .btn-g-primary:hover { background: #065F46; color: var(--g-cream); }
             .btn-g-outline {
                 background: transparent;
                 color: var(--g-teal);
@@ -387,20 +391,20 @@
                 color: var(--g-cream);
             }
             .badge-entrada {
-                background: rgba(28,85,96,0.12);
+                background: rgba(4,120,87,0.12);
                 color: var(--g-teal);
                 font-size: 11px; font-weight: 600;
                 padding: 3px 9px; border-radius: 20px;
             }
             .badge-salida {
-                background: rgba(192,57,43,0.1);
-                color: #c0392b;
+                background: rgba(220,38,38,0.1);
+                color: var(--g-danger);
                 font-size: 11px; font-weight: 600;
                 padding: 3px 9px; border-radius: 20px;
             }
             .badge-alerta {
-                background: rgba(231,76,60,0.1);
-                color: #e74c3c;
+                background: rgba(220,38,38,0.1);
+                color: var(--g-danger);
                 font-size: 11px; font-weight: 600;
                 padding: 3px 9px; border-radius: 20px;
             }
