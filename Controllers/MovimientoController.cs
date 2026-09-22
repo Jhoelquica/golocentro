@@ -298,29 +298,28 @@ namespace GestionAlmacen_Golocentro.Controllers
 
             return View(new SalidaCarritoViewModel());
         }
-        // POST: Movimiento/CrearClienteRapido (SIN AJAX)
+        // POST: Movimiento/CrearClienteRapido (AJAX — lo consume el modal de Salida.cshtml)
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CrearClienteRapido(ClienteRapidoViewModel model)
         {
             if (!ModelState.IsValid)
             {
-                TempData["Error"] = "Datos del cliente inválidos.";
-                return RedirectToAction("Salida");
+                var errores = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage);
+                return Json(new { success = false, errors = errores });
             }
 
             var cliente = new Cliente
             {
                 Nombre = model.Nombre,
-                RucDni = model.RucDni ?? "S/D",
+                RucDni = model.RucDni,
                 Contacto = model.Contacto,
                 Direccion = model.Direccion
             };
             _context.Clientes.Add(cliente);
             await _context.SaveChangesAsync();
 
-            TempData["Mensaje"] = $"Cliente '{cliente.Nombre}' registrado correctamente.";
-            return RedirectToAction("Salida");
+            return Json(new { success = true, clienteId = cliente.IdCliente, nombre = cliente.Nombre });
         }
 
         // POST: Movimiento/Salida (NUEVO - Versión carrito)

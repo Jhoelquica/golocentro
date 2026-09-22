@@ -21,6 +21,7 @@
 
     <form method="post" asp-action="Salida" enctype="multipart/form-data" id="formSalida">
         @Html.AntiForgeryToken()
+        <input type="hidden" asp-for="TotalGeneral" id="TotalGeneral" />
 
         <!-- Fila superior: Cliente y Comprobante -->
         <div class="row mb-3">
@@ -115,7 +116,7 @@
 <div class="modal fade" id="modalNuevoCliente" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form method="post" asp-action="CrearClienteRapido" asp-controller="Movimiento">
+            <form method="post" asp-action="CrearClienteRapido" asp-controller="Movimiento" id="formNuevoCliente">
                 @Html.AntiForgeryToken()
                 <div class="modal-header bg-success text-white">
                     <h5 class="modal-title"><i class="bi bi-person-plus"></i> Registrar Nuevo Cliente</h5>
@@ -123,25 +124,25 @@
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label">Nombre o Razón Social <span class="text-danger">*</span></label>
-                        <input type="text" name="Nombre" class="form-control" required />
+                        <label class="form-label" for="clienteNombre">Nombre o Razón Social <span class="text-danger">*</span></label>
+                        <input type="text" id="clienteNombre" name="Nombre" class="form-control" required />
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">RUC / DNI</label>
-                        <input type="text" name="RucDni" class="form-control" />
+                        <label class="form-label" for="clienteRucDni">RUC / DNI <span class="text-danger">*</span></label>
+                        <input type="text" id="clienteRucDni" name="RucDni" class="form-control" required minlength="8" maxlength="11" />
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Contacto</label>
-                        <input type="text" name="Contacto" class="form-control" />
+                        <label class="form-label" for="clienteContacto">Contacto</label>
+                        <input type="text" id="clienteContacto" name="Contacto" class="form-control" />
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Dirección</label>
-                        <input type="text" name="Direccion" class="form-control" />
+                        <label class="form-label" for="clienteDireccion">Dirección</label>
+                        <input type="text" id="clienteDireccion" name="Direccion" class="form-control" />
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-success"><i class="bi bi-check-lg"></i> Guardar Cliente</button>
+                    <button type="submit" class="btn btn-success" id="btnGuardarCliente"><i class="bi bi-check-lg"></i> Guardar Cliente</button>
                 </div>
             </form>
         </div>
@@ -301,7 +302,9 @@
         }
 
         // ======= REGISTRAR NUEVO CLIENTE (AJAX) =======
-        document.getElementById('btnGuardarCliente').addEventListener('click', async function() {
+        document.getElementById('formNuevoCliente').addEventListener('submit', async function(event) {
+            event.preventDefault();
+
             const nombre = document.getElementById('clienteNombre').value.trim();
             if (!nombre) {
                 alert('El nombre del cliente es obligatorio.');
