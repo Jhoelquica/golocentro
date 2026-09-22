@@ -14,13 +14,13 @@
 
     .perfil-card {
         background: #fff;
-        border: 1px solid rgba(121,174,146,0.2);
+        border: 1px solid rgba(230,232,234,0.2);
         border-radius: 14px;
         overflow: hidden;
     }
-    /* Header con fondo teal */
+    /* Header con fondo primary */
     .perfil-header {
-        background: #001F36;
+        background: #334155;
         padding: 2rem;
         display: flex;
         align-items: center;
@@ -36,21 +36,21 @@
         height: 80px;
         border-radius: 50%;
         object-fit: cover;
-        border: 3px solid #79AE92;
+        border: 3px solid #CBD5E1;
     }
 
     .perfil-avatar-placeholder {
         width: 80px;
         height: 80px;
         border-radius: 50%;
-        background: #1C5560;
+        background: #047857;
         display: flex;
         align-items: center;
         justify-content: center;
         font-size: 28px;
         font-weight: 600;
-        color: #FBFFCD;
-        border: 3px solid #79AE92;
+        color: #FFFFFF;
+        border: 3px solid #CBD5E1;
     }
 
     .perfil-avatar-edit {
@@ -59,31 +59,31 @@
         right: 0;
         width: 26px;
         height: 26px;
-        background: #79AE92;
+        background: #CBD5E1;
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
         text-decoration: none;
-        border: 2px solid #001F36;
+        border: 2px solid #334155;
     }
 
         .perfil-avatar-edit i {
             font-size: 12px;
-            color: #001F36;
+            color: #334155;
         }
 
     .perfil-header-info h4 {
         font-size: 18px;
         font-weight: 600;
-        color: #FBFFCD;
+        color: #FFFFFF;
         margin-bottom: 2px;
     }
 
     .perfil-header-info .rol-badge {
         display: inline-block;
-        background: rgba(28,85,96,0.6);
-        color: #79AE92;
+        background: rgba(4,120,87,0.6);
+        color: #CBD5E1;
         font-size: 11px;
         font-weight: 600;
         padding: 3px 10px;
@@ -93,7 +93,7 @@
 
     .perfil-header-info .sede-text {
         font-size: 12px;
-        color: rgba(251,255,205,0.6);
+        color: rgba(255,255,255,0.6);
         margin-top: 4px;
         display: flex;
         align-items: center;
@@ -109,7 +109,7 @@
         display: flex;
         align-items: flex-start;
         padding: 12px 0;
-        border-bottom: 1px solid rgba(121,174,146,0.15);
+        border-bottom: 1px solid rgba(230,232,234,0.15);
         gap: 12px;
     }
 
@@ -120,7 +120,7 @@
     .perfil-field-icon {
         width: 32px;
         height: 32px;
-        background: rgba(28,85,96,0.08);
+        background: rgba(4,120,87,0.08);
         border-radius: 8px;
         display: flex;
         align-items: center;
@@ -130,7 +130,7 @@
 
         .perfil-field-icon i {
             font-size: 15px;
-            color: #1C5560;
+            color: #047857;
         }
 
     .perfil-field-info {
@@ -139,7 +139,7 @@
 
     .perfil-field-label {
         font-size: 11px;
-        color: #79AE92;
+        color: #475569;
         font-weight: 500;
         letter-spacing: 0.04em;
         margin-bottom: 2px;
@@ -148,7 +148,7 @@
     .perfil-field-value {
         font-size: 14px;
         font-weight: 500;
-        color: #001F36;
+        color: #0F172A;
     }
 
     /* Acciones */
@@ -161,8 +161,8 @@
     .btn-g-primary {
         flex: 1;
         padding: 10px;
-        background: #1C5560;
-        color: #FBFFCD;
+        background: #047857;
+        color: #FFFFFF;
         border: none;
         border-radius: 8px;
         font-size: 13px;
@@ -178,16 +178,16 @@
     }
 
         .btn-g-primary:hover {
-            background: #17464f;
-            color: #FBFFCD;
+            background: #065F46;
+            color: #FFFFFF;
         }
 
     .btn-g-outline {
         flex: 1;
         padding: 10px;
         background: transparent;
-        color: #1C5560;
-        border: 1px solid #1C5560;
+        color: #047857;
+        border: 1px solid #047857;
         border-radius: 8px;
         font-size: 13px;
         font-weight: 500;
@@ -202,8 +202,8 @@
     }
 
         .btn-g-outline:hover {
-            background: #1C5560;
-            color: #FBFFCD;
+            background: #047857;
+            color: #FFFFFF;
         }
 </style>
 
@@ -274,13 +274,13 @@
                     <div class="perfil-field-value">
                         @if (Model.Estado == "Activo")
                         {
-                            <span style="color:#1C5560; font-weight:600">
+                            <span style="color:#047857; font-weight:600">
                                 <i class="bi bi-circle-fill" style="font-size:8px;margin-right:4px"></i>Activo
                             </span>
                         }
                         else
                         {
-                            <span style="color:#c0392b; font-weight:600">
+                            <span style="color:#DC2626; font-weight:600">
                                 <i class="bi bi-circle-fill" style="font-size:8px;margin-right:4px"></i>Inactivo
                             </span>
                         }
