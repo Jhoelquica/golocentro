@@ -12,7 +12,7 @@ namespace GestionAlmacen_Golocentro.ViewModels
         public int? ClienteId { get; set; }
 
         [Display(Name = "Nº Comprobante")]
-        public string NumeroComprobante { get; set; }
+        public string? NumeroComprobante { get; set; }
 
         [Display(Name = "Evidencia")]
         public IFormFile? Evidencia { get; set; }

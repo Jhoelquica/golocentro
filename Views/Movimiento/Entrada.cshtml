@@ -55,14 +55,15 @@
         <!-- Datos generales -->
         <div class="row">
             <div class="col-md-4 mb-3">
-                <label asp-for="ProveedorId" class="form-label fw-bold">Proveedor (opcional)</label>
-                <select asp-for="ProveedorId" class="form-select">
-                    <option value="">-- Sin proveedor --</option>
+                <label asp-for="ProveedorId" class="form-label fw-bold">Proveedor <span class="text-danger">*</span></label>
+                <select asp-for="ProveedorId" class="form-select" required>
+                    <option value="">-- Seleccione proveedor --</option>
                     @foreach (var item in ViewBag.Proveedores as IEnumerable<SelectListItem>)
                     {
                         <option value="@item.Value">@item.Text</option>
                     }
                 </select>
+                <span asp-validation-for="ProveedorId" class="text-danger"></span>
             </div>
             <div class="col-md-4 mb-3">
                 <label asp-for="NumeroFactura" class="form-label fw-bold">Nº Factura / Guía</label>

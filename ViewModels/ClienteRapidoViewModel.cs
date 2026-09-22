@@ -7,10 +7,10 @@ namespace GestionAlmacen_Golocentro.ViewModels
         [Required(ErrorMessage = "El nombre es obligatorio")]
         public string Nombre { get; set; }
 
-        public string RucDni { get; set; }
+        public string? RucDni { get; set; }
 
-        public string Contacto { get; set; }
+        public string? Contacto { get; set; }
 
-        public string Direccion { get; set; }
+        public string? Direccion { get; set; }
     }
 }
