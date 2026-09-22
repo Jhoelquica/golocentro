@@ -118,7 +118,7 @@ namespace GestionAlmacen_Golocentro.Controllers
             // 3. Procesar cada detalle
             foreach (var detalleVM in model.Detalles)
             {
-                // Validar que la ubicación pertenezca a la sede (si el usuario no es dueña)
+                // Validar que la ubicación pertenezca a la sede (si el usuario no es duena)
                 if (sedeId.HasValue)
                 {
                     var ubicacion = await _context.Ubicaciones.FindAsync(detalleVM.UbicacionId);

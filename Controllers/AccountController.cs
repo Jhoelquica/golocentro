@@ -125,7 +125,6 @@ namespace GestionAlmacen_Golocentro.Controllers
         // GET: Account/Login
         public IActionResult Login()
         {
-            ViewBag.Sedes = _context.Sedes.ToList();
             return View();
         }
 
@@ -179,7 +178,7 @@ namespace GestionAlmacen_Golocentro.Controllers
             }
             else
             {
-                // dueña (id_sede NULL)
+                // duena (id_sede NULL)
                 claims.Add(new Claim("SedeId", ""));
                 claims.Add(new Claim("SedeNombre", "Todas las sedes"));
             }
@@ -197,7 +196,7 @@ namespace GestionAlmacen_Golocentro.Controllers
                 authProperties);
 
             // Redirigir según el rol
-            if (usuario.Rol == "dueña" || usuario.Rol == "encargada")
+            if (usuario.Rol == "duena" || usuario.Rol == "encargada")
                 return RedirectToAction("Index", "Home");
             else
                 return RedirectToAction("Index", "Movimiento");

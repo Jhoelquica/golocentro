@@ -380,25 +380,6 @@
                     </div>
                 </div>
 
-                @* Sede *@
-                <div class="field-group">
-                    <label for="idSede">Sede</label>
-                    <div class="select-wrap">
-                        <i class="bi bi-building icon-left"></i>
-                        <select id="idSede" name="idSede" required>
-                            <option value="" disabled selected>Selecciona tu sede</option>
-                            @if (ViewBag.Sedes != null)
-                            {
-                                foreach (var sede in ViewBag.Sedes)
-                                {
-                                    <option value="@sede.IdSede">@sede.Nombre</option>
-                                }
-                            }
-                        </select>
-                        <i class="bi bi-chevron-down icon-right"></i>
-                    </div>
-                </div>
-
                 <button type="submit" class="btn-login">
                     <i class="bi bi-box-arrow-in-right"></i>
                     Ingresar al Sistema

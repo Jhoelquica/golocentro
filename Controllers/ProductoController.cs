@@ -52,7 +52,7 @@ namespace GestionAlmacen_Golocentro.Controllers
         }
 
         // GET: Producto/Create
-        [Authorize(Roles = "dueña,encargada")]
+        [Authorize(Roles = "duena,encargada")]
         public IActionResult Create()
         {
             return View();
@@ -61,7 +61,7 @@ namespace GestionAlmacen_Golocentro.Controllers
         // POST: Producto/Create
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [Authorize(Roles = "dueña,encargada")]
+        [Authorize(Roles = "duena,encargada")]
         public async Task<IActionResult> Create(Producto producto)
         {
             if (ModelState.IsValid)
@@ -75,7 +75,7 @@ namespace GestionAlmacen_Golocentro.Controllers
         }
 
         // GET: Producto/Edit/5
-        [Authorize(Roles = "dueña,encargada")]
+        [Authorize(Roles = "duena,encargada")]
         public async Task<IActionResult> Edit(int? id)
         {
             if (id == null) return NotFound();
@@ -87,7 +87,7 @@ namespace GestionAlmacen_Golocentro.Controllers
         // POST: Producto/Edit/5
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [Authorize(Roles = "dueña,encargada")]
+        [Authorize(Roles = "duena,encargada")]
         public async Task<IActionResult> Edit(int id, Producto producto)
         {
             if (id != producto.IdProducto) return NotFound();
@@ -121,7 +121,7 @@ namespace GestionAlmacen_Golocentro.Controllers
         }
 
         // GET: Producto/Delete/5
-        [Authorize(Roles = "dueña,encargada")]
+        [Authorize(Roles = "duena,encargada")]
         public async Task<IActionResult> Delete(int? id)
         {
             if (id == null) return NotFound();
@@ -133,7 +133,7 @@ namespace GestionAlmacen_Golocentro.Controllers
         // POST: Producto/Delete/5
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
-        [Authorize(Roles = "dueña,encargada")]
+        [Authorize(Roles = "duena,encargada")]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
             var producto = await _context.Productos
@@ -171,7 +171,7 @@ namespace GestionAlmacen_Golocentro.Controllers
                     .ThenInclude(u => u.IdSedeNavigation)
                 .AsQueryable();
 
-            // Filtrar por sede si el usuario no es dueña
+            // Filtrar por sede si el usuario no es duena
             if (sedeId.HasValue)
             {
                 query = query.Where(pu => pu.IdUbicacionNavigation.IdSede == sedeId.Value);

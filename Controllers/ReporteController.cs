@@ -13,7 +13,7 @@ using System.Threading.Tasks;
 
 namespace GestionAlmacen_Golocentro.Controllers
 {
-    [Authorize(Roles = "dueña,encargada")]
+    [Authorize(Roles = "duena,encargada")]
     public class ReporteController : Controller
     {
         private readonly AppDbContext _context;
