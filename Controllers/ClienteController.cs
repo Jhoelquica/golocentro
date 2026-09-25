@@ -40,7 +40,7 @@ namespace GestionAlmacen_Golocentro.Controllers
                 .Skip((pagina - 1) * TamanoPagina)
                 .Take(TamanoPagina)
                 .Select(c => new ContraparteFila(
-                    c.IdCliente, c.Nombre, c.RucDni, c.Contacto, c.Direccion,
+                    c.IdCliente, c.Nombre, c.RucDni, c.Contacto, c.Direccion, c.Celular,
                     c.Movimientos.Count,
                     c.Movimientos.Max(m => (DateTime?)m.Fecha)))
                 .ToListAsync();
@@ -81,6 +81,8 @@ namespace GestionAlmacen_Golocentro.Controllers
             var cliente = await _context.Clientes.FindAsync(id);
             if (cliente == null)
                 return NotFound();
+            if (EsClienteGeneral(cliente))
+                return ClienteGeneralProtegido();
 
             return Formulario(new ContraparteFormViewModel
             {
@@ -88,7 +90,8 @@ namespace GestionAlmacen_Golocentro.Controllers
                 Nombre = cliente.Nombre,
                 Documento = cliente.RucDni,
                 Contacto = cliente.Contacto,
-                Direccion = cliente.Direccion
+                Direccion = cliente.Direccion,
+                Celular = cliente.Celular
             });
         }
 
@@ -99,6 +102,8 @@ namespace GestionAlmacen_Golocentro.Controllers
             var cliente = await _context.Clientes.FindAsync(id);
             if (cliente == null)
                 return NotFound();
+            if (EsClienteGeneral(cliente))
+                return ClienteGeneralProtegido();
 
             model.Id = id;
             await Validar(model, id);
@@ -120,12 +125,14 @@ namespace GestionAlmacen_Golocentro.Controllers
             var cliente = await _context.Clientes.FindAsync(id);
             if (cliente == null)
                 return NotFound();
+            if (EsClienteGeneral(cliente))
+                return ClienteGeneralProtegido();
 
-            // Borrarlo dejaría salidas sin cliente y rompería el historial
-            var salidas = await _context.Movimientos.CountAsync(m => m.IdCliente == id);
-            if (salidas > 0)
+            // Borrarlo dejaría ventas sin cliente y rompería el historial
+            var ventas = await _context.Movimientos.CountAsync(m => m.IdCliente == id);
+            if (ventas > 0)
             {
-                TempData["Error"] = $"No se puede eliminar «{cliente.Nombre}»: tiene {salidas} {(salidas == 1 ? "salida registrada" : "salidas registradas")}.";
+                TempData["Error"] = $"No se puede eliminar «{cliente.Nombre}»: tiene {ventas} {(ventas == 1 ? "venta registrada" : "ventas registradas")}.";
                 return RedirectToAction(nameof(Index));
             }
 
@@ -175,6 +182,18 @@ namespace GestionAlmacen_Golocentro.Controllers
             cliente.RucDni = model.Documento!;
             cliente.Contacto = string.IsNullOrWhiteSpace(model.Contacto) ? null : model.Contacto.Trim();
             cliente.Direccion = string.IsNullOrWhiteSpace(model.Direccion) ? null : model.Direccion.Trim();
+            cliente.Celular = string.IsNullOrWhiteSpace(model.Celular) ? null : model.Celular.Trim();
+        }
+
+        // «Público en general» es el cliente por defecto de las ventas: no se edita ni se borra
+        [NonAction]
+        private static bool EsClienteGeneral(Cliente cliente) => cliente.RucDni == ClienteGeneral.RucDni;
+
+        [NonAction]
+        private IActionResult ClienteGeneralProtegido()
+        {
+            TempData["Error"] = "«Público en general» es el cliente por defecto de las ventas: no se puede editar ni eliminar.";
+            return RedirectToAction(nameof(Index));
         }
 
         // Si otro usuario registró el mismo documento entre la validación y el guardado

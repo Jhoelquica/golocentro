@@ -18,6 +18,9 @@ namespace GestionAlmacen_Golocentro.ViewModels
         public string MovimientoSingular { get; init; } = "";
         public string MovimientoPlural { get; init; } = "";
 
+        // Solo los clientes tienen celular (para enviarles la nota de venta por WhatsApp)
+        public bool TieneCelular { get; init; }
+
         public static readonly ContraparteTipo Cliente = new()
         {
             Controlador = "Cliente",
@@ -27,8 +30,9 @@ namespace GestionAlmacen_Golocentro.ViewModels
             DocAyuda = "DNI de 8 dígitos o RUC de 11, solo números.",
             DocMaxLength = 11,
             Icono = "bi-people",
-            MovimientoSingular = "salida",
-            MovimientoPlural = "salidas"
+            MovimientoSingular = "venta",
+            MovimientoPlural = "ventas",
+            TieneCelular = true
         };
 
         public static readonly ContraparteTipo Proveedor = new()
@@ -51,6 +55,7 @@ namespace GestionAlmacen_Golocentro.ViewModels
         string Documento,
         string? Contacto,
         string? Direccion,
+        string? Celular,
         int Movimientos,
         DateTime? UltimoMovimiento);
 
@@ -80,6 +85,9 @@ namespace GestionAlmacen_Golocentro.ViewModels
 
         [StringLength(200, ErrorMessage = "La dirección no puede pasar de 200 caracteres.")]
         public string? Direccion { get; set; }
+
+        [RegularExpression(@"^9\d{8}$", ErrorMessage = "El celular debe tener 9 dígitos y empezar con 9.")]
+        public string? Celular { get; set; }
 
         [BindNever, ValidateNever]
         public ContraparteTipo Tipo { get; set; } = null!;

@@ -110,9 +110,15 @@
                             <tr>
                                 <td>
                                     <div class="cp-nombre">@f.Nombre</div>
-                                    @if (!string.IsNullOrEmpty(f.Contacto))
+                                    @{
+                                        // El contacto suele ser el mismo número que el celular: no repetirlo
+                                        var datosContacto = new[] { f.Celular != null ? "Cel. " + f.Celular : null, f.Contacto != f.Celular ? f.Contacto : null }
+                                            .Where(x => !string.IsNullOrEmpty(x))
+                                            .ToList();
+                                    }
+                                    @if (datosContacto.Count > 0)
                                     {
-                                        <div class="cp-sub">@f.Contacto</div>
+                                        <div class="cp-sub">@string.Join(" · ", datosContacto)</div>
                                     }
                                 </td>
                                 <td class="cp-doc">@f.Documento</td>
@@ -129,20 +135,27 @@
                                     }
                                 </td>
                                 <td>
-                                    <div class="cp-acciones">
-                                        <a class="cp-icono-btn" asp-controller="@t.Controlador" asp-action="Editar" asp-route-id="@f.Id"
-                                           aria-label="Editar @f.Nombre" title="Editar">
-                                            <i class="bi bi-pencil" aria-hidden="true"></i>
-                                        </a>
-                                        @if (f.Movimientos == 0)
-                                        {
-                                            <button type="button" class="cp-icono-btn peligro" data-bs-toggle="modal" data-bs-target="#modalEliminar"
-                                                    data-nombre="@f.Nombre" data-url="@Url.Action("Eliminar", t.Controlador, new { id = f.Id })"
-                                                    aria-label="Eliminar @f.Nombre" title="Eliminar">
-                                                <i class="bi bi-trash3" aria-hidden="true"></i>
-                                            </button>
-                                        }
-                                    </div>
+                                    @if (t.TieneCelular && f.Documento == ClienteGeneral.RucDni)
+                                    {
+                                        <div class="cp-acciones"><span class="cp-sub">Por defecto en ventas</span></div>
+                                    }
+                                    else
+                                    {
+                                        <div class="cp-acciones">
+                                            <a class="cp-icono-btn" asp-controller="@t.Controlador" asp-action="Editar" asp-route-id="@f.Id"
+                                               aria-label="Editar @f.Nombre" title="Editar">
+                                                <i class="bi bi-pencil" aria-hidden="true"></i>
+                                            </a>
+                                            @if (f.Movimientos == 0)
+                                            {
+                                                <button type="button" class="cp-icono-btn peligro" data-bs-toggle="modal" data-bs-target="#modalEliminar"
+                                                        data-nombre="@f.Nombre" data-url="@Url.Action("Eliminar", t.Controlador, new { id = f.Id })"
+                                                        aria-label="Eliminar @f.Nombre" title="Eliminar">
+                                                    <i class="bi bi-trash3" aria-hidden="true"></i>
+                                                </button>
+                                            }
+                                        </div>
+                                    }
                                 </td>
                             </tr>
                         }

@@ -40,7 +40,7 @@ namespace GestionAlmacen_Golocentro.Controllers
                 .Skip((pagina - 1) * TamanoPagina)
                 .Take(TamanoPagina)
                 .Select(p => new ContraparteFila(
-                    p.IdProveedor, p.Nombre, p.Ruc, p.Contacto, p.Direccion,
+                    p.IdProveedor, p.Nombre, p.Ruc, p.Contacto, p.Direccion, null,
                     p.Movimientos.Count,
                     p.Movimientos.Max(m => (DateTime?)m.Fecha)))
                 .ToListAsync();
