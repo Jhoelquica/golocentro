@@ -20,9 +20,13 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<DetalleMovimiento> DetalleMovimientos { get; set; }
 
+    public virtual DbSet<DetalleTraslado> DetalleTraslados { get; set; }
+
     public virtual DbSet<Evidencium> Evidencia { get; set; }
 
     public virtual DbSet<Movimiento> Movimientos { get; set; }
+
+    public virtual DbSet<PlanoLinea> PlanoLineas { get; set; }
 
     public virtual DbSet<Producto> Productos { get; set; }
 
@@ -33,6 +37,8 @@ public partial class AppDbContext : DbContext
     public virtual DbSet<Reporte> Reportes { get; set; }
 
     public virtual DbSet<Sede> Sedes { get; set; }
+
+    public virtual DbSet<Traslado> Traslados { get; set; }
 
     public virtual DbSet<Ubicacion> Ubicacions { get; set; }
 
@@ -173,6 +179,42 @@ public partial class AppDbContext : DbContext
                 .HasConstraintName("detalle_movimiento_id_ubicacion_fkey");
         });
 
+        modelBuilder.Entity<DetalleTraslado>(entity =>
+        {
+            entity.HasKey(e => e.IdDetalle).HasName("detalle_traslado_pkey");
+
+            entity.ToTable("detalle_traslado");
+
+            entity.Property(e => e.IdDetalle)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("id_detalle");
+            entity.Property(e => e.Cantidad).HasColumnName("cantidad");
+            entity.Property(e => e.IdProducto).HasColumnName("id_producto");
+            entity.Property(e => e.IdTraslado).HasColumnName("id_traslado");
+            entity.Property(e => e.IdUbicacionDestino).HasColumnName("id_ubicacion_destino");
+            entity.Property(e => e.IdUbicacionOrigen).HasColumnName("id_ubicacion_origen");
+
+            entity.HasOne(d => d.IdProductoNavigation).WithMany(p => p.DetalleTraslados)
+                .HasForeignKey(d => d.IdProducto)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("detalle_traslado_id_producto_fkey");
+
+            entity.HasOne(d => d.IdTrasladoNavigation).WithMany(p => p.DetalleTraslados)
+                .HasForeignKey(d => d.IdTraslado)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("detalle_traslado_id_traslado_fkey");
+
+            entity.HasOne(d => d.IdUbicacionDestinoNavigation).WithMany(p => p.DetalleTrasladoIdUbicacionDestinoNavigations)
+                .HasForeignKey(d => d.IdUbicacionDestino)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("detalle_traslado_destino_fkey");
+
+            entity.HasOne(d => d.IdUbicacionOrigenNavigation).WithMany(p => p.DetalleTrasladoIdUbicacionOrigenNavigations)
+                .HasForeignKey(d => d.IdUbicacionOrigen)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("detalle_traslado_origen_fkey");
+        });
+
         modelBuilder.Entity<Evidencium>(entity =>
         {
             entity.HasKey(e => e.IdEvidencia).HasName("evidencia_pkey");
@@ -252,6 +294,38 @@ public partial class AppDbContext : DbContext
                 .HasForeignKey(d => d.IdUsuario)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("movimiento_id_usuario_fkey");
+        });
+
+        modelBuilder.Entity<PlanoLinea>(entity =>
+        {
+            entity.HasKey(e => e.IdLinea).HasName("plano_linea_pkey");
+
+            entity.ToTable("plano_linea");
+
+            entity.Property(e => e.IdLinea)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("id_linea");
+            entity.Property(e => e.IdSede).HasColumnName("id_sede");
+            entity.Property(e => e.Tipo)
+                .HasMaxLength(15)
+                .HasColumnName("tipo");
+            entity.Property(e => e.X1)
+                .HasPrecision(5, 1)
+                .HasColumnName("x1");
+            entity.Property(e => e.X2)
+                .HasPrecision(5, 1)
+                .HasColumnName("x2");
+            entity.Property(e => e.Y1)
+                .HasPrecision(5, 1)
+                .HasColumnName("y1");
+            entity.Property(e => e.Y2)
+                .HasPrecision(5, 1)
+                .HasColumnName("y2");
+
+            entity.HasOne(d => d.IdSedeNavigation).WithMany(p => p.PlanoLineas)
+                .HasForeignKey(d => d.IdSede)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("plano_linea_id_sede_fkey");
         });
 
         modelBuilder.Entity<Producto>(entity =>
@@ -405,6 +479,42 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.Nombre)
                 .HasMaxLength(100)
                 .HasColumnName("nombre");
+            entity.Property(e => e.PlanoAlto)
+                .HasPrecision(5, 1)
+                .HasColumnName("plano_alto");
+            entity.Property(e => e.PlanoAncho)
+                .HasPrecision(5, 1)
+                .HasColumnName("plano_ancho");
+        });
+
+        modelBuilder.Entity<Traslado>(entity =>
+        {
+            entity.HasKey(e => e.IdTraslado).HasName("traslado_pkey");
+
+            entity.ToTable("traslado");
+
+            entity.Property(e => e.IdTraslado)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("id_traslado");
+            entity.Property(e => e.Fecha)
+                .HasDefaultValueSql("now()")
+                .HasColumnType("timestamp(6) without time zone")
+                .HasColumnName("fecha");
+            entity.Property(e => e.IdSede).HasColumnName("id_sede");
+            entity.Property(e => e.IdUsuario).HasColumnName("id_usuario");
+            entity.Property(e => e.Observaciones)
+                .HasMaxLength(200)
+                .HasColumnName("observaciones");
+
+            entity.HasOne(d => d.IdSedeNavigation).WithMany(p => p.Traslados)
+                .HasForeignKey(d => d.IdSede)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("traslado_id_sede_fkey");
+
+            entity.HasOne(d => d.IdUsuarioNavigation).WithMany(p => p.Traslados)
+                .HasForeignKey(d => d.IdUsuario)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("traslado_id_usuario_fkey");
         });
 
         modelBuilder.Entity<Ubicacion>(entity =>
@@ -418,6 +528,12 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.IdUbicacion)
                 .UseIdentityAlwaysColumn()
                 .HasColumnName("id_ubicacion");
+            entity.Property(e => e.Alto)
+                .HasPrecision(5, 1)
+                .HasColumnName("alto");
+            entity.Property(e => e.Ancho)
+                .HasPrecision(5, 1)
+                .HasColumnName("ancho");
             entity.Property(e => e.Capacidad).HasColumnName("capacidad");
             entity.Property(e => e.CodigoEstante)
                 .HasMaxLength(20)
@@ -426,6 +542,16 @@ public partial class AppDbContext : DbContext
                 .HasMaxLength(200)
                 .HasColumnName("descripcion");
             entity.Property(e => e.IdSede).HasColumnName("id_sede");
+            entity.Property(e => e.PosX)
+                .HasPrecision(5, 1)
+                .HasColumnName("pos_x");
+            entity.Property(e => e.PosY)
+                .HasPrecision(5, 1)
+                .HasColumnName("pos_y");
+            entity.Property(e => e.Tipo)
+                .HasMaxLength(15)
+                .HasDefaultValueSql("'almacenaje'::character varying")
+                .HasColumnName("tipo");
 
             entity.HasOne(d => d.IdSedeNavigation).WithMany(p => p.Ubicacions)
                 .HasForeignKey(d => d.IdSede)
