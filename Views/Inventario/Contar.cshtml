@@ -28,7 +28,7 @@
         .ToList();
 }
 
-@await Html.PartialAsync("~/Views/Shared/Contraparte/_Estilos.cshtml")
+@await Html.PartialAsync("~/Views/Shared/_EstilosGestion.cshtml")
 
 <style>
     .ct-card {
@@ -411,7 +411,14 @@
             </div>
             <p class="cp-ayuda" id="estadoBusqueda" role="status" aria-live="polite"></p>
             <ul class="ct-resultados" id="resultadosProducto"></ul>
-            <p class="ct-crear">¿No está en el catálogo? Regístralo en <a asp-controller="Producto" asp-action="Create" target="_blank">Productos (nueva pestaña)</a> y vuelve a buscarlo.</p>
+            @if (User.IsInRole("duena") || User.IsInRole("encargada"))
+            {
+                <p class="ct-crear">¿No está en el catálogo? Regístralo en <a asp-controller="Producto" asp-action="Crear" asp-route-desde="conteo" target="_blank">Productos (nueva pestaña)</a> y vuelve a buscarlo.</p>
+            }
+            else
+            {
+                <p class="ct-crear">¿No está en el catálogo? Pide a la dueña o a la encargada que lo registre en Productos y vuelve a buscarlo aquí.</p>
+            }
         </section>
 
         <section class="ct-card" aria-labelledby="tituloGuardar">
@@ -589,7 +596,18 @@
             return (texto || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
         }
 
-        function buscar() {
+        let ultimaRecarga = Date.now();
+        async function recargarCatalogo() {
+            ultimaRecarga = Date.now();
+            try {
+                const respuesta = await fetch(urlCatalogo);
+                if (respuesta.ok) catalogo = await respuesta.json();
+            } catch {
+                // Sin conexión: se sigue con el catálogo que ya estaba cargado
+            }
+        }
+
+        async function buscar() {
             const consulta = normalizar(inputBuscar.value);
             resultados.replaceChildren();
             if (!consulta) {
@@ -601,6 +619,11 @@
                 .filter(p => normalizar(p.nombre).includes(consulta) || normalizar(p.codigo).includes(consulta))
                 .slice(0, 8);
             if (!encontrados.length) {
+                // Puede que alguien lo acabe de registrar: se vuelve a pedir el catálogo antes de decir que no está
+                if (Date.now() - ultimaRecarga > 5000) {
+                    await recargarCatalogo();
+                    return buscar();
+                }
                 estadoBusqueda.textContent = `No encontramos «${inputBuscar.value.trim()}» en el catálogo.`;
                 return;
             }
@@ -640,14 +663,8 @@
         // Al volver de crear un producto en otra pestaña, traer el catálogo actualizado
         document.addEventListener('visibilitychange', async () => {
             if (document.visibilityState !== 'visible') return;
-            try {
-                const respuesta = await fetch(urlCatalogo);
-                if (!respuesta.ok) return;
-                catalogo = await respuesta.json();
-                if (inputBuscar.value.trim()) buscar();
-            } catch {
-                // Sin conexión: se sigue con el catálogo que ya estaba cargado
-            }
+            await recargarCatalogo();
+            if (inputBuscar.value.trim()) buscar();
         });
 
         lista.querySelectorAll('.ct-fila').forEach(prepararFila);

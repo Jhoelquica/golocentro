@@ -17,7 +17,7 @@
     static string Productos(int n) => n == 0 ? "vacía" : n == 1 ? "1 producto" : $"{n} productos";
 }
 
-@await Html.PartialAsync("~/Views/Shared/Contraparte/_Estilos.cshtml")
+@await Html.PartialAsync("~/Views/Shared/_EstilosGestion.cshtml")
 
 <style>
     .mp-layout {
@@ -658,6 +658,13 @@
             selZona.addEventListener('change', () => {
                 if (selZona.value) seleccionarZona(Number(selZona.value), true);
             });
+
+            // Desde Productos ("¿Dónde está?") se llega con ?buscar=CODIGO
+            const buscarInicial = new URLSearchParams(location.search).get('buscar');
+            if (buscarInicial) {
+                inputBuscar.value = buscarInicial;
+                mostrarResultados();
+            }
 
             elementosZona.forEach((g, id) => {
                 g.addEventListener('click', () => seleccionarZona(id, false));

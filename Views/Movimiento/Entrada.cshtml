@@ -1,7 +1,7 @@
 ﻿@model GestionAlmacen_Golocentro.ViewModels.MovimientoEntradaViewModel
 @{
     ViewData["Title"] = "Registrar Entrada";
-    // ProveedorController solo admite a estos roles
+    // Proveedores y el alta de productos solo admiten a estos roles
     var puedeCrearProveedor = User.IsInRole("duena") || User.IsInRole("encargada");
 }
 
@@ -26,9 +26,12 @@
         <!-- nuevo producto -->
         <div class="d-flex justify-content-between align-items-center mb-2">
             <span></span>
-            <a href="/Producto/Create" target="_blank" class="btn btn-sm btn-outline-success">
-                <i class="bi bi-plus-circle"></i> Nuevo producto (nueva pestaña)
-            </a>
+            @if (puedeCrearProveedor)
+            {
+                <a asp-controller="Producto" asp-action="Crear" asp-route-desde="entrada" target="_blank" class="btn btn-sm btn-outline-success">
+                    <i class="bi bi-plus-circle" aria-hidden="true"></i> Nuevo producto (nueva pestaña)
+                </a>
+            }
         </div>
         <!-- Tabla dinámica de productos -->
         <div class="card mb-3">
@@ -158,6 +161,25 @@
         // { idProducto: [{ u: idUbicacion, c: cantidad }] } de las zonas que ve el usuario
         var stockPorProducto = @Json.Serialize((object)ViewBag.StockPorProducto);
         const ubicacionPorId = new Map(ubicaciones.map(u => [u.value, u]));
+
+        // Al volver de crear un producto en otra pestaña, sumarlo a la lista sin recargar (se perdería lo cargado)
+        document.addEventListener('visibilitychange', async () => {
+            if (document.visibilityState !== 'visible') return;
+            try {
+                const respuesta = await fetch('@Url.Action("Catalogo", "Inventario")');
+                if (!respuesta.ok) return;
+                const conocidos = new Set(productos.map(p => p.value));
+                const nuevos = (await respuesta.json())
+                    .map(p => ({ value: String(p.id), text: p.nombre }))
+                    .filter(p => !conocidos.has(p.value));
+                if (!nuevos.length) return;
+                productos.push(...nuevos);
+                document.querySelectorAll('select[name$=".ProductoId"]').forEach(select =>
+                    nuevos.forEach(p => select.add(new Option(p.text, p.value))));
+            } catch {
+                // Sin conexión: se sigue con la lista que ya estaba cargada
+            }
+        });
 
         // Los nombres vienen de la BD: escaparlos antes de meterlos en HTML
         function escaparHtml(texto) {
