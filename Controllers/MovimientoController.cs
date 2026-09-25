@@ -76,7 +76,7 @@ namespace GestionAlmacen_Golocentro.Controllers
 
         // Para la dueña (sin sede) se muestra la sede de cada ubicación, porque ve las de todas.
         [NonAction]
-        private List<(int Id, string Texto)> UbicacionesParaUsuario(int? sedeId)
+        private List<(int Id, string Texto, bool EsRecepcion)> UbicacionesParaUsuario(int? sedeId)
         {
             var query = _context.Ubicaciones.AsQueryable();
             if (sedeId.HasValue)
@@ -85,14 +85,31 @@ namespace GestionAlmacen_Golocentro.Controllers
             return query
                 .OrderBy(u => u.IdSedeNavigation.Nombre)
                 .ThenBy(u => u.CodigoEstante)
-                .Select(u => new { u.IdUbicacion, u.CodigoEstante, u.Descripcion, Sede = u.IdSedeNavigation.Nombre })
+                .Select(u => new { u.IdUbicacion, u.CodigoEstante, u.Descripcion, u.Tipo, Sede = u.IdSedeNavigation.Nombre })
                 .ToList()
                 .Select(u =>
                 {
                     var texto = string.IsNullOrEmpty(u.Descripcion) ? u.CodigoEstante : $"{u.CodigoEstante} — {u.Descripcion}";
-                    return (u.IdUbicacion, sedeId.HasValue ? texto : $"{texto} · {u.Sede}");
+                    return (u.IdUbicacion, sedeId.HasValue ? texto : $"{texto} · {u.Sede}", u.Tipo == "recepcion");
                 })
                 .ToList();
+        }
+
+        // Zonas de Entrada con el stock actual de cada producto, para sugerir recibir donde ya está
+        // (reponer ahí) o en Recepción si el producto no está en ninguna zona.
+        [NonAction]
+        private void CargarZonasEntrada(int? sedeId)
+        {
+            ViewBag.Ubicaciones = UbicacionesParaUsuario(sedeId)
+                .Select(u => new { value = u.Id.ToString(), text = u.Texto, recepcion = u.EsRecepcion })
+                .ToList();
+
+            ViewBag.StockPorProducto = _context.ProductoUbicacions
+                .Where(pu => pu.CantidadActual > 0 && (!sedeId.HasValue || pu.IdUbicacionNavigation.IdSede == sedeId.Value))
+                .Select(pu => new { pu.IdProducto, pu.IdUbicacion, pu.CantidadActual })
+                .ToList()
+                .GroupBy(pu => pu.IdProducto)
+                .ToDictionary(g => g.Key, g => g.Select(pu => new { u = pu.IdUbicacion, c = pu.CantidadActual }).ToList());
         }
 
         // GET: Movimiento/ObtenerStock
@@ -118,9 +135,7 @@ namespace GestionAlmacen_Golocentro.Controllers
                 Text = p.Nombre
             }).ToList();
 
-            ViewBag.Ubicaciones = UbicacionesParaUsuario(sedeId)
-                .Select(u => new SelectListItem { Value = u.Id.ToString(), Text = u.Texto })
-                .ToList();
+            CargarZonasEntrada(sedeId);
 
             // Proveedores
             ViewBag.Proveedores = _context.Proveedores.Select(p => new SelectListItem
@@ -288,9 +303,7 @@ namespace GestionAlmacen_Golocentro.Controllers
         private IActionResult CargarListasParaVista(int? sedeId)
         {
             ViewBag.Productos = new SelectList(_context.Productos, "IdProducto", "Nombre");
-            ViewBag.Ubicaciones = UbicacionesParaUsuario(sedeId)
-                .Select(u => new SelectListItem { Value = u.Id.ToString(), Text = u.Texto })
-                .ToList();
+            CargarZonasEntrada(sedeId);
 
             ViewBag.Proveedores = new SelectList(_context.Proveedores, "IdProveedor", "Nombre");
             return View("Entrada");

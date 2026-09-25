@@ -1,0 +1,440 @@
+@using GestionAlmacen_Golocentro.ViewModels
+@model MoverFormViewModel
+@{
+    ViewData["Title"] = "Mover mercadería";
+    var d = Model.Datos;
+    var zonasConStock = d.Zonas.Where(z => z.Stock.Count > 0).ToList();
+
+    string? Error(string campo) => ViewData.ModelState[campo]?.Errors.FirstOrDefault()?.ErrorMessage;
+    string? Describe(string campo, string? extra = null)
+    {
+        var ids = new[] { extra, Error(campo) != null ? campo + "-error" : null }.Where(x => x != null);
+        var valor = string.Join(" ", ids);
+        return valor.Length == 0 ? null : valor;
+    }
+
+    // En el mismo orden que los pasos del formulario
+    var ordenCampos = new[] { "OrigenId", "ProductoId", "DestinoId", "Cantidad", "Observaciones" };
+    var errores = ViewData.ModelState
+        .Where(kv => kv.Value!.Errors.Count > 0)
+        .SelectMany(kv => kv.Value!.Errors.Select(e => (Campo: string.IsNullOrEmpty(kv.Key) ? "OrigenId" : kv.Key, e.ErrorMessage)))
+        .OrderBy(e => Array.IndexOf(ordenCampos, e.Campo) is var i && i >= 0 ? i : ordenCampos.Length)
+        .ToList();
+}
+
+@functions {
+    static string Cuando(DateTime f)
+    {
+        if (f.Date == DateTime.Today) return "Hoy, " + f.ToString("HH:mm");
+        if (f.Date == DateTime.Today.AddDays(-1)) return "Ayer, " + f.ToString("HH:mm");
+        return f.ToString("dd/MM, HH:mm");
+    }
+}
+
+@await Html.PartialAsync("~/Views/Shared/Contraparte/_Estilos.cshtml")
+
+<style>
+    .mv-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 640px) minmax(260px, 360px);
+        gap: 1rem;
+        align-items: start;
+    }
+
+    @@media (max-width: 1100px) {
+        .mv-layout {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .mv-select,
+    .cp-campo select {
+        width: 100%;
+        min-height: 44px;
+        padding: 8px 10px;
+        border: 1px solid var(--g-input-border);
+        border-radius: 8px;
+        font-size: 15px;
+        font-family: inherit;
+        color: var(--g-text);
+        background: var(--g-white);
+    }
+
+        .cp-campo select:focus,
+        .mv-select:focus {
+            outline: none;
+            border-color: var(--g-teal);
+            box-shadow: 0 0 0 3px rgba(4,120,87,0.25);
+        }
+
+        .cp-campo select:disabled {
+            background: var(--g-bg);
+            color: var(--g-muted);
+        }
+
+        .cp-campo select[aria-invalid="true"] {
+            border-color: var(--g-danger);
+        }
+
+    .mv-cantidad {
+        display: flex;
+        gap: 8px;
+    }
+
+        .mv-cantidad input {
+            flex: 1;
+        }
+
+        .mv-cantidad .btn-g-outline {
+            min-width: 84px;
+        }
+
+            .mv-cantidad .btn-g-outline:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+            }
+
+    .mv-paso {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: rgba(4,120,87,0.12);
+        color: var(--g-teal);
+        font-size: 12px;
+        font-weight: 700;
+        margin-right: 6px;
+    }
+
+    .mv-recientes {
+        background: var(--g-white);
+        border: 1px solid var(--g-border);
+        border-radius: 14px;
+        padding: 1rem 1.1rem;
+    }
+
+        .mv-recientes h2 {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--g-navy);
+            margin: 0 0 6px;
+        }
+
+        .mv-recientes ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .mv-recientes li {
+            padding: 10px 0;
+            border-top: 1px solid var(--g-border);
+            font-size: 14px;
+        }
+
+    .mv-ruta {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-weight: 600;
+        color: var(--g-teal);
+        margin-top: 2px;
+    }
+
+    .mv-sub {
+        font-size: 12px;
+        color: var(--g-muted);
+        margin-top: 2px;
+    }
+</style>
+
+<div class="cp-page" style="max-width:1100px">
+
+    <a class="cp-volver" asp-action="Index" asp-route-sede="@Model.Sede">
+        <i class="bi bi-arrow-left" aria-hidden="true"></i> Volver al mapa
+    </a>
+
+    <div class="cp-header">
+        <div>
+            <h1><i class="bi bi-arrow-left-right" aria-hidden="true"></i> Mover mercadería</h1>
+            <p>Ordena o reubica mercadería entre zonas@(string.IsNullOrEmpty(d.SedeNombre) ? "" : " de " + d.SedeNombre).</p>
+        </div>
+        @if (d.PuedeElegirSede)
+        {
+            <form method="get" asp-action="Mover">
+                <label for="sede" class="visually-hidden">Sede</label>
+                <select id="sede" name="sede" class="mv-select" style="width:auto" onchange="this.form.submit()">
+                    @foreach (var s in d.Sedes)
+                    {
+                        <option value="@s.Id" selected="@(s.Id == Model.Sede)">@s.Nombre</option>
+                    }
+                </select>
+            </form>
+        }
+    </div>
+
+    @if (TempData["Exito"] is string exito)
+    {
+        <div class="cp-aviso exito" role="status">
+            <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+            <span>@exito</span>
+            <button type="button" aria-label="Cerrar mensaje" onclick="this.parentElement.remove()"><i class="bi bi-x" aria-hidden="true"></i></button>
+        </div>
+    }
+
+    @if (errores.Count > 0)
+    {
+        <div class="cp-resumen" role="alert" tabindex="-1" id="resumenErrores" aria-labelledby="resumenTitulo">
+            <h2 id="resumenTitulo">Revisa estos datos antes de mover:</h2>
+            <ul>
+                @foreach (var e in errores)
+                {
+                    <li><a href="#@e.Campo">@e.ErrorMessage</a></li>
+                }
+            </ul>
+        </div>
+    }
+
+    <div class="mv-layout">
+        @if (zonasConStock.Count == 0)
+        {
+            <div class="cp-form-card cp-vacio">
+                <p>No hay mercadería en ninguna zona para mover.</p>
+            </div>
+        }
+        else
+        {
+            <form class="cp-form-card" method="post" asp-action="Mover" novalidate id="formMover">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="Sede" value="@Model.Sede" />
+
+                <div class="cp-campo">
+                    <label for="OrigenId"><span class="mv-paso" aria-hidden="true">1</span>Desde qué zona <span class="cp-req" aria-hidden="true">*</span></label>
+                    <select id="OrigenId" name="OrigenId" required aria-required="true"
+                            aria-invalid="@(Error("OrigenId") != null ? "true" : null)"
+                            aria-describedby="@Describe("OrigenId")">
+                        <option value="">Elige la zona de donde sacas…</option>
+                        @foreach (var z in zonasConStock)
+                        {
+                            var n = z.Stock.Count;
+                            <option value="@z.Id" selected="@(z.Id == Model.OrigenId)">@($"{z.Codigo}{(z.EsRecepcion ? " · Recepción" : "")} — {n} {(n == 1 ? "producto" : "productos")}")</option>
+                        }
+                    </select>
+                    @if (Error("OrigenId") is string errOrigen)
+                    {
+                        <p class="cp-error" id="OrigenId-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @errOrigen</p>
+                    }
+                </div>
+
+                <div class="cp-campo">
+                    <label for="ProductoId"><span class="mv-paso" aria-hidden="true">2</span>Qué producto <span class="cp-req" aria-hidden="true">*</span></label>
+                    <select id="ProductoId" name="ProductoId" required aria-required="true"
+                            aria-invalid="@(Error("ProductoId") != null ? "true" : null)"
+                            aria-describedby="@Describe("ProductoId", "ProductoId-ayuda")">
+                        <option value="">Primero elige la zona de origen</option>
+                    </select>
+                    <p class="cp-ayuda" id="ProductoId-ayuda">Solo aparecen los productos que hay en esa zona.</p>
+                    @if (Error("ProductoId") is string errProducto)
+                    {
+                        <p class="cp-error" id="ProductoId-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @errProducto</p>
+                    }
+                </div>
+
+                <div class="cp-campo">
+                    <label for="DestinoId"><span class="mv-paso" aria-hidden="true">3</span>A qué zona lo llevas <span class="cp-req" aria-hidden="true">*</span></label>
+                    <select id="DestinoId" name="DestinoId" required aria-required="true"
+                            aria-invalid="@(Error("DestinoId") != null ? "true" : null)"
+                            aria-describedby="@Describe("DestinoId")">
+                        <option value="">Elige a qué zona lo llevas…</option>
+                    </select>
+                    @if (Error("DestinoId") is string errDestino)
+                    {
+                        <p class="cp-error" id="DestinoId-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @errDestino</p>
+                    }
+                </div>
+
+                <div class="cp-campo">
+                    <label for="Cantidad"><span class="mv-paso" aria-hidden="true">4</span>Cuánto <span class="cp-req" aria-hidden="true">*</span></label>
+                    <div class="mv-cantidad">
+                        <input id="Cantidad" name="Cantidad" type="number" min="1" step="1" inputmode="numeric"
+                               value="@Model.Cantidad" required aria-required="true"
+                               aria-invalid="@(Error("Cantidad") != null ? "true" : null)"
+                               aria-describedby="@Describe("Cantidad", "Cantidad-ayuda")" />
+                        <button type="button" class="btn-g-outline" id="btnTodo" aria-describedby="Cantidad-ayuda">Todo</button>
+                    </div>
+                    <p class="cp-ayuda" id="Cantidad-ayuda" aria-live="polite">Elige zona y producto para ver cuánto hay.</p>
+                    @if (Error("Cantidad") is string errCantidad)
+                    {
+                        <p class="cp-error" id="Cantidad-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @errCantidad</p>
+                    }
+                </div>
+
+                <div class="cp-campo">
+                    <label for="Observaciones">Observación <span class="cp-opcional">(opcional)</span></label>
+                    <input id="Observaciones" name="Observaciones" type="text" maxlength="200" value="@Model.Observaciones"
+                           aria-invalid="@(Error("Observaciones") != null ? "true" : null)"
+                           aria-describedby="@Describe("Observaciones", "Observaciones-ayuda")" />
+                    <p class="cp-ayuda" id="Observaciones-ayuda">Por ejemplo: "ordenando lo que llegó hoy".</p>
+                    @if (Error("Observaciones") is string errObs)
+                    {
+                        <p class="cp-error" id="Observaciones-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @errObs</p>
+                    }
+                </div>
+
+                <div class="cp-botones">
+                    <a class="btn-g-outline" asp-action="Index" asp-route-sede="@Model.Sede">Cancelar</a>
+                    <button type="submit" class="btn-g-primary" id="btnMover">
+                        <i class="bi bi-arrow-left-right" aria-hidden="true"></i> Mover
+                    </button>
+                </div>
+            </form>
+        }
+
+        <section class="mv-recientes" aria-labelledby="tituloRecientes">
+            <h2 id="tituloRecientes">Últimos movimientos internos</h2>
+            @if (d.Recientes.Count == 0)
+            {
+                <p class="cp-ayuda">Todavía no se ha movido mercadería entre zonas.</p>
+            }
+            else
+            {
+                <ul>
+                    @foreach (var r in d.Recientes)
+                    {
+                        <li>
+                            <div><strong>@r.Cantidad</strong> × @r.Producto</div>
+                            <div class="mv-ruta">
+                                @r.Origen <i class="bi bi-arrow-right" aria-hidden="true"></i><span class="visually-hidden">a</span> @r.Destino
+                            </div>
+                            <div class="mv-sub"><time datetime="@r.Fecha.ToString("yyyy-MM-ddTHH:mm")">@Cuando(r.Fecha)</time> · @r.Usuario</div>
+                        </li>
+                    }
+                </ul>
+            }
+        </section>
+    </div>
+</div>
+
+@section Scripts {
+    @if (zonasConStock.Count > 0)
+    {
+        <script>
+            const zonas = @Json.Serialize(d.Zonas);
+            const productos = @Json.Serialize(d.Productos);
+            const inicial = {
+                producto: @(Model.ProductoId?.ToString() ?? "null"),
+                destino: @(Model.DestinoId?.ToString() ?? "null")
+            };
+
+            const zonaPorId = new Map(zonas.map(z => [z.id, z]));
+            const productoPorId = new Map(productos.map(p => [p.id, p]));
+            const selOrigen = document.getElementById('OrigenId');
+            const selProducto = document.getElementById('ProductoId');
+            const selDestino = document.getElementById('DestinoId');
+            const inputCantidad = document.getElementById('Cantidad');
+            const ayudaCantidad = document.getElementById('Cantidad-ayuda');
+            const btnTodo = document.getElementById('btnTodo');
+
+            function opcion(valor, texto) {
+                const o = document.createElement('option');
+                o.value = valor;
+                o.textContent = texto;
+                return o;
+            }
+
+            function grupo(etiqueta, opciones) {
+                const g = document.createElement('optgroup');
+                g.label = etiqueta;
+                g.append(...opciones);
+                return g;
+            }
+
+            function cantidadEn(zona, productoId) {
+                return zona?.stock.find(s => s.productoId === productoId)?.cantidad ?? 0;
+            }
+
+            function nombreZona(z) {
+                return z.codigo + (z.descripcion ? ' — ' + z.descripcion : '');
+            }
+
+            function llenarProductos() {
+                const zona = zonaPorId.get(Number(selOrigen.value));
+                const previo = inicial.producto ?? Number(selProducto.value || 0);
+                inicial.producto = null;
+
+                selProducto.replaceChildren(opcion('', zona ? 'Elige el producto…' : 'Primero elige la zona de origen'));
+                selProducto.disabled = !zona;
+                if (zona) {
+                    zona.stock.forEach(s => {
+                        const p = productoPorId.get(s.productoId);
+                        selProducto.append(opcion(s.productoId, `${p ? p.nombre : 'Producto'} — hay ${s.cantidad}`));
+                    });
+                    if (previo && zona.stock.some(s => s.productoId === previo)) selProducto.value = String(previo);
+                    else if (zona.stock.length === 1) selProducto.value = String(zona.stock[0].productoId);
+                }
+                llenarDestinos();
+                actualizarCantidad();
+            }
+
+            // Primero las zonas donde ya hay ese producto (para juntarlo), luego el resto y al final Recepción
+            function llenarDestinos() {
+                const origenId = Number(selOrigen.value);
+                const productoId = Number(selProducto.value);
+                const previo = inicial.destino ?? Number(selDestino.value || 0);
+                inicial.destino = null;
+
+                const otras = zonas.filter(z => z.id !== origenId);
+                const conProducto = productoId ? otras.filter(z => cantidadEn(z, productoId) > 0) : [];
+                const recepcion = otras.filter(z => z.esRecepcion && !conProducto.includes(z));
+                const resto = otras.filter(z => !z.esRecepcion && !conProducto.includes(z));
+
+                selDestino.replaceChildren(opcion('', 'Elige a qué zona lo llevas…'));
+                if (conProducto.length)
+                    selDestino.append(grupo('Donde ya hay este producto',
+                        conProducto.map(z => opcion(z.id, `${nombreZona(z)} (hay ${cantidadEn(z, productoId)})`))));
+                if (resto.length)
+                    selDestino.append(grupo('Otras zonas',
+                        resto.map(z => opcion(z.id, nombreZona(z) + (z.stock.length ? '' : ' · vacía')))));
+                if (recepcion.length)
+                    selDestino.append(grupo('Recepción', recepcion.map(z => opcion(z.id, nombreZona(z)))));
+
+                if (previo && otras.some(z => z.id === previo)) selDestino.value = String(previo);
+            }
+
+            function actualizarCantidad() {
+                const zona = zonaPorId.get(Number(selOrigen.value));
+                const disponible = cantidadEn(zona, Number(selProducto.value));
+                inputCantidad.max = disponible || '';
+                btnTodo.disabled = !disponible;
+                ayudaCantidad.textContent = disponible
+                    ? `Hay ${disponible} en ${zona.codigo}.`
+                    : 'Elige zona y producto para ver cuánto hay.';
+            }
+
+            selOrigen.addEventListener('change', llenarProductos);
+            selProducto.addEventListener('change', () => { llenarDestinos(); actualizarCantidad(); });
+            btnTodo.addEventListener('click', () => {
+                if (inputCantidad.max) inputCantidad.value = inputCantidad.max;
+                inputCantidad.focus();
+            });
+
+            const btnMover = document.getElementById('btnMover');
+            const contenidoMover = btnMover.innerHTML;
+            document.getElementById('formMover').addEventListener('submit', () => {
+                btnMover.disabled = true;
+                btnMover.setAttribute('aria-busy', 'true');
+                btnMover.innerHTML = '<span class="cp-spinner" aria-hidden="true"></span> Moviendo…';
+            });
+            window.addEventListener('pageshow', () => {
+                btnMover.disabled = false;
+                btnMover.removeAttribute('aria-busy');
+                btnMover.innerHTML = contenidoMover;
+            });
+
+            llenarProductos();
+            document.getElementById('resumenErrores')?.focus();
+        </script>
+    }
+}

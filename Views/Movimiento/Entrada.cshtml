@@ -154,8 +154,10 @@
         // Json.Serialize escapa < > & para que un nombre con una etiqueta de cierre de script no rompa el bloque
         var productos = @Json.Serialize(
                     ((IEnumerable<SelectListItem>)ViewBag.Productos).Select(p => new { value = p.Value, text = p.Text }));
-        var ubicaciones = @Json.Serialize(
-                    ((IEnumerable<SelectListItem>)ViewBag.Ubicaciones).Select(u => new { value = u.Value, text = u.Text }));
+        var ubicaciones = @Json.Serialize((object)ViewBag.Ubicaciones);
+        // { idProducto: [{ u: idUbicacion, c: cantidad }] } de las zonas que ve el usuario
+        var stockPorProducto = @Json.Serialize((object)ViewBag.StockPorProducto);
+        const ubicacionPorId = new Map(ubicaciones.map(u => [u.value, u]));
 
         // Los nombres vienen de la BD: escaparlos antes de meterlos en HTML
         function escaparHtml(texto) {
@@ -188,10 +190,12 @@
                     </select>
                 </td>
                 <td>
-                    <select name="Detalles[${contadorFila}].UbicacionId" class="form-select" required>
+                    <select name="Detalles[${contadorFila}].UbicacionId" class="form-select" required
+                            aria-describedby="pistaUbicacion${contadorFila}">
                         <option value="">-- Seleccione ubicación --</option>
                         ${ubicaciones.map(u => `<option value="${escaparHtml(u.value)}">${escaparHtml(u.text)}</option>`).join('')}
                     </select>
+                    <small class="text-muted d-block mt-1" id="pistaUbicacion${contadorFila}" aria-live="polite"></small>
                 </td>
                 <td>
                     <input type="number" name="Detalles[${contadorFila}].Cantidad" class="form-control" min="1" required>
@@ -203,8 +207,69 @@
                 </td>
             `;
             tbodyProductos.appendChild(fila);
+
+            const selProducto = fila.querySelector('select[name$=".ProductoId"]');
+            const selUbicacion = fila.querySelector('select[name$=".UbicacionId"]');
+            const pista = fila.querySelector(`#pistaUbicacion${contadorFila}`);
+            selProducto.addEventListener('change', () => sugerirUbicacion(selUbicacion, selProducto.value, pista));
+            selUbicacion.addEventListener('change', () => {
+                selUbicacion.dataset.elegidaPorUsuario = '1';
+                pista.textContent = '';
+            });
+
             contadorFila++;
             actualizarEstadoCarrito();
+        }
+
+        function nuevaOpcion(valor, texto) {
+            const o = document.createElement('option');
+            o.value = valor;
+            o.textContent = texto;
+            return o;
+        }
+
+        function grupoOpciones(etiqueta, opciones) {
+            const g = document.createElement('optgroup');
+            g.label = etiqueta;
+            g.append(...opciones);
+            return g;
+        }
+
+        // Ordena las zonas para el producto elegido y sugiere dónde recibirlo: donde ya está y queda
+        // menos (para reponer ahí) o, si no está en ninguna zona, en Recepción.
+        function sugerirUbicacion(select, productoId, pista) {
+            const enZonas = (stockPorProducto[productoId] || [])
+                .filter(s => ubicacionPorId.has(String(s.u)))
+                .sort((a, b) => a.c - b.c);
+            const idsConProducto = new Set(enZonas.map(s => String(s.u)));
+            const recepcion = ubicaciones.filter(u => u.recepcion && !idsConProducto.has(u.value));
+            const otras = ubicaciones.filter(u => !u.recepcion && !idsConProducto.has(u.value));
+            const previa = select.value;
+
+            select.replaceChildren(nuevaOpcion('', '-- Seleccione ubicación --'));
+            if (enZonas.length)
+                select.append(grupoOpciones('Donde ya está este producto',
+                    enZonas.map(s => nuevaOpcion(String(s.u), `${ubicacionPorId.get(String(s.u)).text} · quedan ${s.c}`))));
+            if (recepcion.length)
+                select.append(grupoOpciones('Recepción', recepcion.map(u => nuevaOpcion(u.value, u.text))));
+            if (otras.length)
+                select.append(grupoOpciones('Otras zonas', otras.map(u => nuevaOpcion(u.value, u.text))));
+
+            if (select.dataset.elegidaPorUsuario === '1' && previa) {
+                select.value = previa;
+                return;
+            }
+
+            if (enZonas.length) {
+                const zona = ubicacionPorId.get(String(enZonas[0].u));
+                select.value = zona.value;
+                pista.textContent = `Sugerido: donde ya está (quedan ${enZonas[0].c}). Puedes cambiarlo.`;
+            } else if (recepcion.length) {
+                select.value = recepcion[0].value;
+                pista.textContent = 'Sugerido: Recepción, porque no hay este producto en ninguna zona.';
+            } else {
+                pista.textContent = '';
+            }
         }
 
         function eliminarFila(boton) {

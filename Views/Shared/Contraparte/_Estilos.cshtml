@@ -174,4 +174,136 @@
     @@keyframes cp-girar {
         to { transform: rotate(360deg); }
     }
+
+    /* Formularios (contrapartes, mover mercadería) */
+    .cp-form-card {
+        max-width: 640px;
+        background: var(--g-white);
+        border: 1px solid var(--g-border);
+        border-radius: 14px;
+        padding: 1.5rem;
+    }
+
+    .cp-resumen {
+        max-width: 640px;
+        background: rgba(220,38,38,0.06);
+        border: 1px solid rgba(220,38,38,0.3);
+        border-radius: 10px;
+        padding: 12px 16px;
+        margin-bottom: 1rem;
+        color: var(--g-danger-text);
+    }
+
+        .cp-resumen h2 {
+            font-size: 15px;
+            font-weight: 600;
+            margin: 0 0 6px;
+        }
+
+        .cp-resumen ul {
+            margin: 0;
+            padding-left: 1.1rem;
+            font-size: 14px;
+        }
+
+        .cp-resumen a {
+            color: var(--g-danger-text);
+        }
+
+        .cp-resumen:focus-visible {
+            outline: 2px solid var(--g-danger-text);
+            outline-offset: 2px;
+        }
+
+    .cp-nota {
+        font-size: 13px;
+        color: var(--g-muted);
+        margin-bottom: 1.25rem;
+    }
+
+    .cp-campo {
+        margin-bottom: 1.1rem;
+    }
+
+        .cp-campo label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--g-text);
+            margin-bottom: 6px;
+        }
+
+    .cp-req {
+        color: var(--g-danger-text);
+    }
+
+    .cp-opcional {
+        font-weight: 400;
+        color: var(--g-muted);
+        font-size: 13px;
+    }
+
+    .cp-campo input,
+    .cp-campo textarea {
+        width: 100%;
+        min-height: 44px;
+        padding: 10px 12px;
+        border: 1px solid var(--g-input-border);
+        border-radius: 8px;
+        font-size: 15px;
+        font-family: inherit;
+        color: var(--g-text);
+        background: var(--g-white);
+        transition: border-color var(--transition), box-shadow var(--transition);
+    }
+
+    .cp-campo textarea {
+        resize: vertical;
+        min-height: 72px;
+    }
+
+        .cp-campo input:focus,
+        .cp-campo textarea:focus {
+            outline: none;
+            border-color: var(--g-teal);
+            box-shadow: 0 0 0 3px rgba(4,120,87,0.25);
+        }
+
+        .cp-campo input[aria-invalid="true"],
+        .cp-campo textarea[aria-invalid="true"] {
+            border-color: var(--g-danger);
+        }
+
+    .cp-ayuda {
+        font-size: 13px;
+        color: var(--g-muted);
+        margin-top: 4px;
+    }
+
+    .cp-error {
+        font-size: 13px;
+        color: var(--g-danger-text);
+        margin-top: 4px;
+        display: flex;
+        align-items: flex-start;
+        gap: 6px;
+    }
+
+        .cp-error i {
+            margin-top: 2px;
+        }
+
+    .cp-botones {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 1.5rem;
+        flex-wrap: wrap;
+    }
+
+    @@media (max-width: 576px) {
+        .cp-botones > * {
+            flex: 1;
+        }
+    }
 </style>
