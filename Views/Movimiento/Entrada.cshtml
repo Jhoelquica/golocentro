@@ -1,388 +1,672 @@
-﻿@model GestionAlmacen_Golocentro.ViewModels.MovimientoEntradaViewModel
+@using GestionAlmacen_Golocentro.ViewModels
+@model MovimientoEntradaViewModel
 @{
-    ViewData["Title"] = "Registrar Entrada";
-    // Proveedores y el alta de productos solo admiten a estos roles
-    var puedeCrearProveedor = User.IsInRole("duena") || User.IsInRole("encargada");
+    ViewData["Title"] = "Nueva entrada";
+    var d = Model.Datos;
+    var errores = ViewData.ModelState.Values
+        .SelectMany(v => v.Errors.Select(e => e.ErrorMessage))
+        .Distinct()
+        .ToList();
+    string? Error(string campo) => ViewData.ModelState[campo]?.Errors.FirstOrDefault()?.ErrorMessage;
 }
 
-<div class="container">
-    <h2 class="mb-4"><i class="bi bi-box-arrow-in-down"></i> Registrar Entrada de Productos</h2>
+@await Html.PartialAsync("~/Views/Shared/_EstilosGestion.cshtml")
+@await Html.PartialAsync("~/Views/Shared/_EstilosCarrito.cshtml")
 
-    @if (!ViewData.ModelState.IsValid)
+<style>
+    /* En la entrada cada línea solo lleva zona y cantidad */
+    .en-campos {
+        grid-template-columns: minmax(180px, 1fr) 148px;
+    }
+
+    @@media (max-width: 640px) {
+        .en-campos {
+            grid-template-columns: 1fr 148px;
+        }
+    }
+
+    .en-otra-zona {
+        border: none;
+        background: none;
+        padding: 6px 0 0;
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--g-teal);
+        cursor: pointer;
+    }
+
+        .en-otra-zona:hover {
+            text-decoration: underline;
+        }
+
+        .en-otra-zona:focus-visible {
+            outline: 2px solid var(--g-teal);
+            outline-offset: 2px;
+            border-radius: 4px;
+        }
+
+    .en-nuevo-producto {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 10px;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--g-teal);
+        text-decoration: none;
+    }
+
+        .en-nuevo-producto:hover {
+            text-decoration: underline;
+        }
+
+    .en-proveedor {
+        display: flex;
+        gap: 8px;
+    }
+
+        .en-proveedor select {
+            flex: 1;
+            min-width: 0;
+        }
+
+    .vn-card .cp-campo select {
+        width: 100%;
+        min-height: 44px;
+        padding: 10px 12px;
+        border: 1px solid var(--g-input-border);
+        border-radius: 8px;
+        font-size: 15px;
+        font-family: inherit;
+        color: var(--g-text);
+        background: var(--g-white);
+    }
+
+        .vn-card .cp-campo select[aria-invalid="true"] {
+            border-color: var(--g-danger);
+        }
+
+    .en-resumen {
+        border-top: 1px dashed var(--g-input-border);
+        padding-top: 12px;
+        margin-bottom: 14px;
+    }
+</style>
+
+<div class="cp-page vn-page">
+    <a class="cp-volver" asp-action="Index"><i class="bi bi-arrow-left" aria-hidden="true"></i> Movimientos</a>
+    <header class="cp-header">
+        <div>
+            <h1><i class="bi bi-box-arrow-in-down" aria-hidden="true"></i> Nueva entrada</h1>
+            <p>Registra la mercadería que llegó: qué productos, cuántos y en qué zona los dejas.</p>
+        </div>
+    </header>
+
+    @if (errores.Count > 0)
     {
-        <div class="alert alert-danger" role="alert" tabindex="-1" id="resumenErrores">
-            <strong><i class="bi bi-exclamation-triangle-fill"></i> Revisa lo siguiente antes de continuar:</strong>
-            <ul class="mb-0 mt-1">
-                @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+        <div class="cp-resumen" id="resumenErrores" role="alert" tabindex="-1">
+            <h2>No se pudo registrar la entrada</h2>
+            <ul>
+                @foreach (var error in errores)
                 {
-                    <li>@error.ErrorMessage</li>
+                    <li>@error</li>
                 }
             </ul>
         </div>
     }
 
-    <form method="post" asp-action="Entrada" enctype="multipart/form-data">
-        @Html.AntiForgeryToken()
-        <!-- nuevo producto -->
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <span></span>
-            @if (puedeCrearProveedor)
-            {
-                <a asp-controller="Producto" asp-action="Crear" asp-route-desde="entrada" target="_blank" class="btn btn-sm btn-outline-success">
-                    <i class="bi bi-plus-circle" aria-hidden="true"></i> Nuevo producto (nueva pestaña)
-                </a>
-            }
-        </div>
-        <!-- Tabla dinámica de productos -->
-        <div class="card mb-3">
-            <div class="card-header bg-primary text-white">
-                <i class="bi bi-cart-plus"></i> Productos
-            </div>
-            <div class="card-body">
-                <table class="table table-bordered" id="tablaProductos">
-                    <thead>
-                        <tr>
-                            <th>Producto <span class="text-danger">*</span></th>
-                            <th>Ubicación <span class="text-danger">*</span></th>
-                            <th>Cantidad <span class="text-danger">*</span></th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <!-- Las filas se agregan dinámicamente -->
-                    </tbody>
-                </table>
-
-                <div id="estadoVacio" class="text-center border rounded py-4 text-muted" style="display:none; border-style: dashed;">
-                    <i class="bi bi-box-seam fs-2 d-block mb-2"></i>
-                    Sin productos agregados todavía.
-                </div>
-
-                <button type="button" class="btn btn-outline-primary btn-sm" id="btnAgregarFila">
-                    <i class="bi bi-plus-circle"></i> Agregar producto
-                </button>
+    @if (d.Zonas.Count == 0)
+    {
+        <div class="cp-panel" style="max-width:640px">
+            <div class="cp-vacio">
+                <i class="bi bi-map" aria-hidden="true"></i>
+                Tu sede todavía no tiene zonas en el mapa del almacén. Pídele a la dueña que las registre.
             </div>
         </div>
-
-        <!-- Datos generales -->
-        <div class="row">
-            <div class="col-md-6 col-xl-4 mb-3">
-                <label asp-for="ProveedorId" class="form-label fw-bold">Proveedor <span class="text-danger">*</span></label>
-                <div class="input-group">
-                    <select asp-for="ProveedorId" class="form-select" required
-                            aria-describedby="proveedor-error"
-                            aria-invalid="@(ViewData.ModelState["ProveedorId"]?.Errors.Count > 0 ? "true" : "false")">
-                        <option value="">-- Seleccione proveedor --</option>
-                        @foreach (var item in ViewBag.Proveedores as IEnumerable<SelectListItem>)
+    }
+    else
+    {
+        <form method="post" asp-action="Entrada" enctype="multipart/form-data" id="formEntrada" novalidate>
+            <div class="vn-grid">
+                <div class="vn-col">
+                    <section class="vn-card" aria-labelledby="tituloProductos">
+                        <h2 class="vn-titulo" id="tituloProductos"><i class="bi bi-box-seam" aria-hidden="true"></i> Productos que llegaron</h2>
+                        <div class="vn-buscar">
+                            <i class="bi bi-search" aria-hidden="true"></i>
+                            <input type="search" id="buscarProducto" autocomplete="off" placeholder="Buscar por nombre o código"
+                                   aria-label="Buscar producto" aria-controls="resultadosProducto" aria-describedby="ayudaBuscar" />
+                        </div>
+                        <p class="cp-ayuda" id="ayudaBuscar">Toca un producto para agregarlo. Enter agrega el primero de la lista.</p>
+                        <ul class="vn-resultados" id="resultadosProducto" aria-label="Productos"></ul>
+                        <p class="vn-mas" id="masResultados"></p>
+                        @if (d.PuedeCrear)
                         {
-                            <option value="@item.Value">@item.Text</option>
+                            <a class="en-nuevo-producto" asp-controller="Producto" asp-action="Crear" asp-route-desde="entrada" target="_blank">
+                                <i class="bi bi-plus-circle" aria-hidden="true"></i> ¿No está? Crear producto (nueva pestaña)
+                            </a>
                         }
-                    </select>
-                    @if (puedeCrearProveedor)
-                    {
-                        <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#modalNuevoProveedor">
-                            <i class="bi bi-plus-circle" aria-hidden="true"></i> Nuevo
-                        </button>
-                    }
+                        else
+                        {
+                            <p class="cp-ayuda">Si un producto no aparece, pídele a la encargada que lo registre.</p>
+                        }
+
+                        <h3 class="vn-subtitulo">En esta entrada <span class="vn-contador" id="contadorLineas">0</span></h3>
+                        <ol class="vn-carrito" id="carrito" aria-label="Productos de la entrada"></ol>
+                        <div class="vn-carrito-vacio" id="carritoVacio">
+                            <i class="bi bi-box-arrow-in-down" aria-hidden="true"></i>
+                            Todavía no agregaste productos.
+                        </div>
+                    </section>
                 </div>
-                <span asp-validation-for="ProveedorId" id="proveedor-error" class="text-danger"></span>
-            </div>
-            <div class="col-md-6 col-xl-4 mb-3">
-                <label asp-for="NumeroFactura" class="form-label fw-bold">Nº Factura / Guía</label>
-                <input asp-for="NumeroFactura" class="form-control" placeholder="Opcional" />
-            </div>
-            <div class="col-md-6 col-xl-4 mb-3">
-                <label asp-for="Evidencia" class="form-label fw-bold">Evidencia (foto)</label>
-                <input asp-for="Evidencia" type="file" class="form-control" accept="image/*" />
-            </div>
-        </div>
 
-        <div class="d-flex justify-content-between">
-            <a asp-action="Index" class="btn btn-secondary"><i class="bi bi-arrow-left"></i> Volver</a>
-            <button type="submit" class="btn btn-primary" id="btnRegistrarEntrada"><i class="bi bi-save"></i> Registrar Entrada</button>
-        </div>
-    </form>
+                <div class="vn-col vn-cobro">
+                    <section class="vn-card" aria-label="Datos de la entrada">
+                        <div class="cp-campo">
+                            <label for="ProveedorId">Proveedor <span class="cp-req" aria-hidden="true">*</span></label>
+                            <div class="en-proveedor">
+                                <select id="ProveedorId" name="ProveedorId" required aria-required="true"
+                                        aria-invalid="@(Error("ProveedorId") != null ? "true" : null)"
+                                        aria-describedby="@(Error("ProveedorId") != null ? "ProveedorId-error" : null)">
+                                    <option value="">Elige el proveedor</option>
+                                    @foreach (var p in d.Proveedores)
+                                    {
+                                        <option value="@p.Id" selected="@(Model.ProveedorId == p.Id)">@p.Nombre</option>
+                                    }
+                                </select>
+                                @if (d.PuedeCrear)
+                                {
+                                    <button type="button" class="btn-g-outline" id="btnNuevoProveedor" aria-label="Registrar nuevo proveedor" title="Nuevo proveedor">
+                                        <i class="bi bi-plus-lg" aria-hidden="true"></i>
+                                    </button>
+                                }
+                            </div>
+                            @if (Error("ProveedorId") is string eProv)
+                            {
+                                <p class="cp-error" id="ProveedorId-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @eProv</p>
+                            }
+                        </div>
 
-    <p class="visually-hidden" aria-live="polite" id="avisoProveedor"></p>
+                        <div class="cp-campo">
+                            <label for="NumeroFactura">Factura o guía <span class="cp-opcional">(opcional)</span></label>
+                            <input id="NumeroFactura" name="NumeroFactura" type="text" maxlength="50" value="@Model.NumeroFactura"
+                                   autocomplete="off" placeholder="Ej.: F001-00012345" />
+                        </div>
+
+                        <div class="cp-campo">
+                            <label for="Evidencia">Foto <span class="cp-opcional">(opcional)</span></label>
+                            <input type="file" id="Evidencia" name="Evidencia" accept="image/jpeg,image/png,image/webp" aria-describedby="ayudaFoto" />
+                            <div class="cp-ayuda" id="ayudaFoto">De la mercadería o de la guía. También puedes subirla después.</div>
+                        </div>
+
+                        <div class="en-resumen">
+                            <div class="vn-total-fila"><span>Productos</span><span id="txtProductos">0</span></div>
+                            <div class="vn-total-fila vn-total"><span>Unidades</span><span id="txtUnidades">0</span></div>
+                        </div>
+
+                        <p class="vn-motivo" id="motivo" role="alert"></p>
+                        <button type="submit" class="btn-g-primary vn-registrar" id="btnRegistrar">
+                            <i class="bi bi-check2-circle" aria-hidden="true"></i> <span id="txtRegistrar">Registrar entrada</span>
+                        </button>
+                    </section>
+                </div>
+            </div>
+        </form>
+
+        @if (d.PuedeCrear)
+        {
+            <div class="modal fade" id="modalProveedor" tabindex="-1" aria-labelledby="tituloModalProveedor" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content" style="border:none;border-radius:14px">
+                        <form id="formProveedor" novalidate>
+                            <div class="modal-header">
+                                <h2 class="modal-title fs-5" id="tituloModalProveedor"><i class="bi bi-truck" aria-hidden="true"></i> Nuevo proveedor</h2>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="cp-aviso error" id="errorGeneralProveedor" role="alert" hidden></div>
+                                <div class="cp-campo">
+                                    <label for="provNombre">Nombre o razón social <span class="cp-req" aria-hidden="true">*</span></label>
+                                    <input type="text" id="provNombre" name="Nombre" maxlength="150" required aria-required="true" autocomplete="off" data-campo="Nombre" />
+                                    <div class="cp-error" id="provNombre-error"></div>
+                                </div>
+                                <div class="cp-campo">
+                                    <label for="provRuc">RUC <span class="cp-req" aria-hidden="true">*</span></label>
+                                    <input type="text" id="provRuc" name="Documento" maxlength="11" inputmode="numeric" required aria-required="true" autocomplete="off"
+                                           data-campo="Documento" data-ayuda="provRuc-ayuda" aria-describedby="provRuc-ayuda" />
+                                    <div class="cp-ayuda" id="provRuc-ayuda">11 dígitos, solo números.</div>
+                                    <div class="cp-error" id="provRuc-error"></div>
+                                </div>
+                                <div class="cp-campo mb-0">
+                                    <label for="provContacto">Contacto <span class="cp-opcional">(opcional)</span></label>
+                                    <input type="text" id="provContacto" name="Contacto" maxlength="100" autocomplete="off" data-campo="Contacto" />
+                                    <div class="cp-error" id="provContacto-error"></div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn-g-outline" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="submit" class="btn-g-primary" id="btnGuardarProveedor"><i class="bi bi-check-lg" aria-hidden="true"></i> Guardar y elegir</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        }
+    }
 </div>
 
-@if (puedeCrearProveedor)
-{
-    <div class="modal fade" id="modalNuevoProveedor" tabindex="-1" aria-labelledby="tituloNuevoProveedor" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <form id="formNuevoProveedor" novalidate>
-                    <div class="modal-header bg-success text-white">
-                        <h2 class="modal-title fs-5" id="tituloNuevoProveedor"><i class="bi bi-truck" aria-hidden="true"></i> Registrar nuevo proveedor</h2>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="alert alert-danger d-none" role="alert" tabindex="-1" id="errorGeneralProveedor"></div>
-                        <div class="mb-3">
-                            <label class="form-label" for="provNombre">Nombre o razón social <span class="text-danger" aria-hidden="true">*</span></label>
-                            <input type="text" id="provNombre" name="Nombre" class="form-control" maxlength="150" required aria-required="true" data-campo="Nombre" />
-                            <div class="invalid-feedback" id="provNombre-error"></div>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label" for="provRuc">RUC <span class="text-danger" aria-hidden="true">*</span></label>
-                            <input type="text" id="provRuc" name="Documento" class="form-control" inputmode="numeric" maxlength="11"
-                                   autocomplete="off" required aria-required="true" aria-describedby="provRuc-ayuda"
-                                   data-ayuda="provRuc-ayuda" data-campo="Documento" />
-                            <div class="form-text" id="provRuc-ayuda">11 dígitos, solo números.</div>
-                            <div class="invalid-feedback" id="provRuc-error"></div>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label" for="provContacto">Contacto <span class="text-muted fw-normal">(opcional)</span></label>
-                            <input type="text" id="provContacto" name="Contacto" class="form-control" maxlength="100" data-campo="Contacto" />
-                            <div class="invalid-feedback" id="provContacto-error"></div>
-                        </div>
-                        <div class="mb-1">
-                            <label class="form-label" for="provDireccion">Dirección <span class="text-muted fw-normal">(opcional)</span></label>
-                            <input type="text" id="provDireccion" name="Direccion" class="form-control" maxlength="200" data-campo="Direccion" />
-                            <div class="invalid-feedback" id="provDireccion-error"></div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn btn-success" id="btnGuardarProveedor"><i class="bi bi-check-lg" aria-hidden="true"></i> Guardar proveedor</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-}
-
 @section Scripts {
-    <script>
-        // Json.Serialize escapa < > & para que un nombre con una etiqueta de cierre de script no rompa el bloque
-        var productos = @Json.Serialize(
-                    ((IEnumerable<SelectListItem>)ViewBag.Productos).Select(p => new { value = p.Value, text = p.Text }));
-        var ubicaciones = @Json.Serialize((object)ViewBag.Ubicaciones);
-        // { idProducto: [{ u: idUbicacion, c: cantidad }] } de las zonas que ve el usuario
-        var stockPorProducto = @Json.Serialize((object)ViewBag.StockPorProducto);
-        const ubicacionPorId = new Map(ubicaciones.map(u => [u.value, u]));
+    @if (d.Zonas.Count > 0)
+    {
+        <script>
+            // Json.Serialize escapa < > & para que un nombre con una etiqueta de cierre no rompa el bloque
+            const productos = @Json.Serialize(d.Productos);
+            const zonas = @Json.Serialize(d.Zonas);
+            const stock = @Json.Serialize(d.Stock);
+            const variasSedes = @Json.Serialize(d.VariasSedes);
+            const previos = @Json.Serialize(Model.Detalles);
 
-        // Al volver de crear un producto en otra pestaña, sumarlo a la lista sin recargar (se perdería lo cargado)
-        document.addEventListener('visibilitychange', async () => {
-            if (document.visibilityState !== 'visible') return;
-            try {
-                const respuesta = await fetch('@Url.Action("Catalogo", "Inventario")');
-                if (!respuesta.ok) return;
-                const conocidos = new Set(productos.map(p => p.value));
-                const nuevos = (await respuesta.json())
-                    .map(p => ({ value: String(p.id), text: p.nombre }))
-                    .filter(p => !conocidos.has(p.value));
-                if (!nuevos.length) return;
-                productos.push(...nuevos);
-                document.querySelectorAll('select[name$=".ProductoId"]').forEach(select =>
-                    nuevos.forEach(p => select.add(new Option(p.text, p.value))));
-            } catch {
-                // Sin conexión: se sigue con la lista que ya estaba cargada
+            const productoPorId = new Map(productos.map(p => [p.id, p]));
+            const zonaPorId = new Map(zonas.map(z => [z.id, z]));
+            const normalizar = t => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+            const textoZona = z => z.codigo + (z.descripcion ? ` — ${z.descripcion}` : '') + (variasSedes ? ` · ${z.sede}` : '');
+
+            // { idProducto: [{ zonaId, cantidad }] } de las zonas que ve el usuario
+            const stockPorProducto = new Map();
+            for (const s of stock) {
+                if (!zonaPorId.has(s.zonaId)) continue;
+                if (!stockPorProducto.has(s.productoId)) stockPorProducto.set(s.productoId, []);
+                stockPorProducto.get(s.productoId).push(s);
             }
-        });
+            const hayEnSede = id => (stockPorProducto.get(id) ?? []).reduce((t, s) => t + s.cantidad, 0);
 
-        // Los nombres vienen de la BD: escaparlos antes de meterlos en HTML
-        function escaparHtml(texto) {
-            return String(texto)
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#39;');
-        }
+            const form = document.getElementById('formEntrada');
+            const carrito = document.getElementById('carrito');
+            const carritoVacio = document.getElementById('carritoVacio');
+            const buscarProducto = document.getElementById('buscarProducto');
+            const listaProductos = document.getElementById('resultadosProducto');
+            const masResultados = document.getElementById('masResultados');
+            const motivo = document.getElementById('motivo');
+            const btnRegistrar = document.getElementById('btnRegistrar');
+            const MAX_RESULTADOS = 8;
+            const lineas = () => [...carrito.children];
+            const campo = (li, nombre) => li.querySelector(`[data-campo="${nombre}"]`);
 
-        let contadorFila = 0;
-        const tbodyProductos = document.querySelector('#tablaProductos tbody');
-        const estadoVacio = document.getElementById('estadoVacio');
-        const btnRegistrarEntrada = document.getElementById('btnRegistrarEntrada');
-
-        function actualizarEstadoCarrito() {
-            const hayFilas = tbodyProductos.children.length > 0;
-            estadoVacio.style.display = hayFilas ? 'none' : 'block';
-            btnRegistrarEntrada.disabled = !hayFilas;
-        }
-
-        function agregarFila() {
-            const fila = document.createElement('tr');
-            fila.innerHTML = `
-                <td>
-                    <select name="Detalles[${contadorFila}].ProductoId" class="form-select" required>
-                        <option value="">-- Seleccione producto --</option>
-                        ${productos.map(p => `<option value="${escaparHtml(p.value)}">${escaparHtml(p.text)}</option>`).join('')}
-                    </select>
-                </td>
-                <td>
-                    <select name="Detalles[${contadorFila}].UbicacionId" class="form-select" required
-                            aria-describedby="pistaUbicacion${contadorFila}">
-                        <option value="">-- Seleccione ubicación --</option>
-                        ${ubicaciones.map(u => `<option value="${escaparHtml(u.value)}">${escaparHtml(u.text)}</option>`).join('')}
-                    </select>
-                    <small class="text-muted d-block mt-1" id="pistaUbicacion${contadorFila}" aria-live="polite"></small>
-                </td>
-                <td>
-                    <input type="number" name="Detalles[${contadorFila}].Cantidad" class="form-control" min="1" required>
-                </td>
-                <td>
-                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="eliminarFila(this)" aria-label="Quitar producto">
-                        <i class="bi bi-trash"></i>
-                    </button>
-                </td>
-            `;
-            tbodyProductos.appendChild(fila);
-
-            const selProducto = fila.querySelector('select[name$=".ProductoId"]');
-            const selUbicacion = fila.querySelector('select[name$=".UbicacionId"]');
-            const pista = fila.querySelector(`#pistaUbicacion${contadorFila}`);
-            selProducto.addEventListener('change', () => sugerirUbicacion(selUbicacion, selProducto.value, pista));
-            selUbicacion.addEventListener('change', () => {
-                selUbicacion.dataset.elegidaPorUsuario = '1';
-                pista.textContent = '';
-            });
-
-            contadorFila++;
-            actualizarEstadoCarrito();
-        }
-
-        function nuevaOpcion(valor, texto) {
-            const o = document.createElement('option');
-            o.value = valor;
-            o.textContent = texto;
-            return o;
-        }
-
-        function grupoOpciones(etiqueta, opciones) {
-            const g = document.createElement('optgroup');
-            g.label = etiqueta;
-            g.append(...opciones);
-            return g;
-        }
-
-        // Ordena las zonas para el producto elegido y sugiere dónde recibirlo: donde ya está y queda
-        // menos (para reponer ahí) o, si no está en ninguna zona, en Recepción.
-        function sugerirUbicacion(select, productoId, pista) {
-            const enZonas = (stockPorProducto[productoId] || [])
-                .filter(s => ubicacionPorId.has(String(s.u)))
-                .sort((a, b) => a.c - b.c);
-            const idsConProducto = new Set(enZonas.map(s => String(s.u)));
-            const recepcion = ubicaciones.filter(u => u.recepcion && !idsConProducto.has(u.value));
-            const otras = ubicaciones.filter(u => !u.recepcion && !idsConProducto.has(u.value));
-            const previa = select.value;
-
-            select.replaceChildren(nuevaOpcion('', '-- Seleccione ubicación --'));
-            if (enZonas.length)
-                select.append(grupoOpciones('Donde ya está este producto',
-                    enZonas.map(s => nuevaOpcion(String(s.u), `${ubicacionPorId.get(String(s.u)).text} · quedan ${s.c}`))));
-            if (recepcion.length)
-                select.append(grupoOpciones('Recepción', recepcion.map(u => nuevaOpcion(u.value, u.text))));
-            if (otras.length)
-                select.append(grupoOpciones('Otras zonas', otras.map(u => nuevaOpcion(u.value, u.text))));
-
-            if (select.dataset.elegidaPorUsuario === '1' && previa) {
-                select.value = previa;
-                return;
+            const avisoLector = document.createElement('p');
+            avisoLector.className = 'visually-hidden';
+            avisoLector.setAttribute('aria-live', 'polite');
+            document.body.append(avisoLector);
+            function anunciar(texto) {
+                avisoLector.textContent = '';
+                setTimeout(() => avisoLector.textContent = texto, 50);
             }
 
-            if (enZonas.length) {
-                const zona = ubicacionPorId.get(String(enZonas[0].u));
-                select.value = zona.value;
-                pista.textContent = `Sugerido: donde ya está (quedan ${enZonas[0].c}). Puedes cambiarlo.`;
-            } else if (recepcion.length) {
-                select.value = recepcion[0].value;
-                pista.textContent = 'Sugerido: Recepción, porque no hay este producto en ninguna zona.';
-            } else {
-                pista.textContent = '';
+            // ===== Búsqueda =====
+            function filtrarProductos() {
+                const texto = buscarProducto.value.trim();
+                const q = normalizar(texto);
+                const coinciden = productos.filter(p => !q || normalizar(p.nombre).includes(q) || normalizar(p.codigo).includes(q));
+                listaProductos.replaceChildren(...coinciden.slice(0, MAX_RESULTADOS).map(p => {
+                    const li = document.createElement('li');
+                    const boton = document.createElement('button');
+                    boton.type = 'button';
+                    boton.className = 'vn-opcion';
+                    boton.innerHTML = '<span class="vn-opcion-nombre"></span><span class="vn-opcion-meta"></span><i class="bi bi-plus-lg" aria-hidden="true"></i>';
+                    boton.querySelector('.vn-opcion-nombre').textContent = p.nombre;
+                    const hay = hayEnSede(p.id);
+                    boton.querySelector('.vn-opcion-meta').textContent = `${p.codigo} · ${hay > 0 ? `hay ${hay}` : 'sin stock'}`;
+                    boton.setAttribute('aria-label', `Agregar ${p.nombre}, ${hay > 0 ? `hay ${hay}` : 'sin stock'}`);
+                    boton.addEventListener('click', () => agregarProducto(p.id));
+                    li.append(boton);
+                    return li;
+                }));
+                masResultados.textContent = coinciden.length === 0
+                    ? `No hay productos con «${texto}».`
+                    : coinciden.length > MAX_RESULTADOS ? `Y ${coinciden.length - MAX_RESULTADOS} más: escribe para acotar.` : '';
             }
-        }
-
-        function eliminarFila(boton) {
-            boton.closest('tr').remove();
-            actualizarEstadoCarrito();
-        }
-
-        document.getElementById('btnAgregarFila').addEventListener('click', agregarFila);
-
-        document.addEventListener('DOMContentLoaded', () => {
-            actualizarEstadoCarrito();
-            document.getElementById('resumenErrores')?.focus();
-        });
-
-        // ======= NUEVO PROVEEDOR (modal, sin recargar para no perder el carrito) =======
-        const formProveedor = document.getElementById('formNuevoProveedor');
-        if (formProveedor) {
-            const modalProveedor = document.getElementById('modalNuevoProveedor');
-            const btnGuardarProveedor = document.getElementById('btnGuardarProveedor');
-            const errorGeneral = document.getElementById('errorGeneralProveedor');
-            const contenidoBotonProveedor = btnGuardarProveedor.innerHTML;
-            const camposProveedor = [...formProveedor.querySelectorAll('[data-campo]')];
-
-            function limpiarErroresProveedor() {
-                errorGeneral.classList.add('d-none');
-                errorGeneral.textContent = '';
-                camposProveedor.forEach(input => {
-                    input.classList.remove('is-invalid');
-                    input.removeAttribute('aria-invalid');
-                    document.getElementById(input.id + '-error').textContent = '';
-                    if (input.dataset.ayuda) input.setAttribute('aria-describedby', input.dataset.ayuda);
-                    else input.removeAttribute('aria-describedby');
-                });
-            }
-
-            function mostrarErroresProveedor(errores) {
-                let primero = null;
-                for (const [campo, mensaje] of Object.entries(errores)) {
-                    const input = camposProveedor.find(i => i.dataset.campo === campo);
-                    if (!input) {
-                        errorGeneral.textContent = mensaje;
-                        errorGeneral.classList.remove('d-none');
-                        primero ??= errorGeneral;
-                        continue;
-                    }
-                    const idError = input.id + '-error';
-                    input.classList.add('is-invalid');
-                    input.setAttribute('aria-invalid', 'true');
-                    input.setAttribute('aria-describedby', [input.dataset.ayuda, idError].filter(Boolean).join(' '));
-                    document.getElementById(idError).textContent = mensaje;
-                    primero ??= input;
-                }
-                primero?.focus();
-            }
-
-            formProveedor.addEventListener('submit', async function (e) {
+            buscarProducto.addEventListener('input', filtrarProductos);
+            buscarProducto.addEventListener('keydown', e => {
+                if (e.key !== 'Enter') return;
                 e.preventDefault();
-                limpiarErroresProveedor();
+                listaProductos.querySelector('button')?.click();
+            });
 
-                const datos = new FormData(formProveedor);
-                datos.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]').value);
+            // ===== Zonas: sugerir recibir donde ya está y queda menos (reponer ahí) o en Recepción =====
+            function opcion(valor, texto) {
+                const o = document.createElement('option');
+                o.value = valor;
+                o.textContent = texto;
+                return o;
+            }
+            function grupo(etiqueta, opciones) {
+                const g = document.createElement('optgroup');
+                g.label = etiqueta;
+                g.append(...opciones);
+                return g;
+            }
 
-                btnGuardarProveedor.disabled = true;
-                btnGuardarProveedor.innerHTML = '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Guardando…';
-                try {
-                    const respuesta = await fetch('@Url.Action("CrearRapido", "Proveedor")', { method: 'POST', body: datos });
-                    const resultado = await respuesta.json();
-                    if (resultado.success) {
-                        const select = document.getElementById('ProveedorId');
-                        select.add(new Option(resultado.nombre, resultado.id, true, true));
-                        select.setAttribute('aria-invalid', 'false');
-                        document.getElementById('proveedor-error').textContent = '';
-                        bootstrap.Modal.getInstance(modalProveedor).hide();
-                        document.getElementById('avisoProveedor').textContent = `Proveedor ${resultado.nombre} registrado y seleccionado.`;
-                    } else {
-                        mostrarErroresProveedor(resultado.errores || {});
+            // Devuelve la zona sugerida y el porqué; excluye las zonas que ya usa otra línea del mismo producto
+            function llenarZonas(select, productoId, excluir) {
+                const enZonas = (stockPorProducto.get(productoId) ?? []).slice().sort((a, b) => a.cantidad - b.cantidad);
+                const conProducto = new Set(enZonas.map(s => s.zonaId));
+                const recepcion = zonas.filter(z => z.recepcion && !conProducto.has(z.id));
+                const otras = zonas.filter(z => !z.recepcion && !conProducto.has(z.id));
+
+                select.replaceChildren(opcion('', 'Elige la zona'));
+                if (enZonas.length)
+                    select.append(grupo('Donde ya está este producto', enZonas.map(s => opcion(s.zonaId, `${textoZona(zonaPorId.get(s.zonaId))} · hay ${s.cantidad}`))));
+                if (recepcion.length)
+                    select.append(grupo('Recepción', recepcion.map(z => opcion(z.id, textoZona(z)))));
+                if (otras.length)
+                    select.append(grupo('Otras zonas', otras.map(z => opcion(z.id, textoZona(z)))));
+
+                const libre = enZonas.find(s => !excluir.has(s.zonaId));
+                if (libre) return { zona: libre.zonaId, pista: `Sugerido: donde ya está (hay ${libre.cantidad}). Puedes cambiarlo.` };
+                const rec = recepcion.find(z => !excluir.has(z.id));
+                if (rec) return { zona: rec.id, pista: enZonas.length ? 'Sugerido: Recepción.' : 'Sugerido: Recepción, porque no está en ninguna zona.' };
+                return { zona: '', pista: '' };
+            }
+
+            // ===== Carrito =====
+            let secuencia = 0;
+            function destacar(li) {
+                li.classList.remove('vn-destacar');
+                void li.offsetWidth;
+                li.classList.add('vn-destacar');
+            }
+
+            function agregarProducto(id, zonaPrevia, cantidadPrevia) {
+                const p = productoPorId.get(id);
+                if (!p) return;
+                const existente = lineas().find(li => Number(li.dataset.producto) === id);
+                if (existente && zonaPrevia === undefined) {
+                    destacar(existente);
+                    campo(existente, 'Cantidad').focus();
+                    campo(existente, 'Cantidad').select();
+                    anunciar(`${p.nombre} ya está en la entrada. Ajusta su cantidad.`);
+                    return;
+                }
+                crearLinea(p, zonaPrevia, cantidadPrevia);
+            }
+
+            function crearLinea(p, zonaPrevia, cantidadPrevia) {
+                const n = ++secuencia;
+                const li = document.createElement('li');
+                li.className = 'vn-linea';
+                li.dataset.producto = p.id;
+                li.innerHTML = `
+                    <div class="vn-linea-cab">
+                        <div>
+                            <div class="vn-linea-nombre"></div>
+                            <div class="cp-sub vn-linea-cod"></div>
+                        </div>
+                        <button type="button" class="cp-icono-btn peligro" data-accion="quitar"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                    </div>
+                    <div class="vn-linea-campos en-campos">
+                        <div class="vn-f">
+                            <label for="zona${n}">Dejar en la zona</label>
+                            <select id="zona${n}" data-campo="UbicacionId" aria-describedby="aviso${n}"></select>
+                        </div>
+                        <div class="vn-f">
+                            <label for="cant${n}">Cantidad</label>
+                            <div class="vn-stepper">
+                                <button type="button" data-accion="menos" aria-label="Uno menos"><i class="bi bi-dash-lg" aria-hidden="true"></i></button>
+                                <input type="number" id="cant${n}" data-campo="Cantidad" min="1" step="1" inputmode="numeric" aria-describedby="aviso${n}" />
+                                <button type="button" data-accion="mas" aria-label="Uno más"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="vn-linea-aviso" id="aviso${n}"></p>
+                    <button type="button" class="en-otra-zona" data-accion="otra-zona">+ Repartir en otra zona</button>
+                    <input type="hidden" data-campo="ProductoId" />`;
+
+                li.querySelector('.vn-linea-nombre').textContent = p.nombre;
+                li.querySelector('.vn-linea-cod').textContent = p.codigo + (p.unidad ? ` · en ${p.unidad}` : '');
+                li.querySelector('[data-accion="quitar"]').setAttribute('aria-label', `Quitar ${p.nombre}`);
+                campo(li, 'ProductoId').value = p.id;
+
+                const usadas = new Set(lineas().filter(x => Number(x.dataset.producto) === p.id).map(x => Number(campo(x, 'UbicacionId').value)));
+                const select = campo(li, 'UbicacionId');
+                const sugerencia = llenarZonas(select, p.id, usadas);
+                select.value = zonaPrevia ?? sugerencia.zona;
+                li.querySelector('.vn-linea-aviso').textContent = zonaPrevia ? '' : sugerencia.pista;
+                const inputCant = campo(li, 'Cantidad');
+                inputCant.value = cantidadPrevia ?? 1;
+
+                carrito.append(li);
+                actualizar();
+                destacar(li);
+                if (cantidadPrevia === undefined) {
+                    inputCant.focus();
+                    inputCant.select();
+                    anunciar(`${p.nombre} agregado. Escribe la cantidad.`);
+                }
+            }
+
+            carrito.addEventListener('click', e => {
+                const boton = e.target.closest('[data-accion]');
+                if (!boton) return;
+                const li = boton.closest('.vn-linea');
+                const input = campo(li, 'Cantidad');
+                const actual = parseInt(input.value, 10) || 0;
+                switch (boton.dataset.accion) {
+                    case 'quitar': {
+                        const nombre = li.querySelector('.vn-linea-nombre').textContent;
+                        const siguiente = li.nextElementSibling ?? li.previousElementSibling;
+                        li.remove();
+                        actualizar();
+                        anunciar(`${nombre} quitado de la entrada.`);
+                        (siguiente?.querySelector('[data-accion="quitar"]') ?? buscarProducto).focus();
+                        return;
                     }
+                    case 'otra-zona':
+                        crearLinea(productoPorId.get(Number(li.dataset.producto)));
+                        return;
+                    case 'mas':
+                        input.value = actual + 1;
+                        break;
+                    case 'menos':
+                        input.value = Math.max(1, actual - 1);
+                        break;
+                }
+                actualizar();
+            });
+            carrito.addEventListener('input', actualizar);
+            carrito.addEventListener('change', e => {
+                // Si la cambian a mano, la pista de sugerencia ya no aplica
+                if (e.target.dataset.campo === 'UbicacionId')
+                    e.target.closest('.vn-linea').querySelector('.vn-linea-aviso').textContent = '';
+                actualizar();
+            });
+
+            function actualizar() {
+                let problema = null;
+                let unidades = 0;
+                const vistas = new Set();
+                for (const li of lineas()) {
+                    const p = productoPorId.get(Number(li.dataset.producto));
+                    const inputCant = campo(li, 'Cantidad');
+                    const select = campo(li, 'UbicacionId');
+                    const cantidad = parseInt(inputCant.value, 10);
+                    const aviso = li.querySelector('.vn-linea-aviso');
+                    const clave = `${li.dataset.producto}-${select.value}`;
+                    let error = null;
+                    let elemento = null;
+
+                    if (!select.value) {
+                        error = 'Elige la zona donde lo dejas.';
+                        elemento = select;
+                    } else if (vistas.has(clave)) {
+                        error = 'Ya hay otra línea de este producto en esa zona: súmalas en una.';
+                        elemento = select;
+                    } else if (!Number.isInteger(cantidad) || cantidad < 1) {
+                        error = 'La cantidad debe ser 1 o más.';
+                        elemento = inputCant;
+                    }
+                    vistas.add(clave);
+
+                    inputCant.setAttribute('aria-invalid', elemento === inputCant ? 'true' : 'false');
+                    select.setAttribute('aria-invalid', elemento === select ? 'true' : 'false');
+                    if (error) {
+                        aviso.textContent = error;
+                        aviso.classList.add('error');
+                        problema ??= { mensaje: `${p.nombre}: ${error}`, elemento };
+                    } else {
+                        if (aviso.classList.contains('error')) aviso.textContent = '';
+                        aviso.classList.remove('error');
+                        unidades += cantidad;
+                    }
+                }
+
+                const n = lineas().length;
+                const distintos = new Set(lineas().map(li => li.dataset.producto)).size;
+                document.getElementById('contadorLineas').textContent = n;
+                document.getElementById('txtProductos').textContent = distintos;
+                document.getElementById('txtUnidades').textContent = unidades.toLocaleString('es-PE');
+                document.getElementById('txtRegistrar').textContent = n ? `Registrar entrada · ${unidades} ${unidades === 1 ? 'unidad' : 'unidades'}` : 'Registrar entrada';
+                carritoVacio.hidden = n > 0;
+                if (motivo.textContent && !problema && n > 0) motivo.textContent = '';
+                return problema;
+            }
+
+            // ===== Registrar =====
+            const selectProveedor = document.getElementById('ProveedorId');
+            form.addEventListener('submit', e => {
+                let problema = actualizar();
+                if (!lineas().length)
+                    problema = { mensaje: 'Agrega al menos un producto que llegó.', elemento: buscarProducto };
+                else if (!selectProveedor.value)
+                    problema ??= { mensaje: 'Elige el proveedor.', elemento: selectProveedor };
+
+                if (problema) {
+                    e.preventDefault();
+                    motivo.textContent = problema.mensaje;
+                    problema.elemento?.focus();
+                    return;
+                }
+                // Nombres en orden para que el model binding arme la lista Detalles
+                lineas().forEach((li, i) =>
+                    li.querySelectorAll('[data-campo]').forEach(c => c.name = `Detalles[${i}].${c.dataset.campo}`));
+                btnRegistrar.disabled = true;
+                btnRegistrar.innerHTML = '<span class="cp-spinner" aria-hidden="true"></span> Registrando entrada…';
+            });
+            selectProveedor.addEventListener('change', () => {
+                selectProveedor.setAttribute('aria-invalid', 'false');
+                if (motivo.textContent === 'Elige el proveedor.') motivo.textContent = '';
+            });
+            window.addEventListener('pageshow', e => {
+                if (!e.persisted) return;
+                btnRegistrar.disabled = false;
+                btnRegistrar.innerHTML = '<i class="bi bi-check2-circle" aria-hidden="true"></i> <span id="txtRegistrar"></span>';
+                actualizar();
+            });
+
+            // Al volver de crear un producto en otra pestaña, sumarlo a la búsqueda sin recargar (se perdería lo cargado)
+            document.addEventListener('visibilitychange', async () => {
+                if (document.visibilityState !== 'visible') return;
+                try {
+                    const respuesta = await fetch('@Url.Action("Catalogo", "Inventario")');
+                    if (!respuesta.ok) return;
+                    const nuevos = (await respuesta.json()).filter(p => !productoPorId.has(p.id));
+                    if (!nuevos.length) return;
+                    for (const p of nuevos) {
+                        const producto = { id: p.id, nombre: p.nombre, codigo: p.codigo, unidad: '' };
+                        productos.push(producto);
+                        productoPorId.set(p.id, producto);
+                    }
+                    productos.sort((a, b) => a.nombre.localeCompare(b.nombre));
+                    filtrarProductos();
+                    anunciar(nuevos.length === 1 ? `Producto nuevo disponible: ${nuevos[0].nombre}.` : `${nuevos.length} productos nuevos disponibles.`);
                 } catch {
-                    // También cae aquí si la sesión expiró (la respuesta es la página de login, no JSON)
-                    mostrarErroresProveedor({ '': 'No se pudo registrar el proveedor. Revisa tu conexión o vuelve a iniciar sesión.' });
-                } finally {
-                    btnGuardarProveedor.disabled = false;
-                    btnGuardarProveedor.innerHTML = contenidoBotonProveedor;
+                    // Sin conexión: se sigue con la lista que ya estaba cargada
                 }
             });
 
-            modalProveedor.addEventListener('shown.bs.modal', () => document.getElementById('provNombre').focus());
-            modalProveedor.addEventListener('hidden.bs.modal', () => {
-                formProveedor.reset();
-                limpiarErroresProveedor();
-            });
-        }
-    </script>
+            // ===== Nuevo proveedor (modal, sin recargar para no perder lo cargado) =====
+            const formProveedor = document.getElementById('formProveedor');
+            if (formProveedor) {
+                const modalProveedor = document.getElementById('modalProveedor');
+                const btnGuardar = document.getElementById('btnGuardarProveedor');
+                const contenidoBoton = btnGuardar.innerHTML;
+                const errorGeneral = document.getElementById('errorGeneralProveedor');
+                const campos = [...formProveedor.querySelectorAll('[data-campo]')];
+
+                document.getElementById('btnNuevoProveedor').addEventListener('click', () => {
+                    formProveedor.reset();
+                    limpiarErrores();
+                    bootstrap.Modal.getOrCreateInstance(modalProveedor).show();
+                });
+
+                function limpiarErrores() {
+                    errorGeneral.hidden = true;
+                    errorGeneral.textContent = '';
+                    campos.forEach(input => {
+                        input.removeAttribute('aria-invalid');
+                        document.getElementById(input.id + '-error').textContent = '';
+                        if (input.dataset.ayuda) input.setAttribute('aria-describedby', input.dataset.ayuda);
+                        else input.removeAttribute('aria-describedby');
+                    });
+                }
+
+                function mostrarErrores(errores) {
+                    let primero = null;
+                    for (const [nombre, mensaje] of Object.entries(errores)) {
+                        const input = campos.find(i => i.dataset.campo === nombre);
+                        if (!input) {
+                            errorGeneral.textContent = mensaje;
+                            errorGeneral.hidden = false;
+                            primero ??= errorGeneral;
+                            continue;
+                        }
+                        const idError = input.id + '-error';
+                        input.setAttribute('aria-invalid', 'true');
+                        input.setAttribute('aria-describedby', [input.dataset.ayuda, idError].filter(Boolean).join(' '));
+                        const destino = document.getElementById(idError);
+                        destino.innerHTML = '<i class="bi bi-exclamation-circle" aria-hidden="true"></i> <span></span>';
+                        destino.querySelector('span').textContent = mensaje;
+                        primero ??= input;
+                    }
+                    primero?.focus();
+                }
+
+                formProveedor.addEventListener('submit', async e => {
+                    e.preventDefault();
+                    limpiarErrores();
+                    const datos = new FormData(formProveedor);
+                    datos.append('__RequestVerificationToken', form.querySelector('input[name="__RequestVerificationToken"]').value);
+                    btnGuardar.disabled = true;
+                    btnGuardar.innerHTML = '<span class="cp-spinner" aria-hidden="true"></span> Guardando…';
+                    try {
+                        const respuesta = await fetch('@Url.Action("CrearRapido", "Proveedor")', { method: 'POST', body: datos });
+                        const resultado = await respuesta.json();
+                        if (resultado.success) {
+                            selectProveedor.add(new Option(resultado.nombre, resultado.id, true, true));
+                            selectProveedor.dispatchEvent(new Event('change'));
+                            bootstrap.Modal.getInstance(modalProveedor).hide();
+                            anunciar(`Proveedor ${resultado.nombre} registrado y elegido.`);
+                        } else {
+                            mostrarErrores(resultado.errores || {});
+                        }
+                    } catch {
+                        // También cae aquí si la sesión expiró (la respuesta es la página de login, no JSON)
+                        mostrarErrores({ '': 'No se pudo registrar el proveedor. Revisa tu conexión o vuelve a iniciar sesión.' });
+                    } finally {
+                        btnGuardar.disabled = false;
+                        btnGuardar.innerHTML = contenidoBoton;
+                    }
+                });
+                modalProveedor.addEventListener('shown.bs.modal', () => document.getElementById('provNombre').focus());
+            }
+
+            // ===== Estado inicial (también al volver con errores del servidor) =====
+            for (const d of previos) {
+                const p = productoPorId.get(d.productoId);
+                if (p) crearLinea(p, zonaPorId.has(d.ubicacionId) ? d.ubicacionId : undefined, d.cantidad > 0 ? d.cantidad : 1);
+            }
+            filtrarProductos();
+            actualizar();
+            carrito.querySelectorAll('.vn-destacar').forEach(li => li.classList.remove('vn-destacar'));
+            document.getElementById('resumenErrores')?.focus();
+        </script>
+    }
 }
