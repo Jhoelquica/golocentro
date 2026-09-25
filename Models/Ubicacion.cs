@@ -27,6 +27,8 @@ public partial class Ubicacion
 
     public virtual ICollection<Camara> Camaras { get; set; } = new List<Camara>();
 
+    public virtual ICollection<DetalleAjuste> DetalleAjustes { get; set; } = new List<DetalleAjuste>();
+
     public virtual ICollection<DetalleMovimiento> DetalleMovimientos { get; set; } = new List<DetalleMovimiento>();
 
     public virtual ICollection<DetalleTraslado> DetalleTrasladoIdUbicacionDestinoNavigations { get; set; } = new List<DetalleTraslado>();

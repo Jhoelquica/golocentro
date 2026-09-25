@@ -12,11 +12,15 @@ public partial class AppDbContext : DbContext
     {
     }
 
+    public virtual DbSet<AjusteInventario> AjusteInventarios { get; set; }
+
     public virtual DbSet<Alertum> Alerta { get; set; }
 
     public virtual DbSet<Camara> Camaras { get; set; }
 
     public virtual DbSet<Cliente> Clientes { get; set; }
+
+    public virtual DbSet<DetalleAjuste> DetalleAjustes { get; set; }
 
     public virtual DbSet<DetalleMovimiento> DetalleMovimientos { get; set; }
 
@@ -46,6 +50,39 @@ public partial class AppDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<AjusteInventario>(entity =>
+        {
+            entity.HasKey(e => e.IdAjuste).HasName("ajuste_inventario_pkey");
+
+            entity.ToTable("ajuste_inventario");
+
+            entity.Property(e => e.IdAjuste)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("id_ajuste");
+            entity.Property(e => e.Fecha)
+                .HasDefaultValueSql("now()")
+                .HasColumnType("timestamp(6) without time zone")
+                .HasColumnName("fecha");
+            entity.Property(e => e.IdSede).HasColumnName("id_sede");
+            entity.Property(e => e.IdUsuario).HasColumnName("id_usuario");
+            entity.Property(e => e.Motivo)
+                .HasMaxLength(20)
+                .HasColumnName("motivo");
+            entity.Property(e => e.Observaciones)
+                .HasMaxLength(200)
+                .HasColumnName("observaciones");
+
+            entity.HasOne(d => d.IdSedeNavigation).WithMany(p => p.AjusteInventarios)
+                .HasForeignKey(d => d.IdSede)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("ajuste_inventario_id_sede_fkey");
+
+            entity.HasOne(d => d.IdUsuarioNavigation).WithMany(p => p.AjusteInventarios)
+                .HasForeignKey(d => d.IdUsuario)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("ajuste_inventario_id_usuario_fkey");
+        });
+
         modelBuilder.Entity<Alertum>(entity =>
         {
             entity.HasKey(e => e.IdAlerta).HasName("alerta_pkey");
@@ -143,6 +180,39 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.RucDni)
                 .HasMaxLength(20)
                 .HasColumnName("ruc_dni");
+        });
+
+        modelBuilder.Entity<DetalleAjuste>(entity =>
+        {
+            entity.HasKey(e => e.IdDetalle).HasName("detalle_ajuste_pkey");
+
+            entity.ToTable("detalle_ajuste");
+
+            entity.HasIndex(e => new { e.IdAjuste, e.IdProducto, e.IdUbicacion }, "uq_detalleajuste_producto").IsUnique();
+
+            entity.Property(e => e.IdDetalle)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("id_detalle");
+            entity.Property(e => e.CantidadAnterior).HasColumnName("cantidad_anterior");
+            entity.Property(e => e.CantidadNueva).HasColumnName("cantidad_nueva");
+            entity.Property(e => e.IdAjuste).HasColumnName("id_ajuste");
+            entity.Property(e => e.IdProducto).HasColumnName("id_producto");
+            entity.Property(e => e.IdUbicacion).HasColumnName("id_ubicacion");
+
+            entity.HasOne(d => d.IdAjusteNavigation).WithMany(p => p.DetalleAjustes)
+                .HasForeignKey(d => d.IdAjuste)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("detalle_ajuste_id_ajuste_fkey");
+
+            entity.HasOne(d => d.IdProductoNavigation).WithMany(p => p.DetalleAjustes)
+                .HasForeignKey(d => d.IdProducto)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("detalle_ajuste_id_producto_fkey");
+
+            entity.HasOne(d => d.IdUbicacionNavigation).WithMany(p => p.DetalleAjustes)
+                .HasForeignKey(d => d.IdUbicacion)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("detalle_ajuste_id_ubicacion_fkey");
         });
 
         modelBuilder.Entity<DetalleMovimiento>(entity =>

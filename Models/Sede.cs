@@ -19,6 +19,8 @@ public partial class Sede
 
     public decimal? PlanoAlto { get; set; }
 
+    public virtual ICollection<AjusteInventario> AjusteInventarios { get; set; } = new List<AjusteInventario>();
+
     public virtual ICollection<Alertum> Alerta { get; set; } = new List<Alertum>();
 
     public virtual ICollection<Camara> Camaras { get; set; } = new List<Camara>();

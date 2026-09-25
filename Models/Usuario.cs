@@ -23,6 +23,8 @@ public partial class Usuario
 
     public string? FotoUrl { get; set; }
 
+    public virtual ICollection<AjusteInventario> AjusteInventarios { get; set; } = new List<AjusteInventario>();
+
     public virtual ICollection<Alertum> Alerta { get; set; } = new List<Alertum>();
 
     public virtual Sede? IdSedeNavigation { get; set; }

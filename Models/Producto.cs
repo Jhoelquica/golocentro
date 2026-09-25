@@ -27,6 +27,8 @@ public partial class Producto
 
     public virtual ICollection<Alertum> Alerta { get; set; } = new List<Alertum>();
 
+    public virtual ICollection<DetalleAjuste> DetalleAjustes { get; set; } = new List<DetalleAjuste>();
+
     public virtual ICollection<DetalleMovimiento> DetalleMovimientos { get; set; } = new List<DetalleMovimiento>();
 
     public virtual ICollection<DetalleTraslado> DetalleTraslados { get; set; } = new List<DetalleTraslado>();
