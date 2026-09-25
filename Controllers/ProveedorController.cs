@@ -76,6 +76,27 @@ namespace GestionAlmacen_Golocentro.Controllers
             return RedirectToAction(nameof(Index));
         }
 
+        // Alta rápida desde el modal de Entrada: responde JSON para no recargar ni perder el carrito
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CrearRapido(ContraparteFormViewModel model)
+        {
+            await Validar(model, null);
+            if (ModelState.IsValid)
+            {
+                var proveedor = new Proveedor();
+                Copiar(model, proveedor);
+                _context.Proveedores.Add(proveedor);
+                if (await GuardarAsync())
+                    return Json(new { success = true, id = proveedor.IdProveedor, nombre = proveedor.Nombre });
+            }
+
+            var errores = ModelState
+                .Where(kv => kv.Value!.Errors.Count > 0)
+                .ToDictionary(kv => kv.Key, kv => kv.Value!.Errors[0].ErrorMessage);
+            return Json(new { success = false, errores });
+        }
+
         public async Task<IActionResult> Editar(int id)
         {
             var proveedor = await _context.Proveedores.FindAsync(id);

@@ -1,6 +1,8 @@
 ﻿@model GestionAlmacen_Golocentro.ViewModels.MovimientoEntradaViewModel
 @{
     ViewData["Title"] = "Registrar Entrada";
+    // ProveedorController solo admite a estos roles
+    var puedeCrearProveedor = User.IsInRole("duena") || User.IsInRole("encargada");
 }
 
 <div class="container">
@@ -61,24 +63,32 @@
 
         <!-- Datos generales -->
         <div class="row">
-            <div class="col-md-4 mb-3">
+            <div class="col-md-6 col-xl-4 mb-3">
                 <label asp-for="ProveedorId" class="form-label fw-bold">Proveedor <span class="text-danger">*</span></label>
-                <select asp-for="ProveedorId" class="form-select" required
-                        aria-describedby="proveedor-error"
-                        aria-invalid="@(ViewData.ModelState["ProveedorId"]?.Errors.Count > 0 ? "true" : "false")">
-                    <option value="">-- Seleccione proveedor --</option>
-                    @foreach (var item in ViewBag.Proveedores as IEnumerable<SelectListItem>)
+                <div class="input-group">
+                    <select asp-for="ProveedorId" class="form-select" required
+                            aria-describedby="proveedor-error"
+                            aria-invalid="@(ViewData.ModelState["ProveedorId"]?.Errors.Count > 0 ? "true" : "false")">
+                        <option value="">-- Seleccione proveedor --</option>
+                        @foreach (var item in ViewBag.Proveedores as IEnumerable<SelectListItem>)
+                        {
+                            <option value="@item.Value">@item.Text</option>
+                        }
+                    </select>
+                    @if (puedeCrearProveedor)
                     {
-                        <option value="@item.Value">@item.Text</option>
+                        <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#modalNuevoProveedor">
+                            <i class="bi bi-plus-circle" aria-hidden="true"></i> Nuevo
+                        </button>
                     }
-                </select>
+                </div>
                 <span asp-validation-for="ProveedorId" id="proveedor-error" class="text-danger"></span>
             </div>
-            <div class="col-md-4 mb-3">
+            <div class="col-md-6 col-xl-4 mb-3">
                 <label asp-for="NumeroFactura" class="form-label fw-bold">Nº Factura / Guía</label>
                 <input asp-for="NumeroFactura" class="form-control" placeholder="Opcional" />
             </div>
-            <div class="col-md-4 mb-3">
+            <div class="col-md-6 col-xl-4 mb-3">
                 <label asp-for="Evidencia" class="form-label fw-bold">Evidencia (foto)</label>
                 <input asp-for="Evidencia" type="file" class="form-control" accept="image/*" />
             </div>
@@ -89,7 +99,55 @@
             <button type="submit" class="btn btn-primary" id="btnRegistrarEntrada"><i class="bi bi-save"></i> Registrar Entrada</button>
         </div>
     </form>
+
+    <p class="visually-hidden" aria-live="polite" id="avisoProveedor"></p>
 </div>
+
+@if (puedeCrearProveedor)
+{
+    <div class="modal fade" id="modalNuevoProveedor" tabindex="-1" aria-labelledby="tituloNuevoProveedor" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form id="formNuevoProveedor" novalidate>
+                    <div class="modal-header bg-success text-white">
+                        <h2 class="modal-title fs-5" id="tituloNuevoProveedor"><i class="bi bi-truck" aria-hidden="true"></i> Registrar nuevo proveedor</h2>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-danger d-none" role="alert" tabindex="-1" id="errorGeneralProveedor"></div>
+                        <div class="mb-3">
+                            <label class="form-label" for="provNombre">Nombre o razón social <span class="text-danger" aria-hidden="true">*</span></label>
+                            <input type="text" id="provNombre" name="Nombre" class="form-control" maxlength="150" required aria-required="true" data-campo="Nombre" />
+                            <div class="invalid-feedback" id="provNombre-error"></div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="provRuc">RUC <span class="text-danger" aria-hidden="true">*</span></label>
+                            <input type="text" id="provRuc" name="Documento" class="form-control" inputmode="numeric" maxlength="11"
+                                   autocomplete="off" required aria-required="true" aria-describedby="provRuc-ayuda"
+                                   data-ayuda="provRuc-ayuda" data-campo="Documento" />
+                            <div class="form-text" id="provRuc-ayuda">11 dígitos, solo números.</div>
+                            <div class="invalid-feedback" id="provRuc-error"></div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="provContacto">Contacto <span class="text-muted fw-normal">(opcional)</span></label>
+                            <input type="text" id="provContacto" name="Contacto" class="form-control" maxlength="100" data-campo="Contacto" />
+                            <div class="invalid-feedback" id="provContacto-error"></div>
+                        </div>
+                        <div class="mb-1">
+                            <label class="form-label" for="provDireccion">Dirección <span class="text-muted fw-normal">(opcional)</span></label>
+                            <input type="text" id="provDireccion" name="Direccion" class="form-control" maxlength="200" data-campo="Direccion" />
+                            <div class="invalid-feedback" id="provDireccion-error"></div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-success" id="btnGuardarProveedor"><i class="bi bi-check-lg" aria-hidden="true"></i> Guardar proveedor</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}
 
 @section Scripts {
     <script>
@@ -160,5 +218,84 @@
             actualizarEstadoCarrito();
             document.getElementById('resumenErrores')?.focus();
         });
+
+        // ======= NUEVO PROVEEDOR (modal, sin recargar para no perder el carrito) =======
+        const formProveedor = document.getElementById('formNuevoProveedor');
+        if (formProveedor) {
+            const modalProveedor = document.getElementById('modalNuevoProveedor');
+            const btnGuardarProveedor = document.getElementById('btnGuardarProveedor');
+            const errorGeneral = document.getElementById('errorGeneralProveedor');
+            const contenidoBotonProveedor = btnGuardarProveedor.innerHTML;
+            const camposProveedor = [...formProveedor.querySelectorAll('[data-campo]')];
+
+            function limpiarErroresProveedor() {
+                errorGeneral.classList.add('d-none');
+                errorGeneral.textContent = '';
+                camposProveedor.forEach(input => {
+                    input.classList.remove('is-invalid');
+                    input.removeAttribute('aria-invalid');
+                    document.getElementById(input.id + '-error').textContent = '';
+                    if (input.dataset.ayuda) input.setAttribute('aria-describedby', input.dataset.ayuda);
+                    else input.removeAttribute('aria-describedby');
+                });
+            }
+
+            function mostrarErroresProveedor(errores) {
+                let primero = null;
+                for (const [campo, mensaje] of Object.entries(errores)) {
+                    const input = camposProveedor.find(i => i.dataset.campo === campo);
+                    if (!input) {
+                        errorGeneral.textContent = mensaje;
+                        errorGeneral.classList.remove('d-none');
+                        primero ??= errorGeneral;
+                        continue;
+                    }
+                    const idError = input.id + '-error';
+                    input.classList.add('is-invalid');
+                    input.setAttribute('aria-invalid', 'true');
+                    input.setAttribute('aria-describedby', [input.dataset.ayuda, idError].filter(Boolean).join(' '));
+                    document.getElementById(idError).textContent = mensaje;
+                    primero ??= input;
+                }
+                primero?.focus();
+            }
+
+            formProveedor.addEventListener('submit', async function (e) {
+                e.preventDefault();
+                limpiarErroresProveedor();
+
+                const datos = new FormData(formProveedor);
+                datos.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]').value);
+
+                btnGuardarProveedor.disabled = true;
+                btnGuardarProveedor.innerHTML = '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Guardando…';
+                try {
+                    const respuesta = await fetch('@Url.Action("CrearRapido", "Proveedor")', { method: 'POST', body: datos });
+                    const resultado = await respuesta.json();
+                    if (resultado.success) {
+                        const select = document.getElementById('ProveedorId');
+                        select.add(new Option(resultado.nombre, resultado.id, true, true));
+                        select.setAttribute('aria-invalid', 'false');
+                        document.getElementById('proveedor-error').textContent = '';
+                        bootstrap.Modal.getInstance(modalProveedor).hide();
+                        document.getElementById('avisoProveedor').textContent = `Proveedor ${resultado.nombre} registrado y seleccionado.`;
+                    } else {
+                        mostrarErroresProveedor(resultado.errores || {});
+                    }
+                } catch {
+                    // También cae aquí si la sesión expiró (la respuesta es la página de login, no JSON)
+                    mostrarErroresProveedor({ '': 'No se pudo registrar el proveedor. Revisa tu conexión o vuelve a iniciar sesión.' });
+                } finally {
+                    btnGuardarProveedor.disabled = false;
+                    btnGuardarProveedor.innerHTML = contenidoBotonProveedor;
+                }
+            });
+
+            modalProveedor.addEventListener('shown.bs.modal', () => document.getElementById('provNombre').focus());
+            modalProveedor.addEventListener('hidden.bs.modal', () => {
+                formProveedor.reset();
+                limpiarErroresProveedor();
+            });
+        }
     </script>
 }
