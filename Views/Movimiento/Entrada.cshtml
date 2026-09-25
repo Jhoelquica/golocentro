@@ -93,11 +93,21 @@
 
 @section Scripts {
     <script>
-        // Serializar los SelectListItem a JSON de forma segura
-        var productos = @Html.Raw(JsonConvert.SerializeObject(
-                    ((IEnumerable<SelectListItem>)ViewBag.Productos).Select(p => new { value = p.Value, text = p.Text })));
-        var ubicaciones = @Html.Raw(JsonConvert.SerializeObject(
-                    ((IEnumerable<SelectListItem>)ViewBag.Ubicaciones).Select(u => new { value = u.Value, text = u.Text })));
+        // Json.Serialize escapa < > & para que un nombre con una etiqueta de cierre de script no rompa el bloque
+        var productos = @Json.Serialize(
+                    ((IEnumerable<SelectListItem>)ViewBag.Productos).Select(p => new { value = p.Value, text = p.Text }));
+        var ubicaciones = @Json.Serialize(
+                    ((IEnumerable<SelectListItem>)ViewBag.Ubicaciones).Select(u => new { value = u.Value, text = u.Text }));
+
+        // Los nombres vienen de la BD: escaparlos antes de meterlos en HTML
+        function escaparHtml(texto) {
+            return String(texto)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
 
         let contadorFila = 0;
         const tbodyProductos = document.querySelector('#tablaProductos tbody');
@@ -116,13 +126,13 @@
                 <td>
                     <select name="Detalles[${contadorFila}].ProductoId" class="form-select" required>
                         <option value="">-- Seleccione producto --</option>
-                        ${productos.map(p => `<option value="${p.value}">${p.text}</option>`).join('')}
+                        ${productos.map(p => `<option value="${escaparHtml(p.value)}">${escaparHtml(p.text)}</option>`).join('')}
                     </select>
                 </td>
                 <td>
                     <select name="Detalles[${contadorFila}].UbicacionId" class="form-select" required>
                         <option value="">-- Seleccione ubicación --</option>
-                        ${ubicaciones.map(u => `<option value="${u.value}">${u.text}</option>`).join('')}
+                        ${ubicaciones.map(u => `<option value="${escaparHtml(u.value)}">${escaparHtml(u.text)}</option>`).join('')}
                     </select>
                 </td>
                 <td>

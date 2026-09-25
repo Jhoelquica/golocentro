@@ -151,9 +151,19 @@
 
 @section Scripts {
     <script>
-        // Datos desde el servidor
-        var productos = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(ViewBag.Productos ?? new List<object>()));
-        var ubicaciones = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(ViewBag.Ubicaciones ?? new List<object>()));
+        // Json.Serialize escapa < > & para que un nombre con una etiqueta de cierre de script no rompa el bloque
+        var productos = @Json.Serialize((object)(ViewBag.Productos ?? new List<object>()));
+        var ubicaciones = @Json.Serialize((object)(ViewBag.Ubicaciones ?? new List<object>()));
+
+        // Los nombres vienen de la BD: escaparlos antes de meterlos en HTML
+        function escaparHtml(texto) {
+            return String(texto)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
 
         let contadorItems = 0;
         const carritoBody = document.getElementById('carritoBody');
@@ -182,8 +192,8 @@
             );
             if (filtrados.length > 0) {
                 resultadosDiv.innerHTML = filtrados.slice(0, 5).map(p =>
-                    `<a href="#" class="list-group-item list-group-item-action" onclick="seleccionarProducto(${p.id}, '${p.nombre.replace(/'/g, "\\'")}', ${p.precio}); return false;">
-                        <strong>${p.nombre}</strong> <small class="text-muted">${p.codigo}</small> - S/. ${p.precio.toFixed(2)}
+                    `<a href="#" class="list-group-item list-group-item-action" onclick="seleccionarProducto(${Number(p.id)}); return false;">
+                        <strong>${escaparHtml(p.nombre)}</strong> <small class="text-muted">${escaparHtml(p.codigo)}</small> - S/. ${Number(p.precio).toFixed(2)}
                     </a>`
                 ).join('');
                 resultadosDiv.style.display = 'block';
@@ -200,23 +210,26 @@
         });
 
         // ======= AGREGAR PRODUCTO AL CARRITO =======
-        function seleccionarProducto(id, nombre, precio) {
+        function seleccionarProducto(id) {
+            const producto = productos.find(p => p.id === id);
+            if (!producto) return;
             resultadosDiv.style.display = 'none';
             buscarInput.value = '';
-            agregarFilaCarrito(id, nombre, precio);
+            agregarFilaCarrito(producto.id, producto.nombre, Number(producto.precio));
         }
 
         function agregarFilaCarrito(productoId, nombreProducto, precioUnitario) {
+            const nombreSeguro = escaparHtml(nombreProducto);
             const ubicacionOptions = ubicaciones.map(u =>
-                `<option value="${u.id}">${u.codigo}</option>`
+                `<option value="${Number(u.id)}">${escaparHtml(u.codigo)}</option>`
             ).join('');
 
             const fila = document.createElement('tr');
             fila.innerHTML = `
                 <td>
                     <input type="hidden" name="Items[${contadorItems}].ProductoId" value="${productoId}" />
-                    <input type="hidden" name="Items[${contadorItems}].NombreProducto" value="${nombreProducto}" />
-                    <strong>${nombreProducto}</strong>
+                    <input type="hidden" name="Items[${contadorItems}].NombreProducto" value="${nombreSeguro}" />
+                    <strong>${nombreSeguro}</strong>
                 </td>
                 <td>
                     <select name="Items[${contadorItems}].UbicacionId" class="form-select form-select-sm" onchange="actualizarStock(this, ${productoId})">
