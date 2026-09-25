@@ -57,11 +57,15 @@ builder.Services.AddControllersWithViews();
 
 var app = builder.Build();
 
+// En desarrollo se ve la página técnica del error; en producción, la página amable (el detalle va al log)
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Home/Error");
+    app.UseExceptionHandler("/Error");
     app.UseHsts();
 }
+
+// Respuestas sin contenido (404 de una nota que no existe, etc.) muestran la página de error en vez de quedar en blanco
+app.UseStatusCodePagesWithReExecute("/Error/{0}");
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
