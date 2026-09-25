@@ -4,6 +4,7 @@
     var initials = string.Concat((Model.Nombre ?? "").Split(' ')
                     .Where(w => w.Length > 0).Take(2)
                     .Select(w => w[0].ToString().ToUpper()));
+    var sedeNombre = Model.IdSedeNavigation?.Nombre ?? "Todas las sedes";
 }
 
 <style>
@@ -232,7 +233,7 @@
                 <span class="rol-badge">@Model.Rol</span>
                 <div class="sede-text">
                     <i class="bi bi-geo-alt-fill"></i>
-                    @Model.IdSedeNavigation?.Nombre
+                    @sedeNombre
                 </div>
             </div>
         </div>
@@ -264,7 +265,7 @@
                 <div class="perfil-field-icon"><i class="bi bi-building"></i></div>
                 <div class="perfil-field-info">
                     <div class="perfil-field-label">SEDE ASIGNADA</div>
-                    <div class="perfil-field-value">@Model.IdSedeNavigation?.Nombre</div>
+                    <div class="perfil-field-value">@sedeNombre</div>
                 </div>
             </div>
             <div class="perfil-field">
@@ -272,7 +273,7 @@
                 <div class="perfil-field-info">
                     <div class="perfil-field-label">ESTADO</div>
                     <div class="perfil-field-value">
-                        @if (Model.Estado == "Activo")
+                        @if (Model.Estado == "activo")
                         {
                             <span style="color:#047857; font-weight:600">
                                 <i class="bi bi-circle-fill" style="font-size:8px;margin-right:4px"></i>Activo

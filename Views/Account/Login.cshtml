@@ -347,6 +347,7 @@
             @* Formulario — mismos name que tenías: nombreUsuario, contraseña *@
             <form method="post" asp-controller="Account" asp-action="Login">
                 @Html.AntiForgeryToken()
+                <input type="hidden" name="returnUrl" value="@ViewData["ReturnUrl"]" />
 
                 @* Usuario *@
                 <div class="field-group">

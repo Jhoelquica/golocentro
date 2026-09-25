@@ -28,7 +28,9 @@ namespace GestionAlmacen_Golocentro.Controllers
                 return RedirectToAction("Login", "Account");
 
             var idUsuario = int.Parse(idUsuarioClaim);
-            var usuario = await _context.Usuarios.FindAsync(idUsuario);
+            var usuario = await _context.Usuarios
+                .Include(u => u.IdSedeNavigation)
+                .FirstOrDefaultAsync(u => u.IdUsuario == idUsuario);
             if (usuario == null) return NotFound();
             return View(usuario);
         }
@@ -123,16 +125,19 @@ namespace GestionAlmacen_Golocentro.Controllers
 
 
         // GET: Account/Login
-        public IActionResult Login()
+        public IActionResult Login(string? returnUrl = null)
         {
+            ViewData["ReturnUrl"] = returnUrl;
             return View();
         }
 
         // POST: Account/Login
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Login(string nombreUsuario, string contraseña)
+        public async Task<IActionResult> Login(string nombreUsuario, string contraseña, string? returnUrl = null)
         {
+            ViewData["ReturnUrl"] = returnUrl;
+
             if (string.IsNullOrEmpty(nombreUsuario) || string.IsNullOrEmpty(contraseña))
             {
                 ViewBag.Error = "Debe ingresar usuario y contraseña.";
@@ -148,6 +153,12 @@ namespace GestionAlmacen_Golocentro.Controllers
             if (usuario == null || !BCrypt.Net.BCrypt.Verify(contraseña, usuario.Contrasena))
             {
                 ViewBag.Error = "Usuario o contraseña incorrectos.";
+                return View();
+            }
+
+            if (usuario.Estado != "activo")
+            {
+                ViewBag.Error = "Tu cuenta está inactiva. Comunícate con la administración.";
                 return View();
             }
 
@@ -194,6 +205,9 @@ namespace GestionAlmacen_Golocentro.Controllers
                 CookieAuthenticationDefaults.AuthenticationScheme,
                 new ClaimsPrincipal(claimsIdentity),
                 authProperties);
+
+            if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+                return LocalRedirect(returnUrl);
 
             // Redirigir según el rol
             if (usuario.Rol == "duena" || usuario.Rol == "encargada")
