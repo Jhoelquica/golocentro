@@ -1,4 +1,4 @@
-﻿@{
+@{
     ViewData["Title"] = "Cambiar Foto";
     var fotoActual = User.FindFirst("FotoUrl")?.Value ?? "";
     var nombre = User.FindFirst("NombreCompleto")?.Value ?? "";
@@ -14,43 +14,43 @@
     }
 
     .foto-card {
-        background: #fff;
-        border: 1px solid rgba(230,232,234,0.2);
+        background: var(--g-white);
+        border: 1px solid var(--g-border);
         border-radius: 14px;
         padding: 2rem;
     }
 
-        .foto-card h5 {
-            font-size: 16px;
+        .foto-card h1 {
+            font-size: 17px;
             font-weight: 600;
-            color: #0F172A;
+            color: var(--g-text);
             margin-bottom: 1.5rem;
             display: flex;
             align-items: center;
             gap: 8px;
         }
 
-            .foto-card h5 i {
-                color: #047857;
+            .foto-card h1 i {
+                color: var(--g-teal);
                 font-size: 20px;
             }
 
-    /* Avatar preview */
-    .avatar-preview {
-        width: 110px;
-        height: 110px;
-        border-radius: 50%;
-        object-fit: cover;
-        border: 3px solid #047857;
-        display: block;
-        margin: 0 auto 1.25rem;
-    }
-
+    .avatar-preview,
     .avatar-placeholder {
         width: 110px;
         height: 110px;
         border-radius: 50%;
-        background: #047857;
+        margin: 0 auto 1rem;
+    }
+
+    .avatar-preview {
+        object-fit: cover;
+        border: 3px solid var(--g-teal);
+        display: block;
+    }
+
+    .avatar-placeholder {
+        background: var(--g-teal);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -58,39 +58,48 @@
         font-weight: 600;
         color: #FFFFFF;
         border: 3px solid rgba(4,120,87,0.3);
-        margin: 0 auto 1.25rem;
     }
 
     .foto-nombre {
         text-align: center;
         font-size: 15px;
         font-weight: 600;
-        color: #0F172A;
+        color: var(--g-text);
         margin-bottom: 0.25rem;
     }
 
     .foto-sub {
         text-align: center;
-        font-size: 12px;
-        color: #475569;
+        font-size: 13px;
+        color: var(--g-muted);
         margin-bottom: 1.5rem;
     }
 
-    /* Drop zone */
+    /* Zona de subida: el input cubre toda la zona para que clic/tap funcione en cualquier parte */
     .drop-zone {
-        border: 2px dashed rgba(4,120,87,0.35);
+        border: 2px dashed var(--g-input-border);
         border-radius: 10px;
         padding: 1.5rem;
         text-align: center;
         cursor: pointer;
-        transition: border-color 0.18s, background 0.18s;
+        transition: border-color var(--transition), background var(--transition), box-shadow var(--transition);
         position: relative;
-        background: #F8FAFC;
+        background: var(--g-bg);
     }
 
-        .drop-zone:hover, .drop-zone.dragover {
-            border-color: #047857;
+        .drop-zone:hover,
+        .drop-zone.dragover {
+            border-color: var(--g-teal);
             background: rgba(4,120,87,0.05);
+        }
+
+        .drop-zone:focus-within {
+            border-color: var(--g-teal);
+            box-shadow: 0 0 0 3px rgba(4,120,87,0.25);
+        }
+
+        .drop-zone.invalida {
+            border-color: var(--g-danger);
         }
 
         .drop-zone input[type=file] {
@@ -102,51 +111,109 @@
             height: 100%;
         }
 
-        .drop-zone i {
+        .drop-zone .dz-icon {
             font-size: 28px;
-            color: #475569;
+            color: var(--g-muted);
             display: block;
             margin-bottom: 8px;
         }
 
         .drop-zone .dz-text {
-            font-size: 13px;
-            color: #475569;
+            font-size: 14px;
+            color: var(--g-text);
         }
 
+            .drop-zone .dz-text strong {
+                color: var(--g-teal);
+            }
+
         .drop-zone .dz-hint {
-            font-size: 11px;
-            color: #475569;
+            font-size: 12px;
+            color: var(--g-muted);
             margin-top: 4px;
         }
 
-    /* Preview nueva foto */
-    .new-preview-wrap {
-        display: none;
-        text-align: center;
-        margin-top: 1rem;
+    .campo-error {
+        margin-top: 8px;
+        font-size: 13px;
+        color: var(--g-danger-text);
+        display: flex;
+        align-items: center;
+        gap: 6px;
     }
 
-        .new-preview-wrap img {
-            width: 80px;
-            height: 80px;
+        .campo-error:empty {
+            display: none;
+        }
+
+    .nueva-foto {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 1rem;
+        padding: 10px 12px;
+        border: 1px solid var(--g-border);
+        border-radius: 10px;
+        background: var(--g-bg);
+    }
+
+        .nueva-foto[hidden] {
+            display: none;
+        }
+
+        .nueva-foto img {
+            width: 56px;
+            height: 56px;
             border-radius: 50%;
             object-fit: cover;
-            border: 2px solid #047857;
+            border: 2px solid var(--g-teal);
+            flex-shrink: 0;
         }
 
-        .new-preview-wrap .new-name {
-            font-size: 12px;
-            color: #047857;
-            margin-top: 6px;
-            font-weight: 500;
+    .nueva-foto-info {
+        min-width: 0;
+        flex: 1;
+    }
+
+    .nueva-foto-nombre {
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--g-text);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .nueva-foto-peso {
+        font-size: 12px;
+        color: var(--g-muted);
+    }
+
+    .btn-quitar {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        border: none;
+        background: none;
+        color: var(--g-muted);
+        font-size: 16px;
+        cursor: pointer;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: color var(--transition), background var(--transition);
+    }
+
+        .btn-quitar:hover {
+            color: var(--g-danger-text);
+            background: rgba(220,38,38,0.08);
         }
 
-    /* Alerts */
     .alert-g {
         border-radius: 8px;
         padding: 10px 14px;
-        font-size: 13px;
+        font-size: 14px;
         display: flex;
         align-items: center;
         gap: 8px;
@@ -155,120 +222,152 @@
 
         .alert-g.success {
             background: rgba(4,120,87,0.1);
-            color: #047857;
+            color: var(--g-teal);
         }
 
         .alert-g.error {
-            background: rgba(220,38,38,0.1);
-            color: #DC2626;
+            background: rgba(220,38,38,0.08);
+            color: var(--g-danger-text);
         }
 
-    /* Botones */
     .btn-row {
         display: flex;
         gap: 10px;
         margin-top: 1.25rem;
     }
 
-    .btn-g-primary {
-        flex: 1;
-        padding: 10px;
-        background: #047857;
-        color: #FFFFFF;
-        border: none;
-        border-radius: 8px;
-        font-size: 14px;
-        font-weight: 500;
-        cursor: pointer;
-        font-family: inherit;
-        transition: background 0.18s;
-    }
-
-        .btn-g-primary:hover {
-            background: #065F46;
-        }
-
+    .btn-g-primary,
     .btn-g-outline {
         flex: 1;
+        min-height: 44px;
         padding: 10px;
-        background: transparent;
-        color: #047857;
-        border: 1px solid #047857;
         border-radius: 8px;
         font-size: 14px;
         font-weight: 500;
-        cursor: pointer;
         font-family: inherit;
-        text-decoration: none;
+        cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
-        transition: all 0.18s;
+        gap: 6px;
+        text-decoration: none;
+        transition: background var(--transition), color var(--transition);
+    }
+
+    .btn-g-primary {
+        background: var(--g-teal);
+        color: #FFFFFF;
+        border: none;
+    }
+
+        .btn-g-primary:hover:not(:disabled) {
+            background: #065F46;
+        }
+
+        .btn-g-primary:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+
+        .btn-g-primary[aria-busy="true"] {
+            opacity: 1;
+            cursor: wait;
+        }
+
+    .btn-g-outline {
+        background: transparent;
+        color: var(--g-teal);
+        border: 1px solid var(--g-teal);
     }
 
         .btn-g-outline:hover {
-            background: #047857;
+            background: var(--g-teal);
             color: #FFFFFF;
         }
+
+    .btn-g-primary:focus-visible,
+    .btn-g-outline:focus-visible,
+    .btn-quitar:focus-visible {
+        outline: 2px solid var(--g-teal);
+        outline-offset: 2px;
+    }
+
+    .spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255,255,255,0.35);
+        border-top-color: #FFFFFF;
+        border-radius: 50%;
+        animation: girar 0.7s linear infinite;
+    }
+
+    @@keyframes girar {
+        to { transform: rotate(360deg); }
+    }
 </style>
 
 <div class="foto-wrap">
     <div class="foto-card">
 
-        <h5><i class="bi bi-camera-fill"></i> Cambiar Foto de Perfil</h5>
+        <h1><i class="bi bi-camera-fill" aria-hidden="true"></i> Cambiar foto de perfil</h1>
 
-        @* Mensajes *@
         @if (TempData["Success"] != null)
         {
-            <div class="alert-g success">
-                <i class="bi bi-check-circle-fill"></i> @TempData["Success"]
+            <div class="alert-g success" role="status">
+                <i class="bi bi-check-circle-fill" aria-hidden="true"></i> @TempData["Success"]
             </div>
         }
         @if (TempData["Error"] != null)
         {
-            <div class="alert-g error">
-                <i class="bi bi-exclamation-circle-fill"></i> @TempData["Error"]
+            <div class="alert-g error" role="alert">
+                <i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @TempData["Error"]
             </div>
         }
 
-        @* Avatar actual *@
         @if (!string.IsNullOrEmpty(fotoActual))
         {
             <img src="@Url.Content("~/uploads/perfiles/" + fotoActual)"
-                 alt="Foto actual" class="avatar-preview" id="avatarActual" />
+                 alt="Tu foto de perfil actual" class="avatar-preview" />
         }
         else
         {
-            <div class="avatar-placeholder" id="avatarActual">@initials</div>
+            <div class="avatar-placeholder" aria-hidden="true">@initials</div>
         }
         <p class="foto-nombre">@nombre</p>
         <p class="foto-sub">Foto de perfil actual</p>
 
-        @* Formulario *@
-        <form method="post" enctype="multipart/form-data"
+        <form method="post" enctype="multipart/form-data" id="formFoto"
               asp-controller="Account" asp-action="CambiarFoto">
             @Html.AntiForgeryToken()
 
             <div class="drop-zone" id="dropZone">
                 <input type="file" name="foto" id="fotoInput"
-                       accept=".jpg,.jpeg,.png,.webp" />
-                <i class="bi bi-cloud-arrow-up"></i>
-                <div class="dz-text">Arrastra tu foto aquí o haz clic para seleccionar</div>
-                <div class="dz-hint">JPG, PNG o WEBP · Máximo 2 MB</div>
+                       accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                       aria-label="Seleccionar nueva foto de perfil"
+                       aria-describedby="fotoHint fotoError" />
+                <i class="bi bi-cloud-arrow-up dz-icon" aria-hidden="true"></i>
+                <div class="dz-text">Arrastra tu foto aquí o <strong>haz clic para elegirla</strong></div>
+                <div class="dz-hint" id="fotoHint">JPG, PNG o WEBP · Máximo 2 MB</div>
             </div>
+            <p class="campo-error" id="fotoError" role="alert"></p>
 
-            @* Preview de nueva foto seleccionada *@
-            <div class="new-preview-wrap" id="newPreview">
-                <img id="newPreviewImg" src="#" alt="Nueva foto" />
-                <div class="new-name" id="newPreviewName"></div>
+            <div class="nueva-foto" id="nuevaFoto" hidden>
+                <img id="nuevaFotoImg" src="" alt="Vista previa de la nueva foto" />
+                <div class="nueva-foto-info">
+                    <div class="nueva-foto-nombre" id="nuevaFotoNombre"></div>
+                    <div class="nueva-foto-peso" id="nuevaFotoPeso"></div>
+                </div>
+                <button type="button" class="btn-quitar" id="btnQuitar" aria-label="Quitar la foto seleccionada">
+                    <i class="bi bi-x-lg" aria-hidden="true"></i>
+                </button>
             </div>
 
             <div class="btn-row">
                 <a href="@Url.Action("Perfil", "Account")" class="btn-g-outline">
-                    <i class="bi bi-arrow-left" style="margin-right:6px"></i> Cancelar
+                    <i class="bi bi-arrow-left" aria-hidden="true"></i> Cancelar
                 </a>
                 <button type="submit" class="btn-g-primary" id="btnGuardar" disabled>
-                    <i class="bi bi-check-lg" style="margin-right:6px"></i> Guardar Foto
+                    <i class="bi bi-check-lg" aria-hidden="true"></i> Guardar foto
                 </button>
             </div>
         </form>
@@ -278,46 +377,89 @@
 
 @section Scripts {
     <script>
-        const input     = document.getElementById('fotoInput');
-        const dropZone  = document.getElementById('dropZone');
-        const preview   = document.getElementById('newPreview');
-        const previewImg= document.getElementById('newPreviewImg');
-        const previewNm = document.getElementById('newPreviewName');
-        const btnGuardar= document.getElementById('btnGuardar');
+        const MAX_BYTES = 2 * 1024 * 1024;
+        const EXTENSIONES = ['jpg', 'jpeg', 'png', 'webp'];
 
-        input.addEventListener('change', mostrarPreview);
+        const input      = document.getElementById('fotoInput');
+        const dropZone   = document.getElementById('dropZone');
+        const error      = document.getElementById('fotoError');
+        const nuevaFoto  = document.getElementById('nuevaFoto');
+        const previewImg = document.getElementById('nuevaFotoImg');
+        const previewNom = document.getElementById('nuevaFotoNombre');
+        const previewKb  = document.getElementById('nuevaFotoPeso');
+        const btnQuitar  = document.getElementById('btnQuitar');
+        const btnGuardar = document.getElementById('btnGuardar');
+        const form       = document.getElementById('formFoto');
+        let urlPreview = null;
 
-        // Drag & drop visual
-        dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        function formatearPeso(bytes) {
+            return bytes < 1024 * 1024
+                ? Math.max(1, Math.round(bytes / 1024)) + ' KB'
+                : (bytes / 1024 / 1024).toFixed(2) + ' MB';
+        }
+
+        function limpiar() {
+            input.value = '';
+            if (urlPreview) URL.revokeObjectURL(urlPreview);
+            urlPreview = null;
+            nuevaFoto.hidden = true;
+            btnGuardar.disabled = true;
+        }
+
+        function mostrarError(mensaje) {
+            limpiar();
+            error.innerHTML = '<i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i>';
+            error.append(mensaje);
+            dropZone.classList.add('invalida');
+            input.setAttribute('aria-invalid', 'true');
+        }
+
+        function procesar(file) {
+            error.textContent = '';
+            dropZone.classList.remove('invalida');
+            input.removeAttribute('aria-invalid');
+            if (!file) { limpiar(); return; }
+
+            const ext = file.name.split('.').pop().toLowerCase();
+            if (!EXTENSIONES.includes(ext)) {
+                mostrarError('Ese archivo no es una imagen válida. Usa JPG, PNG o WEBP.');
+                return;
+            }
+            if (file.size > MAX_BYTES) {
+                mostrarError('La imagen pesa ' + formatearPeso(file.size) + '. El máximo es 2 MB.');
+                return;
+            }
+
+            if (urlPreview) URL.revokeObjectURL(urlPreview);
+            urlPreview = URL.createObjectURL(file);
+            previewImg.src = urlPreview;
+            previewNom.textContent = file.name;
+            previewKb.textContent = formatearPeso(file.size);
+            nuevaFoto.hidden = false;
+            btnGuardar.disabled = false;
+        }
+
+        input.addEventListener('change', () => procesar(input.files[0]));
+
+        dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
         dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
         dropZone.addEventListener('drop', e => {
             e.preventDefault();
             dropZone.classList.remove('dragover');
-            if (e.dataTransfer.files.length) {
-                input.files = e.dataTransfer.files;
-                mostrarPreview();
-            }
+            if (!e.dataTransfer.files.length) return;
+            input.files = e.dataTransfer.files;
+            procesar(input.files[0]);
         });
 
-        function mostrarPreview() {
-            const file = input.files[0];
-            if (!file) return;
+        btnQuitar.addEventListener('click', () => {
+            limpiar();
+            input.focus();
+        });
 
-            // Validar tamaño en el cliente
-            if (file.size > 2 * 1024 * 1024) {
-                alert('La imagen supera los 2 MB. Elige una más pequeña.');
-                input.value = '';
-                return;
-            }
-
-            const reader = new FileReader();
-            reader.onload = e => {
-                previewImg.src = e.target.result;
-                previewNm.textContent = file.name;
-                preview.style.display = 'block';
-                btnGuardar.disabled = false;
-            };
-            reader.readAsDataURL(file);
-        }
+        form.addEventListener('submit', () => {
+            btnGuardar.disabled = true;
+            btnGuardar.setAttribute('aria-busy', 'true');
+            btnGuardar.innerHTML = '<span class="spinner" aria-hidden="true"></span> Guardando…';
+        });
     </script>
 }

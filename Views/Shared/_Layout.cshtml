@@ -32,6 +32,9 @@
                 --g-text:   #0F172A;   /* antes #001F36 — texto de cuerpo */
                 --g-muted:  #475569;   /* antes #5a7d6e — texto secundario sobre blanco, 7.58:1 */
                 --g-danger: #DC2626;   /* nuevo — unifica los rojos sueltos (#e74c3c/#c0392b) que había antes */
+                --g-danger-text: #B91C1C;  /* texto rojo sobre fondo rosado: 5.5:1 (#DC2626 ahí solo da 4.1:1) */
+                --g-input-border: #8492A6; /* borde de campos: 3.2:1 contra blanco (WCAG 1.4.11) */
+                --g-focus-dark: #6EE7B7;   /* anillo de foco sobre fondos slate oscuros: 6.8:1 */
                 --sidebar-w: 230px;
                 --topbar-h:  62px;
                 --radius:    10px;
@@ -416,7 +419,7 @@
 
     @{
         var nombreCompleto = User.FindFirst("NombreCompleto")?.Value ?? "";
-        var rol = User.FindFirst(ClaimTypes.Role)?.Value ?? "";
+        var rol = RolHelper.Etiqueta(User.FindFirst(ClaimTypes.Role)?.Value);
         var sedeNombre = User.FindFirst("SedeNombre")?.Value ?? "";
         var fotoUrl = User.FindFirst("FotoUrl")?.Value ?? "";
         var initials = string.Concat(nombreCompleto.Split(' ')

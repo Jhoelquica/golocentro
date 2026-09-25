@@ -137,6 +137,7 @@ namespace GestionAlmacen_Golocentro.Controllers
         public async Task<IActionResult> Login(string nombreUsuario, string contraseña, string? returnUrl = null)
         {
             ViewData["ReturnUrl"] = returnUrl;
+            ViewData["NombreUsuario"] = nombreUsuario;
 
             if (string.IsNullOrEmpty(nombreUsuario) || string.IsNullOrEmpty(contraseña))
             {
