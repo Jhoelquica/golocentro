@@ -1,45 +1,134 @@
-﻿@{
+@using System.Globalization
+@using GestionAlmacen_Golocentro.ViewModels
+@model ReporteIndexViewModel
+@{
     ViewData["Title"] = "Reportes";
+    var inv = CultureInfo.InvariantCulture;
+    var mes = DateTime.Today.ToString("MMMM", new CultureInfo("es-PE")).ToLowerInvariant();
 }
 
-<div class="container">
-    <h2 class="mb-4"><i class="bi bi-file-pdf"></i> Generar Reportes</h2>
+@await Html.PartialAsync("_EstilosReporte")
 
-    <div class="row">
-        <div class="col-md-6">
-            <div class="card mb-3">
-                <div class="card-header bg-danger text-white">Movimientos</div>
-                <div class="card-body">
-                    <form asp-action="Movimientos" method="get">
-                        <div class="mb-2">
-                            <label>Desde:</label>
-                            <input type="date" name="desde" class="form-control">
-                        </div>
-                        <div class="mb-2">
-                            <label>Hasta:</label>
-                            <input type="date" name="hasta" class="form-control">
-                        </div>
-                        <div class="mb-2">
-                            <label>Tipo:</label>
-                            <select name="tipo" class="form-select">
-                                <option value="">Todos</option>
-                                <option value="Entrada">Entrada</option>
-                                <option value="Salida">Salida</option>
-                            </select>
-                        </div>
-                        <button type="submit" class="btn btn-danger w-100"><i class="bi bi-file-pdf"></i> Descargar PDF</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card mb-3">
-                <div class="card-header bg-success text-white">Stock Actual</div>
-                <div class="card-body">
-                    <p>Exporta el inventario actual en Excel.</p>
-                    <a asp-action="Stock" class="btn btn-success w-100"><i class="bi bi-file-excel"></i> Descargar Excel</a>
-                </div>
-            </div>
+<style>
+    .rp-hub {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 14px;
+    }
+
+    .rp-tarjeta {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 18px;
+        background: var(--g-white);
+        border: 1px solid var(--g-border);
+        border-radius: 14px;
+        text-decoration: none;
+        color: var(--g-text);
+        transition: border-color var(--transition), box-shadow var(--transition);
+    }
+
+        .rp-tarjeta:hover {
+            border-color: var(--g-teal);
+            box-shadow: 0 4px 14px rgba(15,23,42,0.08);
+        }
+
+        .rp-tarjeta:focus-visible {
+            outline: 2px solid var(--g-teal);
+            outline-offset: 2px;
+        }
+
+    .rp-tarjeta-icono {
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
+        background: rgba(4,120,87,0.1);
+        color: var(--g-teal);
+        font-size: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 4px;
+    }
+
+    .rp-tarjeta h2 {
+        font-size: 17px;
+        font-weight: 600;
+        color: var(--g-navy);
+        margin: 0;
+    }
+
+    .rp-tarjeta p {
+        font-size: 14px;
+        color: var(--g-muted);
+        margin: 0;
+        flex: 1;
+    }
+
+    .rp-tarjeta-dato {
+        margin-top: 8px;
+        padding-top: 10px;
+        border-top: 1px solid var(--g-border);
+        font-size: 14px;
+    }
+
+        .rp-tarjeta-dato strong {
+            color: var(--g-navy);
+        }
+
+    .rp-tarjeta-ir {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--g-teal);
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+</style>
+
+<div class="cp-page rp-page">
+    <div class="cp-header">
+        <div>
+            <h1><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i> Reportes</h1>
+            <p>@Model.SedeNombre · cada reporte se ve aquí, se imprime o se descarga en Excel.</p>
         </div>
     </div>
+
+    <nav class="rp-hub" aria-label="Reportes disponibles">
+        <a class="rp-tarjeta" asp-action="Ventas">
+            <span class="rp-tarjeta-icono" aria-hidden="true"><i class="bi bi-receipt"></i></span>
+            <h2>Ventas</h2>
+            <p>Total vendido, ventas por día, por método de pago y por vendedor, y la lista de notas (las anuladas no suman).</p>
+            <div class="rp-tarjeta-dato">En @mes: <strong>S/ @Model.VentasMes.ToString("N2", inv)</strong> en @Model.NumeroVentasMes @(Model.NumeroVentasMes == 1 ? "venta" : "ventas")</div>
+            <span class="rp-tarjeta-ir">Ver reporte <i class="bi bi-arrow-right" aria-hidden="true"></i></span>
+        </a>
+        <a class="rp-tarjeta" asp-action="Productos">
+            <span class="rp-tarjeta-icono" aria-hidden="true"><i class="bi bi-trophy"></i></span>
+            <h2>Productos más vendidos</h2>
+            <p>Qué productos se venden más, en unidades e importe, y cuánto pesa cada uno en lo vendido.</p>
+            <div class="rp-tarjeta-dato">Útil para decidir qué reponer primero.</div>
+            <span class="rp-tarjeta-ir">Ver reporte <i class="bi bi-arrow-right" aria-hidden="true"></i></span>
+        </a>
+        <a class="rp-tarjeta" asp-action="Entradas">
+            <span class="rp-tarjeta-icono" aria-hidden="true"><i class="bi bi-box-arrow-in-down"></i></span>
+            <h2>Entradas</h2>
+            <p>Mercadería recibida por proveedor, con factura o guía, unidades y el detalle por producto y zona.</p>
+            <div class="rp-tarjeta-dato">En @mes: <strong>@Model.EntradasMes</strong> @(Model.EntradasMes == 1 ? "entrada" : "entradas")</div>
+            <span class="rp-tarjeta-ir">Ver reporte <i class="bi bi-arrow-right" aria-hidden="true"></i></span>
+        </a>
+        <a class="rp-tarjeta" asp-action="Stock">
+            <span class="rp-tarjeta-icono" aria-hidden="true"><i class="bi bi-boxes"></i></span>
+            <h2>Stock valorizado</h2>
+            <p>Stock actual de cada producto con sus zonas, su valor a precio de venta y los que están bajos o agotados.</p>
+            <div class="rp-tarjeta-dato">
+                Valor: <strong>S/ @Model.ValorStock.ToString("N2", inv)</strong>
+                @if (Model.ProductosEnAlerta > 0)
+                {
+                    <span> · @Model.ProductosEnAlerta por reponer</span>
+                }
+            </div>
+            <span class="rp-tarjeta-ir">Ver reporte <i class="bi bi-arrow-right" aria-hidden="true"></i></span>
+        </a>
+    </nav>
 </div>

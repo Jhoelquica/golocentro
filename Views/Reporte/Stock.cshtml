@@ -1,0 +1,161 @@
+@using System.Globalization
+@using GestionAlmacen_Golocentro.ViewModels
+@model ReporteStockViewModel
+@{
+    ViewData["Title"] = "Stock valorizado";
+    var inv = CultureInfo.InvariantCulture;
+    string Soles(decimal n) => "S/ " + n.ToString("N2", inv);
+    var f = Model.Filtro;
+    if (Model.SoloAlertas)
+        ViewData["FiltroExtra"] = new Dictionary<string, string> { ["soloAlertas"] = "true" };
+    var hoy = DateOnly.FromDateTime(DateTime.Today);
+    string Icono(string estado) => estado switch
+    {
+        EstadoStock.SinStock => "bi-x-circle",
+        EstadoStock.Bajo => "bi-exclamation-triangle",
+        _ => "bi-check-circle"
+    };
+    var enAlerta = Model.SinStock + Model.Bajos;
+}
+
+@await Html.PartialAsync("_EstilosReporte")
+
+<style>
+    .rp-vista {
+        display: inline-flex;
+        gap: 4px;
+        padding: 4px;
+        margin: 12px 1.25rem 0;
+        background: var(--g-bg);
+        border: 1px solid var(--g-border);
+        border-radius: 10px;
+    }
+
+        .rp-vista a {
+            min-height: 36px;
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--g-muted);
+            text-decoration: none;
+        }
+
+            .rp-vista a[aria-current="page"] {
+                background: var(--g-white);
+                color: var(--g-teal);
+                box-shadow: 0 1px 3px rgba(15,23,42,0.14);
+            }
+
+            .rp-vista a:focus-visible {
+                outline: 2px solid var(--g-teal);
+                outline-offset: 2px;
+            }
+
+    .rp-vence-pronto {
+        color: var(--g-danger-text);
+        font-weight: 600;
+    }
+</style>
+
+<div class="cp-page rp-page">
+    <a class="cp-volver" asp-action="Index"><i class="bi bi-arrow-left" aria-hidden="true"></i> Reportes</a>
+    <div class="cp-header">
+        <div>
+            <h1><i class="bi bi-boxes" aria-hidden="true"></i> Stock valorizado</h1>
+            <p>@f.SedeNombre · al @DateTime.Now.ToString("dd/MM/yyyy HH:mm", inv)</p>
+        </div>
+    </div>
+
+    @await Html.PartialAsync("_Filtro", f)
+
+    <div class="rp-kpis">
+        <div class="rp-kpi principal">
+            <div class="rp-kpi-etiqueta">Valor del stock</div>
+            <div class="rp-kpi-valor">@Soles(Model.Valor)</div>
+            <div class="rp-kpi-sub">a precio de venta</div>
+        </div>
+        <div class="rp-kpi">
+            <div class="rp-kpi-etiqueta">Unidades</div>
+            <div class="rp-kpi-valor">@Model.Unidades.ToString("N0", inv)</div>
+            <div class="rp-kpi-sub">de @Model.Productos @(Model.Productos == 1 ? "producto" : "productos")</div>
+        </div>
+        <div class="rp-kpi">
+            <div class="rp-kpi-etiqueta">Sin stock</div>
+            <div class="rp-kpi-valor">@Model.SinStock</div>
+            <div class="rp-kpi-sub">@(Model.SinStock == 1 ? "producto agotado" : "productos agotados")</div>
+        </div>
+        <div class="rp-kpi">
+            <div class="rp-kpi-etiqueta">Stock bajo</div>
+            <div class="rp-kpi-valor">@Model.Bajos</div>
+            <div class="rp-kpi-sub">en su mínimo o por debajo</div>
+        </div>
+    </div>
+
+    <section class="rp-seccion" aria-labelledby="tituloStock">
+        <div class="rp-seccion-cab">
+            <h2 id="tituloStock">@(Model.SoloAlertas ? "Productos por reponer" : "Todos los productos")</h2>
+            <p>El estado compara el stock de @(f.SedeId == null ? "todas las sedes" : "la sede") con el mínimo del producto</p>
+        </div>
+        <nav class="rp-vista rp-no-imprimir" aria-label="Qué productos mostrar">
+            <a asp-action="Stock" asp-route-sede="@(f.PuedeElegirSede ? f.SedeId : null)" aria-current="@(Model.SoloAlertas ? null : "page")">Todos (@Model.Productos)</a>
+            <a asp-action="Stock" asp-route-sede="@(f.PuedeElegirSede ? f.SedeId : null)" asp-route-soloAlertas="true" aria-current="@(Model.SoloAlertas ? "page" : null)">Por reponer (@enAlerta)</a>
+        </nav>
+
+        @if (Model.Filas.Count == 0)
+        {
+            <div class="cp-vacio">
+                <i class="bi bi-check-circle" aria-hidden="true"></i>
+                @(Model.SoloAlertas ? "No hay productos con stock bajo ni agotados." : "No hay productos registrados.")
+            </div>
+        }
+        else
+        {
+            <div class="cp-tabla-wrap">
+                <table class="cp-tabla">
+                    <thead>
+                        <tr>
+                            <th scope="col">Producto</th>
+                            <th scope="col" class="rp-num">Stock</th>
+                            <th scope="col" class="rp-num">Mínimo</th>
+                            <th scope="col">Estado</th>
+                            <th scope="col">Zonas</th>
+                            <th scope="col" class="rp-num">Precio</th>
+                            <th scope="col" class="rp-num">Valor</th>
+                            <th scope="col">Vence</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in Model.Filas)
+                        {
+                            var vencePronto = p.Vencimiento is DateOnly v && v.DayNumber - hoy.DayNumber <= 30;
+                            <tr>
+                                <td>
+                                    <div class="cp-nombre">@p.Nombre</div>
+                                    <div class="cp-sub">@p.Codigo · @p.Tipo</div>
+                                </td>
+                                <td class="rp-num">@p.Stock.ToString("N0", inv) <span class="cp-sub">@p.Unidad</span></td>
+                                <td class="rp-num">@p.Minimo</td>
+                                <td><span class="rp-estado @p.Estado"><i class="bi @Icono(p.Estado)" aria-hidden="true"></i> @EstadoStock.Texto(p.Estado)</span></td>
+                                <td>@(string.IsNullOrEmpty(p.Zonas) ? "—" : p.Zonas)</td>
+                                <td class="rp-num">@Soles(p.Precio)</td>
+                                <td class="rp-num">@Soles(p.Valor)</td>
+                                <td class="cp-doc @(vencePronto ? "rp-vence-pronto" : null)">@(p.Vencimiento?.ToString("dd/MM/yyyy", inv) ?? "—")</td>
+                            </tr>
+                        }
+                        <tr class="rp-total">
+                            <td>Total</td>
+                            <td class="rp-num">@Model.Filas.Sum(p => p.Stock).ToString("N0", inv)</td>
+                            <td colspan="4"></td>
+                            <td class="rp-num">@Soles(Model.Filas.Sum(p => p.Valor))</td>
+                            <td></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="rp-nota-pie">Valor = stock × precio de venta. Las fechas en rojo vencen en 30 días o menos.</p>
+        }
+    </section>
+</div>

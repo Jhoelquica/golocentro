@@ -1,0 +1,139 @@
+@using System.Globalization
+@using GestionAlmacen_Golocentro.ViewModels
+@model ReporteEntradasViewModel
+@{
+    ViewData["Title"] = "Reporte de entradas";
+    var inv = CultureInfo.InvariantCulture;
+    var f = Model.Filtro;
+    var todasLasSedes = f.SedeId == null && f.Sedes.Count > 1;
+    var conComprobante = Model.Filas.Count(e => !string.IsNullOrWhiteSpace(e.Comprobante));
+}
+
+@await Html.PartialAsync("_EstilosReporte")
+
+<div class="cp-page rp-page">
+    <a class="cp-volver" asp-action="Index"><i class="bi bi-arrow-left" aria-hidden="true"></i> Reportes</a>
+    <div class="cp-header">
+        <div>
+            <h1><i class="bi bi-box-arrow-in-down" aria-hidden="true"></i> Reporte de entradas</h1>
+            <p>@f.SedeNombre · @f.Periodo</p>
+        </div>
+    </div>
+
+    @await Html.PartialAsync("_Filtro", f)
+
+    <div class="rp-kpis">
+        <div class="rp-kpi principal">
+            <div class="rp-kpi-etiqueta">Unidades recibidas</div>
+            <div class="rp-kpi-valor">@Model.Unidades.ToString("N0", inv)</div>
+            <div class="rp-kpi-sub">en @Model.Filas.Count @(Model.Filas.Count == 1 ? "entrada" : "entradas")</div>
+        </div>
+        <div class="rp-kpi">
+            <div class="rp-kpi-etiqueta">Proveedores</div>
+            <div class="rp-kpi-valor">@Model.PorProveedor.Count</div>
+            <div class="rp-kpi-sub">con entregas en el periodo</div>
+        </div>
+        <div class="rp-kpi">
+            <div class="rp-kpi-etiqueta">Con factura o guía</div>
+            <div class="rp-kpi-valor">@conComprobante de @Model.Filas.Count</div>
+            <div class="rp-kpi-sub">entradas con comprobante anotado</div>
+        </div>
+    </div>
+
+    @if (Model.PorProveedor.Count > 0)
+    {
+        <section class="rp-seccion" aria-labelledby="tituloProveedores">
+            <div class="rp-seccion-cab">
+                <h2 id="tituloProveedores">Por proveedor</h2>
+            </div>
+            <div class="cp-tabla-wrap">
+                <table class="cp-tabla">
+                    <thead>
+                        <tr>
+                            <th scope="col">Proveedor</th>
+                            <th scope="col" class="rp-num">Entradas</th>
+                            <th scope="col" class="rp-num">Unidades</th>
+                            <th scope="col">Parte</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in Model.PorProveedor)
+                        {
+                            var parte = Model.Unidades == 0 ? 0m : (decimal)p.Unidades / Model.Unidades;
+                            <tr>
+                                <td class="cp-nombre">@p.Proveedor</td>
+                                <td class="rp-num">@p.Entradas</td>
+                                <td class="rp-num">@p.Unidades.ToString("N0", inv)</td>
+                                <td>
+                                    <span class="rp-proporcion">
+                                        <span><i style="width:@((parte * 100).ToString("0.#", inv))%"></i></span>
+                                        <span>@((parte * 100).ToString("0", inv))%</span>
+                                    </span>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    }
+
+    <section class="rp-seccion" aria-labelledby="tituloEntradas">
+        <div class="rp-seccion-cab">
+            <h2 id="tituloEntradas">Entradas registradas</h2>
+            <p>El Excel trae además el detalle por producto y zona</p>
+        </div>
+        @if (Model.Filas.Count == 0)
+        {
+            <div class="cp-vacio">
+                <i class="bi bi-box-arrow-in-down" aria-hidden="true"></i>
+                No hay entradas en este periodo.
+            </div>
+        }
+        else
+        {
+            <div class="cp-tabla-wrap">
+                <table class="cp-tabla">
+                    <thead>
+                        <tr>
+                            <th scope="col">Fecha</th>
+                            <th scope="col">Proveedor</th>
+                            <th scope="col">Factura / guía</th>
+                            <th scope="col">Registró</th>
+                            @if (todasLasSedes)
+                            {
+                                <th scope="col">Sede</th>
+                            }
+                            <th scope="col" class="rp-num">Productos</th>
+                            <th scope="col" class="rp-num">Unidades</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var e in Model.Filas)
+                        {
+                            <tr>
+                                <td class="cp-doc">
+                                    <a class="rp-enlace" asp-controller="Movimiento" asp-action="Detalle" asp-route-id="@e.IdMovimiento"
+                                       aria-label="Ver la entrada del @e.Fecha.ToString("dd/MM/yyyy HH:mm", inv)">@e.Fecha.ToString("dd/MM HH:mm", inv)</a>
+                                </td>
+                                <td>@e.Proveedor</td>
+                                <td>@(string.IsNullOrWhiteSpace(e.Comprobante) ? "—" : e.Comprobante)</td>
+                                <td>@e.Usuario</td>
+                                @if (todasLasSedes)
+                                {
+                                    <td>@e.Sede</td>
+                                }
+                                <td class="rp-num">@e.Productos</td>
+                                <td class="rp-num">@e.Unidades.ToString("N0", inv)</td>
+                            </tr>
+                        }
+                        <tr class="rp-total">
+                            <td colspan="@(todasLasSedes ? 6 : 5)">Total</td>
+                            <td class="rp-num">@Model.Unidades.ToString("N0", inv)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+</div>
