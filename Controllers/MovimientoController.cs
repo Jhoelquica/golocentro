@@ -179,7 +179,7 @@ namespace GestionAlmacen_Golocentro.Controllers
                 Tipo = "Entrada",
                 Fecha = DateTime.Now,
                 IdUsuario = usuarioId,
-                IdSede = sedeMovimiento,
+                IdSede = sedeMovimiento!.Value,
                 IdProveedor = model.ProveedorId,
                 ComprobanteEmitido = !string.IsNullOrEmpty(model.NumeroFactura),
                 Observaciones = model.NumeroFactura
@@ -418,7 +418,7 @@ namespace GestionAlmacen_Golocentro.Controllers
                 Tipo = "Salida",
                 Fecha = DateTime.Now,
                 IdUsuario = usuarioId,
-                IdSede = sedeMovimiento,
+                IdSede = sedeMovimiento!.Value,
                 IdCliente = model.ClienteId,
                 ComprobanteEmitido = !string.IsNullOrEmpty(model.NumeroComprobante),
                 Observaciones = model.NumeroComprobante

@@ -21,7 +21,7 @@ public partial class Movimiento
 
     public string? Observaciones { get; set; }
 
-    public int? IdSede { get; set; }
+    public int IdSede { get; set; }
 
     public virtual ICollection<DetalleMovimiento> DetalleMovimientos { get; set; } = new List<DetalleMovimiento>();
 
@@ -31,7 +31,7 @@ public partial class Movimiento
 
     public virtual Proveedor? IdProveedorNavigation { get; set; }
 
-    public virtual Sede? IdSedeNavigation { get; set; }
+    public virtual Sede IdSedeNavigation { get; set; } = null!;
 
     public virtual Usuario IdUsuarioNavigation { get; set; } = null!;
 }

@@ -245,6 +245,7 @@ public partial class AppDbContext : DbContext
 
             entity.HasOne(d => d.IdSedeNavigation).WithMany(p => p.Movimientos)
                 .HasForeignKey(d => d.IdSede)
+                .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("movimiento_id_sede_fkey");
 
             entity.HasOne(d => d.IdUsuarioNavigation).WithMany(p => p.Movimientos)
