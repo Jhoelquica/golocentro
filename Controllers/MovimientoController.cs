@@ -35,6 +35,51 @@ namespace GestionAlmacen_Golocentro.Controllers
             return null;
         }
 
+        // La sede de un movimiento es la de sus ubicaciones (la dueña no tiene sede en el claim).
+        // Todas deben ser de una misma sede y, si el usuario tiene sede asignada, de la suya.
+        [NonAction]
+        private async Task<(int? SedeId, string? Error)> ResolverSedeMovimiento(IEnumerable<int> idsUbicacion, int? sedeUsuario)
+        {
+            var ids = idsUbicacion.Distinct().ToList();
+            var ubicaciones = await _context.Ubicaciones
+                .Where(u => ids.Contains(u.IdUbicacion))
+                .Select(u => new { u.IdUbicacion, u.IdSede })
+                .ToListAsync();
+
+            if (ubicaciones.Count != ids.Count)
+                return (null, "Selecciona una ubicación válida para cada producto.");
+
+            var sedes = ubicaciones.Select(u => u.IdSede).Distinct().ToList();
+            if (sedes.Count > 1)
+                return (null, "Todos los productos de un movimiento deben estar en ubicaciones de la misma sede. Registra un movimiento por cada sede.");
+
+            if (sedeUsuario.HasValue && sedes[0] != sedeUsuario.Value)
+                return (null, "Las ubicaciones seleccionadas no pertenecen a tu sede.");
+
+            return (sedes[0], null);
+        }
+
+        // Para la dueña (sin sede) se muestra la sede de cada ubicación, porque ve las de todas.
+        [NonAction]
+        private List<(int Id, string Texto)> UbicacionesParaUsuario(int? sedeId)
+        {
+            var query = _context.Ubicaciones.AsQueryable();
+            if (sedeId.HasValue)
+                query = query.Where(u => u.IdSede == sedeId.Value);
+
+            return query
+                .OrderBy(u => u.IdSedeNavigation.Nombre)
+                .ThenBy(u => u.CodigoEstante)
+                .Select(u => new { u.IdUbicacion, u.CodigoEstante, u.Descripcion, Sede = u.IdSedeNavigation.Nombre })
+                .ToList()
+                .Select(u =>
+                {
+                    var texto = string.IsNullOrEmpty(u.Descripcion) ? u.CodigoEstante : $"{u.CodigoEstante} — {u.Descripcion}";
+                    return (u.IdUbicacion, sedeId.HasValue ? texto : $"{texto} · {u.Sede}");
+                })
+                .ToList();
+        }
+
         // GET: Movimiento/ObtenerStock
         [HttpGet]
         public async Task<IActionResult> ObtenerStock(int productoId, int ubicacionId)
@@ -58,16 +103,9 @@ namespace GestionAlmacen_Golocentro.Controllers
                 Text = p.Nombre
             }).ToList();
 
-            // Ubicaciones filtradas por sede
-            var ubicacionesQuery = _context.Ubicaciones.AsQueryable();
-            if (sedeId.HasValue)
-                ubicacionesQuery = ubicacionesQuery.Where(u => u.IdSede == sedeId.Value);
-            var ubicaciones = ubicacionesQuery.ToList();
-            ViewBag.Ubicaciones = ubicaciones.Select(u => new SelectListItem
-            {
-                Value = u.IdUbicacion.ToString(),
-                Text = u.CodigoEstante
-            }).ToList();
+            ViewBag.Ubicaciones = UbicacionesParaUsuario(sedeId)
+                .Select(u => new SelectListItem { Value = u.Id.ToString(), Text = u.Texto })
+                .ToList();
 
             // Proveedores
             ViewBag.Proveedores = _context.Proveedores.Select(p => new SelectListItem
@@ -91,9 +129,19 @@ namespace GestionAlmacen_Golocentro.Controllers
             if (redirectSiFalla != null)
                 return redirectSiFalla;
 
-            // 1. Validar que haya al menos un detalle
+            // 1. Validar que haya al menos un detalle y que sus ubicaciones sean de una sola sede
+            int? sedeMovimiento = null;
             if (model.Detalles == null || !model.Detalles.Any())
+            {
                 ModelState.AddModelError("", "Debe agregar al menos un producto.");
+            }
+            else
+            {
+                var (sedeResuelta, errorSede) = await ResolverSedeMovimiento(model.Detalles.Select(d => d.UbicacionId), sedeId);
+                if (errorSede != null)
+                    ModelState.AddModelError("", errorSede);
+                sedeMovimiento = sedeResuelta;
+            }
 
             if (!ModelState.IsValid)
             {
@@ -107,7 +155,7 @@ namespace GestionAlmacen_Golocentro.Controllers
                 Tipo = "Entrada",
                 Fecha = DateTime.Now,
                 IdUsuario = usuarioId,
-                IdSede = sedeId,
+                IdSede = sedeMovimiento,
                 IdProveedor = model.ProveedorId,
                 ComprobanteEmitido = !string.IsNullOrEmpty(model.NumeroFactura),
                 Observaciones = model.NumeroFactura
@@ -116,23 +164,8 @@ namespace GestionAlmacen_Golocentro.Controllers
             await _context.SaveChangesAsync();
 
             // 3. Procesar cada detalle
-            foreach (var detalleVM in model.Detalles)
+            foreach (var detalleVM in model.Detalles!)
             {
-                // Validar que la ubicación pertenezca a la sede (si el usuario no es duena)
-                if (sedeId.HasValue)
-                {
-                    var ubicacion = await _context.Ubicaciones.FindAsync(detalleVM.UbicacionId);
-                    if (ubicacion == null || ubicacion.IdSede != sedeId.Value)
-                    {
-                        ModelState.AddModelError("", $"La ubicación seleccionada en el producto {detalleVM.ProductoId} no pertenece a su sede.");
-                        // Eliminar el movimiento recién creado porque no se completará
-                        _context.Movimientos.Remove(movimiento);
-                        await _context.SaveChangesAsync();
-                        CargarListasParaVista(sedeId);
-                        return View(model);
-                    }
-                }
-
                 var detalle = new DetalleMovimiento
                 {
                     IdMovimiento = movimiento.IdMovimiento,
@@ -235,23 +268,9 @@ namespace GestionAlmacen_Golocentro.Controllers
         private IActionResult CargarListasParaVista(int? sedeId)
         {
             ViewBag.Productos = new SelectList(_context.Productos, "IdProducto", "Nombre");
-            var ubicacionesQuery = _context.Ubicaciones.AsQueryable();
-            if (sedeId.HasValue)
-                ubicacionesQuery = ubicacionesQuery.Where(u => u.IdSede == sedeId.Value);
-
-            // SelectList no soporta texto combinado directamente, así que proyectamos
-            // a un objeto con "Texto" calculado: "CodigoEstante — Descripcion" si hay
-            // descripción, o solo "CodigoEstante" si es null/vacía.
-            var ubicacionesParaLista = ubicacionesQuery
-                .ToList()
-                .Select(u => new
-                {
-                    u.IdUbicacion,
-                    Texto = string.IsNullOrEmpty(u.Descripcion)
-                        ? u.CodigoEstante
-                        : $"{u.CodigoEstante} — {u.Descripcion}"
-                });
-            ViewBag.Ubicaciones = new SelectList(ubicacionesParaLista, "IdUbicacion", "Texto");
+            ViewBag.Ubicaciones = UbicacionesParaUsuario(sedeId)
+                .Select(u => new SelectListItem { Value = u.Id.ToString(), Text = u.Texto })
+                .ToList();
 
             ViewBag.Proveedores = new SelectList(_context.Proveedores, "IdProveedor", "Nombre");
             return View("Entrada");
@@ -283,18 +302,9 @@ namespace GestionAlmacen_Golocentro.Controllers
                     precio = p.PrecioUnitario
                 }).ToList();
 
-            // Ubicaciones filtradas por sede
-            var ubicacionesQuery = _context.Ubicaciones.AsQueryable();
-            if (sedeId.HasValue)
-                ubicacionesQuery = ubicacionesQuery.Where(u => u.IdSede == sedeId.Value);
-
-            ViewBag.Ubicaciones = ubicacionesQuery
-                .OrderBy(u => u.CodigoEstante)
-                .Select(u => new
-                {
-                    id = u.IdUbicacion,
-                    codigo = u.CodigoEstante
-                }).ToList();
+            ViewBag.Ubicaciones = UbicacionesParaUsuario(sedeId)
+                .Select(u => new { id = u.Id, codigo = u.Texto })
+                .ToList();
 
             return View(new SalidaCarritoViewModel());
         }
@@ -335,8 +345,18 @@ namespace GestionAlmacen_Golocentro.Controllers
                 return redirectSiFalla;
 
             // Validaciones
+            int? sedeMovimiento = null;
             if (model.Items == null || !model.Items.Any())
+            {
                 ModelState.AddModelError("", "Debe agregar al menos un producto.");
+            }
+            else
+            {
+                var (sedeResuelta, errorSede) = await ResolverSedeMovimiento(model.Items.Select(i => i.UbicacionId), sedeId);
+                if (errorSede != null)
+                    ModelState.AddModelError("", errorSede);
+                sedeMovimiento = sedeResuelta;
+            }
 
             if (!model.ClienteId.HasValue)
                 ModelState.AddModelError("ClienteId", "Debe seleccionar un cliente.");
@@ -369,7 +389,7 @@ namespace GestionAlmacen_Golocentro.Controllers
                 Tipo = "Salida",
                 Fecha = DateTime.Now,
                 IdUsuario = usuarioId,
-                IdSede = sedeId,
+                IdSede = sedeMovimiento,
                 IdCliente = model.ClienteId,
                 ComprobanteEmitido = !string.IsNullOrEmpty(model.NumeroComprobante),
                 Observaciones = model.NumeroComprobante
@@ -422,13 +442,8 @@ namespace GestionAlmacen_Golocentro.Controllers
                 .Select(p => new { id = p.IdProducto, nombre = p.Nombre, codigo = p.Codigo, precio = p.PrecioUnitario })
                 .ToList();
 
-            var ubicacionesQuery = _context.Ubicaciones.AsQueryable();
-            if (sedeId.HasValue)
-                ubicacionesQuery = ubicacionesQuery.Where(u => u.IdSede == sedeId.Value);
-
-            ViewBag.Ubicaciones = ubicacionesQuery
-                .OrderBy(u => u.CodigoEstante)
-                .Select(u => new { id = u.IdUbicacion, codigo = u.CodigoEstante })
+            ViewBag.Ubicaciones = UbicacionesParaUsuario(sedeId)
+                .Select(u => new { id = u.Id, codigo = u.Texto })
                 .ToList();
         }
         //--------------------detalle--------------------------------------
