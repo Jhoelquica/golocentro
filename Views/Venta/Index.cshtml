@@ -200,6 +200,25 @@
         text-align: right;
     }
 
+    .vt-chip-anulada {
+        display: inline-block;
+        margin-left: 6px;
+        padding: 1px 8px;
+        border-radius: 999px;
+        background: rgba(220,38,38,0.1);
+        color: var(--g-danger-text);
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .vt-anulada td {
+        color: var(--g-muted);
+    }
+
+    .vt-anulada .vt-monto {
+        font-weight: 400;
+    }
+
     @@container (max-width: 720px) {
         .vt-col-vendedor {
             display: none;
@@ -212,10 +231,14 @@
         <div>
             <h1><i class="bi bi-receipt" aria-hidden="true"></i> Ventas</h1>
             <p>
-                @Model.Filas.Count @(Model.Filas.Count == 1 ? "venta" : "ventas") @periodo
+                @Model.Ventas @(Model.Ventas == 1 ? "venta" : "ventas") @periodo
                 @if (hayBusqueda)
                 {
-                    <span> @(Model.Filas.Count == 1 ? "que coincide" : "que coinciden") con «@Model.Busqueda»</span>
+                    <span> @(Model.Ventas == 1 ? "que coincide" : "que coinciden") con «@Model.Busqueda»</span>
+                }
+                @if (Model.Anuladas > 0)
+                {
+                    <span> · @Model.Anuladas @(Model.Anuladas == 1 ? "anulada" : "anuladas") (no suman)</span>
                 }
             </p>
         </div>
@@ -255,7 +278,7 @@
         <div class="vt-tarjeta">
             <div class="vt-etiqueta">Total vendido</div>
             <div class="vt-total">S/ @Monto(Model.Total)</div>
-            <div class="vt-sub">@Model.Filas.Count @(Model.Filas.Count == 1 ? "venta" : "ventas")</div>
+            <div class="vt-sub">@Model.Ventas @(Model.Ventas == 1 ? "venta" : "ventas")</div>
         </div>
         <div class="vt-tarjeta">
             <div class="vt-etiqueta">Por método de pago</div>
@@ -308,13 +331,28 @@
                     <tbody>
                         @foreach (var f in Model.Filas)
                         {
-                            <tr>
-                                <td><a class="vt-num" asp-action="Nota" asp-route-id="@f.IdMovimiento" aria-label="Ver nota @f.Numero">@f.Numero</a></td>
+                            <tr class="@(f.Anulada ? "vt-anulada" : null)">
+                                <td>
+                                    <a class="vt-num" asp-action="Nota" asp-route-id="@f.IdMovimiento" aria-label="Ver nota @f.Numero@(f.Anulada ? ", anulada" : "")">@f.Numero</a>
+                                    @if (f.Anulada)
+                                    {
+                                        <span class="vt-chip-anulada">Anulada</span>
+                                    }
+                                </td>
                                 <td class="cp-doc">@f.Fecha.ToString("dd/MM HH:mm", inv)</td>
                                 <td class="cp-nombre">@f.Cliente</td>
                                 <td>@f.MetodoPago</td>
                                 <td class="vt-col-vendedor">@f.Vendedor</td>
-                                <td class="vt-monto">S/ @Monto(f.Total)</td>
+                                <td class="vt-monto">
+                                    @if (f.Anulada)
+                                    {
+                                        <s>S/ @Monto(f.Total)</s>
+                                    }
+                                    else
+                                    {
+                                        <span>S/ @Monto(f.Total)</span>
+                                    }
+                                </td>
                             </tr>
                         }
                     </tbody>

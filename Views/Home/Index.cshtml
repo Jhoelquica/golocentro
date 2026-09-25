@@ -395,6 +395,7 @@
 
         .chip.entrada     { background: rgba(4,120,87,0.12);  color: var(--g-teal); }
         .chip.salida      { background: rgba(51,65,85,0.1);   color: var(--g-navy); }
+        .chip.anulada     { background: rgba(220,38,38,0.1);  color: var(--g-danger-text); }
         .chip.stock       { background: rgba(245,158,11,0.15); color: #92400E; }
         .chip.vencimiento { background: rgba(220,38,38,0.1);  color: var(--g-danger-text); }
 
@@ -608,7 +609,7 @@
                             <span class="actividad-texto">
                                 <span class="actividad-titulo">@contraparte</span>
                                 <span class="actividad-meta">
-                                    <span class="chip @(esEntrada ? "entrada" : "salida")">@(esEntrada ? "Entrada" : "Venta")</span>
+                                    <span class="chip @(esEntrada ? "entrada" : mov.Anulada ? "anulada" : "salida")">@(esEntrada ? "Entrada" : mov.Anulada ? "Venta anulada" : "Venta")</span>
                                     @mov.CantidadProductos @(mov.CantidadProductos == 1 ? "producto" : "productos") · @mov.Usuario
                                 </span>
                             </span>

@@ -25,7 +25,8 @@ namespace GestionAlmacen_Golocentro.ViewModels
         DateTime Fecha,
         string Usuario,
         string? Contraparte,
-        int CantidadProductos);
+        int CantidadProductos,
+        bool Anulada);
 
     public record AlertaResumen(string Tipo, string Mensaje, DateTime FechaGenerada);
 }

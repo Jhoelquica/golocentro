@@ -34,8 +34,10 @@ namespace GestionAlmacen_Golocentro.Controllers
             var hoy = DateTime.Today;
             var desde = hoy.AddDays(-6);
 
+            // Las ventas anuladas no cuentan como ventas del día
             var conteosPorDia = await movimientosQuery
                 .Where(m => m.Fecha >= desde)
+                .Where(m => m.NotaVentum == null || m.NotaVentum.Estado != EstadoNota.Anulada)
                 .GroupBy(m => new { Dia = m.Fecha.Date, m.Tipo })
                 .Select(g => new { g.Key.Dia, g.Key.Tipo, Total = g.Count() })
                 .ToListAsync();
@@ -73,7 +75,8 @@ namespace GestionAlmacen_Golocentro.Controllers
                         m.Fecha,
                         m.IdUsuarioNavigation.Nombre,
                         m.Tipo == "Entrada" ? m.IdProveedorNavigation!.Nombre : m.IdClienteNavigation!.Nombre,
-                        m.DetalleMovimientos.Count))
+                        m.DetalleMovimientos.Count,
+                        m.NotaVentum != null && m.NotaVentum.Estado == EstadoNota.Anulada))
                     .ToListAsync(),
 
                 UltimasAlertas = await alertasQuery

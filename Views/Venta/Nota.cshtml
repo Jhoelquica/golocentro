@@ -382,6 +382,136 @@
                 box-shadow: 0 0 0 3px rgba(4,120,87,0.25);
             }
 
+    /* Venta anulada */
+    .nv-chip-anulada {
+        font-size: 13px;
+        font-weight: 600;
+        padding: 3px 10px;
+        border-radius: 999px;
+        background: rgba(220,38,38,0.1);
+        color: var(--g-danger-text);
+    }
+
+    .nv-sello {
+        display: inline-block;
+        margin-top: 6px;
+        padding: 2px 12px;
+        border: 2px solid #000000;
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: 0.2em;
+    }
+
+    .nv-titulo-anulada,
+    .nv-titulo-anulada > i {
+        color: var(--g-danger-text);
+    }
+
+    .nv-anulacion {
+        margin: 0 0 10px;
+        font-size: 14px;
+    }
+
+        .nv-anulacion > div {
+            display: flex;
+            gap: 10px;
+            padding: 3px 0;
+        }
+
+        .nv-anulacion dt {
+            flex: none;
+            width: 64px;
+            font-weight: 600;
+            color: var(--g-muted);
+        }
+
+        .nv-anulacion dd {
+            margin: 0;
+            overflow-wrap: anywhere;
+        }
+
+    .nv-btn-anular {
+        width: 100%;
+        min-height: 44px;
+        margin-top: 10px;
+        border: none;
+        border-radius: 8px;
+        background: none;
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--g-danger-text);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        cursor: pointer;
+    }
+
+        .nv-btn-anular:hover {
+            background: rgba(220,38,38,0.08);
+        }
+
+        .nv-btn-anular:focus-visible {
+            outline: 2px solid var(--g-danger-text);
+            outline-offset: 2px;
+        }
+
+    .nv-devolucion {
+        list-style: none;
+        margin: 10px 0 14px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        background: var(--g-bg);
+        border: 1px solid var(--g-border);
+        text-align: left;
+        font-size: 14px;
+        color: var(--g-text);
+    }
+
+        .nv-devolucion li + li {
+            margin-top: 4px;
+        }
+
+        .nv-devolucion span {
+            color: var(--g-muted);
+        }
+
+    .cp-modal .nv-campo-motivo {
+        text-align: left;
+        margin-bottom: 0;
+    }
+
+    .nv-motivos {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 8px;
+    }
+
+        .nv-motivos button {
+            min-height: 36px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            border: 1px solid var(--g-input-border);
+            background: var(--g-white);
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--g-text);
+            cursor: pointer;
+        }
+
+            .nv-motivos button:hover {
+                border-color: var(--g-danger-text);
+                color: var(--g-danger-text);
+            }
+
+            .nv-motivos button:focus-visible {
+                outline: 2px solid var(--g-teal);
+                outline-offset: 2px;
+            }
+
     #nv-impresion {
         display: none;
     }
@@ -408,8 +538,14 @@
     <a class="cp-volver" asp-action="Index"><i class="bi bi-arrow-left" aria-hidden="true"></i> Ventas</a>
     <header class="cp-header">
         <div>
-            <h1><i class="bi bi-receipt" aria-hidden="true"></i> Nota de venta @Model.Numero</h1>
-            <p>@fecha a las @hora · @Model.ClienteNombre · Total S/ @Monto(Model.Total)</p>
+            <h1>
+                <i class="bi bi-receipt" aria-hidden="true"></i> Nota de venta @Model.Numero
+                @if (Model.Anulada)
+                {
+                    <span class="nv-chip-anulada">Anulada</span>
+                }
+            </h1>
+            <p>@fecha a las @hora · @Model.ClienteNombre · Total S/ @Monto(Model.Total)@(Model.Anulada ? " (no suma)" : "")</p>
         </div>
     </header>
 
@@ -451,6 +587,10 @@
                     <div class="nv-doc">
                         <div class="nv-doc-tipo">NOTA DE VENTA</div>
                         <div class="nv-doc-num">@Model.Numero</div>
+                        @if (Model.Anulada)
+                        {
+                            <div class="nv-sello">ANULADA</div>
+                        }
                     </div>
                     <dl class="nv-datos">
                         <div><dt>Fecha</dt><dd>@fecha @hora</dd></div>
@@ -503,33 +643,63 @@
         </div>
 
         <section class="nv-card nv-acciones" aria-labelledby="tituloAcciones">
-            <h2 class="nv-titulo" id="tituloAcciones"><i class="bi bi-send" aria-hidden="true"></i> Entregar la nota</h2>
-            <div class="nv-botones">
-                <button type="button" class="btn-g-primary" id="btnWhatsApp">
-                    <i class="bi bi-whatsapp" aria-hidden="true"></i> Enviar por WhatsApp
-                </button>
-                <p class="nv-destino" id="destinoWhatsApp">
-                    @if (celular != null)
-                    {
-                        <span>Se abrirá el chat de @Model.ClienteNombre (@celular) con el mensaje y el PDF.</span>
-                    }
-                    else
-                    {
-                        <span>Mensaje y PDF; eliges el contacto en WhatsApp.</span>
-                    }
+            @if (Model.Anulada)
+            {
+                <h2 class="nv-titulo nv-titulo-anulada" id="tituloAcciones"><i class="bi bi-x-octagon" aria-hidden="true"></i> Venta anulada</h2>
+                <dl class="nv-anulacion">
+                    <div><dt>Cuándo</dt><dd>@Model.FechaAnulacion?.ToString("dd/MM/yyyy HH:mm", inv)</dd></div>
+                    <div><dt>Quién</dt><dd>@Model.AnuladaPor</dd></div>
+                    <div><dt>Motivo</dt><dd>@Model.MotivoAnulacion</dd></div>
+                </dl>
+                <p class="nv-nota">
+                    No suma en las ventas. Volvió al stock:
+                    @(string.Join("; ", Model.Lineas.Select(l => $"{l.Cantidad} {l.Descripcion} a {l.Zona}"))).
                 </p>
-                <button type="button" class="btn-g-outline" id="btnImprimir">
-                    <i class="bi bi-printer" aria-hidden="true"></i> Imprimir ticket (80 mm)
-                </button>
-                <button type="button" class="btn-g-outline" id="btnPdf">
-                    <i class="bi bi-file-earmark-pdf" aria-hidden="true"></i> Descargar PDF
-                </button>
-            </div>
+                <div class="nv-botones">
+                    <button type="button" class="btn-g-outline" id="btnImprimir">
+                        <i class="bi bi-printer" aria-hidden="true"></i> Imprimir ticket (sale como ANULADA)
+                    </button>
+                    <button type="button" class="btn-g-outline" id="btnPdf">
+                        <i class="bi bi-file-earmark-pdf" aria-hidden="true"></i> Descargar PDF
+                    </button>
+                </div>
+            }
+            else
+            {
+                <h2 class="nv-titulo" id="tituloAcciones"><i class="bi bi-send" aria-hidden="true"></i> Entregar la nota</h2>
+                <div class="nv-botones">
+                    <button type="button" class="btn-g-primary" id="btnWhatsApp">
+                        <i class="bi bi-whatsapp" aria-hidden="true"></i> Enviar por WhatsApp
+                    </button>
+                    <p class="nv-destino" id="destinoWhatsApp">
+                        @if (celular != null)
+                        {
+                            <span>Se abrirá el chat de @Model.ClienteNombre (@celular) con el mensaje y el PDF.</span>
+                        }
+                        else
+                        {
+                            <span>Mensaje y PDF; eliges el contacto en WhatsApp.</span>
+                        }
+                    </p>
+                    <button type="button" class="btn-g-outline" id="btnImprimir">
+                        <i class="bi bi-printer" aria-hidden="true"></i> Imprimir ticket (80 mm)
+                    </button>
+                    <button type="button" class="btn-g-outline" id="btnPdf">
+                        <i class="bi bi-file-earmark-pdf" aria-hidden="true"></i> Descargar PDF
+                    </button>
+                </div>
+            }
             <p class="nv-estado" id="estado" role="status"></p>
             <div class="nv-enlaces">
                 <a class="btn-g-primary" asp-action="Nueva"><i class="bi bi-plus-lg" aria-hidden="true"></i> Nueva venta</a>
                 <a class="btn-g-outline" asp-action="Index"><i class="bi bi-list-ul" aria-hidden="true"></i> Ver ventas</a>
             </div>
+            @if (Model.PuedeAnular && !Model.Anulada)
+            {
+                <button type="button" class="nv-btn-anular" data-bs-toggle="modal" data-bs-target="#modalAnular">
+                    <i class="bi bi-x-octagon" aria-hidden="true"></i> Anular venta
+                </button>
+            }
         </section>
 
         <section class="nv-card nv-fotos" aria-labelledby="tituloFotos">
@@ -537,7 +707,7 @@
             <p class="nv-nota">Para validar que se entregó todo bien. Quedan en el sistema; no salen en la nota.</p>
             @if (Model.Evidencias.Count == 0)
             {
-                <div class="nv-sin-fotos">Aún no hay fotos de esta entrega.</div>
+                <div class="nv-sin-fotos">@(Model.Anulada ? "Esta venta no tiene fotos de entrega." : "Aún no hay fotos de esta entrega.")</div>
             }
             else
             {
@@ -554,15 +724,56 @@
                     }
                 </ul>
             }
-            <form class="nv-subir" method="post" asp-action="AgregarEvidencia" asp-route-id="@Model.IdMovimiento" enctype="multipart/form-data">
-                <label for="foto" class="visually-hidden">Foto de la entrega</label>
-                <input type="file" id="foto" name="foto" accept="image/jpeg,image/png,image/webp" required aria-describedby="ayudaFoto" />
-                <button type="submit" class="btn-g-outline"><i class="bi bi-upload" aria-hidden="true"></i> Subir foto</button>
-            </form>
-            <p class="cp-ayuda" id="ayudaFoto">JPG, PNG o WEBP de hasta 5 MB.</p>
+            @if (!Model.Anulada)
+            {
+                <form class="nv-subir" method="post" asp-action="AgregarEvidencia" asp-route-id="@Model.IdMovimiento" enctype="multipart/form-data">
+                    <label for="foto" class="visually-hidden">Foto de la entrega</label>
+                    <input type="file" id="foto" name="foto" accept="image/jpeg,image/png,image/webp" required aria-describedby="ayudaFoto" />
+                    <button type="submit" class="btn-g-outline"><i class="bi bi-upload" aria-hidden="true"></i> Subir foto</button>
+                </form>
+                <p class="cp-ayuda" id="ayudaFoto">JPG, PNG o WEBP de hasta 5 MB.</p>
+            }
         </section>
     </div>
 </div>
+
+@if (Model.PuedeAnular && !Model.Anulada)
+{
+    <div class="modal fade cp-modal" id="modalAnular" tabindex="-1" aria-labelledby="tituloAnular" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="post" asp-action="Anular" asp-route-id="@Model.IdMovimiento" id="formAnular" novalidate>
+                    <div class="modal-body">
+                        <div class="cp-modal-icono" aria-hidden="true"><i class="bi bi-x-octagon"></i></div>
+                        <h2 id="tituloAnular">¿Anular la venta @Model.Numero?</h2>
+                        <p>La nota no se borra: queda como anulada y deja de sumar en las ventas. Estos productos vuelven al stock:</p>
+                        <ul class="nv-devolucion">
+                            @foreach (var l in Model.Lineas)
+                            {
+                                <li><strong>@l.Cantidad @l.Unidad</strong> @l.Descripcion <span>a @l.Zona</span></li>
+                            }
+                        </ul>
+                        <div class="cp-campo nv-campo-motivo">
+                            <label for="motivo">Motivo <span class="cp-req" aria-hidden="true">*</span></label>
+                            <div class="nv-motivos" role="group" aria-label="Motivos frecuentes">
+                                <button type="button" data-motivo="Nota hecha con error">Nota con error</button>
+                                <button type="button" data-motivo="El cliente canceló la compra">El cliente canceló</button>
+                                <button type="button" data-motivo="El cliente devolvió los productos">Devolución</button>
+                            </div>
+                            <textarea id="motivo" name="motivo" rows="2" maxlength="200" required aria-required="true"
+                                      placeholder="Escribe o elige un motivo"></textarea>
+                            <p class="cp-error" id="motivo-error" hidden><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> Escribe el motivo de la anulación.</p>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn-g-outline" data-bs-dismiss="modal" id="btnCancelarAnular">Cancelar</button>
+                        <button type="submit" class="btn-g-danger" id="btnConfirmarAnular">Sí, anular venta</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}
 
 <style id="nv-pagina"></style>
 
@@ -690,7 +901,7 @@
         }
 
         const btnWhatsApp = document.getElementById('btnWhatsApp');
-        btnWhatsApp.addEventListener('click', () => {
+        btnWhatsApp?.addEventListener('click', () => {
             if (puedeCompartirArchivos()) {
                 conBoton(btnWhatsApp, 'Preparando la nota…', async () => {
                     try {
@@ -718,8 +929,49 @@
             });
         });
 
+        // ===== Anular venta =====
+        const formAnular = document.getElementById('formAnular');
+        if (formAnular) {
+            const modalAnular = document.getElementById('modalAnular');
+            const motivo = document.getElementById('motivo');
+            const errorMotivo = document.getElementById('motivo-error');
+            const btnConfirmar = document.getElementById('btnConfirmarAnular');
+
+            function marcarMotivo(invalido) {
+                errorMotivo.hidden = !invalido;
+                motivo.setAttribute('aria-invalid', invalido ? 'true' : 'false');
+                if (invalido) motivo.setAttribute('aria-describedby', 'motivo-error');
+                else motivo.removeAttribute('aria-describedby');
+            }
+
+            formAnular.querySelectorAll('[data-motivo]').forEach(boton => boton.addEventListener('click', () => {
+                motivo.value = boton.dataset.motivo;
+                marcarMotivo(false);
+                motivo.focus();
+            }));
+            motivo.addEventListener('input', () => { if (motivo.value.trim()) marcarMotivo(false); });
+
+            formAnular.addEventListener('submit', e => {
+                if (!motivo.value.trim()) {
+                    e.preventDefault();
+                    marcarMotivo(true);
+                    motivo.focus();
+                    return;
+                }
+                btnConfirmar.disabled = true;
+                btnConfirmar.innerHTML = '<span class="cp-spinner" aria-hidden="true"></span> Anulando…';
+            });
+
+            // En una acción que no se deshace el foco inicial va a "Cancelar"
+            modalAnular.addEventListener('shown.bs.modal', () => document.getElementById('btnCancelarAnular').focus());
+            modalAnular.addEventListener('hidden.bs.modal', () => {
+                motivo.value = '';
+                marcarMotivo(false);
+            });
+        }
+
         // En el celular el PDF se prepara de antemano: compartir necesita el archivo listo al tocar el botón
-        if (puedeCompartirArchivos()) {
+        if (btnWhatsApp && puedeCompartirArchivos()) {
             const precargar = () => generarPdf().catch(() => { });
             if ('requestIdleCallback' in window) requestIdleCallback(precargar, { timeout: 3000 });
             else setTimeout(precargar, 1500);

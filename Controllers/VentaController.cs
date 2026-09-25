@@ -60,15 +60,21 @@ namespace GestionAlmacen_Golocentro.Controllers
                     Cliente = n.IdMovimientoNavigation.IdClienteNavigation!.Nombre,
                     n.Total,
                     n.MetodoPago,
-                    Vendedor = n.IdMovimientoNavigation.IdUsuarioNavigation.Nombre
+                    Vendedor = n.IdMovimientoNavigation.IdUsuarioNavigation.Nombre,
+                    Anulada = n.Estado == EstadoNota.Anulada
                 })
                 .ToListAsync();
 
             modelo.Filas = filas
-                .Select(f => new VentaFila(f.IdMovimiento, NumeroNota(f.Serie, f.Numero), f.Fecha, f.Cliente, f.Total, MetodosPago.Texto(f.MetodoPago), f.Vendedor))
+                .Select(f => new VentaFila(f.IdMovimiento, NumeroNota(f.Serie, f.Numero), f.Fecha, f.Cliente, f.Total, MetodosPago.Texto(f.MetodoPago), f.Vendedor, f.Anulada))
                 .ToList();
-            modelo.Total = filas.Sum(f => f.Total);
-            modelo.PorMetodo = filas
+
+            // Las anuladas se listan pero no suman
+            var validas = filas.Where(f => !f.Anulada).ToList();
+            modelo.Ventas = validas.Count;
+            modelo.Anuladas = filas.Count - validas.Count;
+            modelo.Total = validas.Sum(f => f.Total);
+            modelo.PorMetodo = validas
                 .GroupBy(f => f.MetodoPago)
                 .Select(g => new TotalPorMetodo(MetodosPago.Texto(g.Key), g.Count(), g.Sum(f => f.Total)))
                 .OrderByDescending(t => t.Total)
@@ -194,6 +200,7 @@ namespace GestionAlmacen_Golocentro.Controllers
             var nota = new NotaVentum
             {
                 Serie = Serie,
+                Estado = EstadoNota.Emitida,
                 Subtotal = subtotal,
                 Descuento = descuento,
                 Total = subtotal - descuento,
@@ -243,12 +250,20 @@ namespace GestionAlmacen_Golocentro.Controllers
                     m.Fecha,
                     m.Observaciones,
                     Nota = m.NotaVentum,
+                    AnuladaPor = m.NotaVentum!.IdUsuarioAnulacionNavigation!.Nombre,
                     Vendedor = m.IdUsuarioNavigation.Nombre,
                     Sede = m.IdSedeNavigation,
                     Cliente = m.IdClienteNavigation,
                     Lineas = m.DetalleMovimientos
                         .OrderBy(d => d.IdDetalle)
-                        .Select(d => new { d.Cantidad, d.IdProductoNavigation.Nombre, d.IdProductoNavigation.UnidadMedida, d.PrecioUnitarioSnapshot })
+                        .Select(d => new
+                        {
+                            d.Cantidad,
+                            d.IdProductoNavigation.Nombre,
+                            d.IdProductoNavigation.UnidadMedida,
+                            d.PrecioUnitarioSnapshot,
+                            Zona = d.IdUbicacionNavigation.CodigoEstante
+                        })
                         .ToList(),
                     Evidencias = m.Evidencia.OrderBy(e => e.Fecha).Select(e => new EvidenciaNota(e.UrlArchivo, e.Fecha)).ToList()
                 })
@@ -276,15 +291,97 @@ namespace GestionAlmacen_Golocentro.Controllers
                 ClienteDocumento = venta.Cliente?.RucDni,
                 ClienteCelular = venta.Cliente?.Celular,
                 Lineas = venta.Lineas
-                    .Select(l => new LineaNota(l.Cantidad, l.Nombre, l.UnidadMedida, l.PrecioUnitarioSnapshot, decimal.Round(l.Cantidad * l.PrecioUnitarioSnapshot, 2)))
+                    .Select(l => new LineaNota(l.Cantidad, l.Nombre, l.UnidadMedida, l.PrecioUnitarioSnapshot, decimal.Round(l.Cantidad * l.PrecioUnitarioSnapshot, 2), l.Zona))
                     .ToList(),
                 Subtotal = venta.Nota.Subtotal,
                 Descuento = venta.Nota.Descuento,
                 Total = venta.Nota.Total,
                 MetodoPago = MetodosPago.Texto(venta.Nota.MetodoPago),
                 Observaciones = venta.Observaciones,
-                Evidencias = venta.Evidencias
+                Evidencias = venta.Evidencias,
+                Anulada = venta.Nota.Estado == EstadoNota.Anulada,
+                FechaAnulacion = venta.Nota.FechaAnulacion,
+                AnuladaPor = venta.AnuladaPor,
+                MotivoAnulacion = venta.Nota.MotivoAnulacion,
+                PuedeAnular = PuedeAnular()
             });
+        }
+
+        // Nota hecha por error o venta cancelada: la nota queda anulada (no se borra) y el stock
+        // vuelve a las zonas de donde salió. Solo dueña y encargada.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [Authorize(Roles = "duena,encargada")]
+        public async Task<IActionResult> Anular(int id, string? motivo)
+        {
+            var usuarioIdClaim = User.FindFirst("UsuarioId")?.Value;
+            if (string.IsNullOrEmpty(usuarioIdClaim))
+                return RedirectToAction("Login", "Account");
+
+            var venta = await _context.Movimientos
+                .Where(m => m.IdMovimiento == id && m.Tipo == "Salida" && m.NotaVentum != null)
+                .Select(m => new
+                {
+                    m.IdSede,
+                    m.NotaVentum!.Serie,
+                    m.NotaVentum.Numero,
+                    m.NotaVentum.Estado,
+                    Lineas = m.DetalleMovimientos.Select(d => new { d.IdProducto, d.IdUbicacion, d.Cantidad }).ToList()
+                })
+                .FirstOrDefaultAsync();
+            if (venta == null)
+                return NotFound();
+            if (SedeDelUsuario() is int sede && venta.IdSede != sede)
+                return RedirectToAction("AccessDenied", "Account");
+
+            var numeroNota = NumeroNota(venta.Serie, venta.Numero);
+            motivo = motivo?.Trim();
+            var error = venta.Estado == EstadoNota.Anulada ? $"La venta {numeroNota} ya estaba anulada."
+                : string.IsNullOrEmpty(motivo) ? "Escribe el motivo de la anulación."
+                : motivo.Length > 200 ? "El motivo no puede pasar de 200 caracteres."
+                : null;
+            if (error != null)
+            {
+                TempData["Error"] = error;
+                return RedirectToAction(nameof(Nota), new { id });
+            }
+
+            var ahora = DateTime.Now;
+            await using var transaccion = await _context.Database.BeginTransactionAsync();
+
+            // Solo marca si sigue emitida: si otra persona la anuló al mismo tiempo, el stock no se devuelve dos veces
+            var marcadas = await _context.NotaVenta
+                .Where(n => n.IdMovimiento == id && n.Estado == EstadoNota.Emitida)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(n => n.Estado, EstadoNota.Anulada)
+                    .SetProperty(n => n.FechaAnulacion, ahora)
+                    .SetProperty(n => n.IdUsuarioAnulacion, int.Parse(usuarioIdClaim))
+                    .SetProperty(n => n.MotivoAnulacion, motivo));
+            if (marcadas == 0)
+            {
+                TempData["Error"] = $"La venta {numeroNota} ya estaba anulada.";
+                return RedirectToAction(nameof(Nota), new { id });
+            }
+
+            // La fila de la zona pudo desaparecer si luego se movió todo lo que quedaba: se vuelve a crear
+            var stocks = await OperacionesAlmacen.CargarStocks(_context, venta.Lineas.Select(l => (l.IdProducto, l.IdUbicacion)));
+            foreach (var linea in venta.Lineas)
+            {
+                var clave = (linea.IdProducto, linea.IdUbicacion);
+                if (!stocks.TryGetValue(clave, out var stock))
+                {
+                    stock = new ProductoUbicacion { IdProducto = linea.IdProducto, IdUbicacion = linea.IdUbicacion };
+                    _context.ProductoUbicacions.Add(stock);
+                    stocks[clave] = stock;
+                }
+                stock.CantidadActual += linea.Cantidad;
+                stock.UltimaActualizacion = ahora;
+            }
+            await _context.SaveChangesAsync();
+            await transaccion.CommitAsync();
+
+            TempData["Exito"] = $"Venta {numeroNota} anulada. Los productos volvieron al stock de sus zonas.";
+            return RedirectToAction(nameof(Nota), new { id });
         }
 
         // La foto de entrega suele tomarse después de la venta; queda en el sistema, no en la nota
@@ -294,14 +391,16 @@ namespace GestionAlmacen_Golocentro.Controllers
         {
             var venta = await _context.Movimientos
                 .Where(m => m.IdMovimiento == id && m.Tipo == "Salida")
-                .Select(m => new { m.IdSede })
+                .Select(m => new { m.IdSede, Anulada = m.NotaVentum != null && m.NotaVentum.Estado == EstadoNota.Anulada })
                 .FirstOrDefaultAsync();
             if (venta == null)
                 return NotFound();
             if (SedeDelUsuario() is int sede && venta.IdSede != sede)
                 return RedirectToAction("AccessDenied", "Account");
 
-            if (foto is not { Length: > 0 })
+            if (venta.Anulada)
+                TempData["Error"] = "La venta está anulada: ya no se le agregan fotos de entrega.";
+            else if (foto is not { Length: > 0 })
                 TempData["Error"] = "Elige una foto para adjuntar.";
             else if (OperacionesAlmacen.ValidarEvidencia(foto) is string error)
                 TempData["Error"] = error;
@@ -342,6 +441,9 @@ namespace GestionAlmacen_Golocentro.Controllers
             await _context.SaveChangesAsync();
             return Json(new { success = true, cliente = new ClienteVenta(cliente.IdCliente, cliente.Nombre, cliente.RucDni, cliente.Celular) });
         }
+
+        [NonAction]
+        private bool PuedeAnular() => User.IsInRole("duena") || User.IsInRole("encargada");
 
         [NonAction]
         private int? SedeDelUsuario()

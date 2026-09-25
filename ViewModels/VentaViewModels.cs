@@ -22,6 +22,13 @@ namespace GestionAlmacen_Golocentro.ViewModels
             Todos.FirstOrDefault(m => m.Valor == valor).Texto ?? valor;
     }
 
+    // Mismos valores que chk_notaventa_estado
+    public static class EstadoNota
+    {
+        public const string Emitida = "emitida";
+        public const string Anulada = "anulada";
+    }
+
     // Cliente genérico creado por Database/2026-09-25_nota_venta.sql
     public static class ClienteGeneral
     {
@@ -68,7 +75,8 @@ namespace GestionAlmacen_Golocentro.ViewModels
         public int ClienteGeneralId { get; set; }
     }
 
-    public record LineaNota(int Cantidad, string Descripcion, string Unidad, decimal PrecioUnitario, decimal Importe);
+    // Zona: de dónde salió (y adónde vuelve si se anula); no se imprime
+    public record LineaNota(int Cantidad, string Descripcion, string Unidad, decimal PrecioUnitario, decimal Importe, string Zona);
 
     public record EvidenciaNota(string Url, DateTime Fecha);
 
@@ -92,9 +100,14 @@ namespace GestionAlmacen_Golocentro.ViewModels
         public string MetodoPago { get; set; } = "";
         public string? Observaciones { get; set; }
         public List<EvidenciaNota> Evidencias { get; set; } = new();
+        public bool Anulada { get; set; }
+        public DateTime? FechaAnulacion { get; set; }
+        public string? AnuladaPor { get; set; }
+        public string? MotivoAnulacion { get; set; }
+        public bool PuedeAnular { get; set; }
     }
 
-    public record VentaFila(int IdMovimiento, string Numero, DateTime Fecha, string Cliente, decimal Total, string MetodoPago, string Vendedor);
+    public record VentaFila(int IdMovimiento, string Numero, DateTime Fecha, string Cliente, decimal Total, string MetodoPago, string Vendedor, bool Anulada);
 
     public record TotalPorMetodo(string Metodo, int Ventas, decimal Total);
 
@@ -104,6 +117,10 @@ namespace GestionAlmacen_Golocentro.ViewModels
         public DateOnly Hasta { get; set; }
         public string? Busqueda { get; set; }
         public List<VentaFila> Filas { get; set; } = new();
+
+        // Ventas válidas (sin las anuladas), que son las que suman en Total
+        public int Ventas { get; set; }
+        public int Anuladas { get; set; }
         public decimal Total { get; set; }
         public List<TotalPorMetodo> PorMetodo { get; set; } = new();
     }
