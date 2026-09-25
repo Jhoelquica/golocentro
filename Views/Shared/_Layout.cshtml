@@ -124,6 +124,20 @@
                 background: var(--g-teal);
                 color: var(--g-cream);
             }
+            .g-nav-link.proximamente {
+                cursor: default;
+                white-space: nowrap;
+                color: rgba(255,255,255,0.45);
+            }
+            .g-nav-link.proximamente:hover { background: none; color: rgba(255,255,255,0.45); }
+            .g-nav-pronto {
+                margin-left: auto;
+                font-size: 10px; font-weight: 600;
+                padding: 1px 6px;
+                border-radius: 20px;
+                border: 1px solid rgba(255,255,255,0.3);
+                color: rgba(255,255,255,0.7);
+            }
             .g-nav-link .badge-alert {
                 margin-left: auto;
                 background: var(--g-danger);
@@ -480,10 +494,10 @@
                     <i class="bi bi-bar-chart-line"></i> Stock
                 </a>
 
-                <a class="g-nav-link @(currentController == "Ubicacion" ? "active" : "")"
-                   asp-controller="Ubicacion" asp-action="Mapa">
-                    <i class="bi bi-map"></i> Mapa Almacén
-                </a>
+                <span class="g-nav-link proximamente" aria-disabled="true">
+                    <i class="bi bi-map" aria-hidden="true"></i> Mapa Almacén
+                    <span class="g-nav-pronto">pronto</span>
+                </span>
 
                 <a class="g-nav-link @(currentController == "Alerta" ? "active" : "")"
                    asp-controller="Alerta" asp-action="Index">

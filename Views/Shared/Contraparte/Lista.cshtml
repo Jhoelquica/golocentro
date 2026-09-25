@@ -1,0 +1,468 @@
+@using GestionAlmacen_Golocentro.ViewModels
+@model ContraparteListaViewModel
+@{
+    var t = Model.Tipo;
+    ViewData["Title"] = t.Plural;
+    var pluralMin = t.Plural.ToLowerInvariant();
+    var hayBusqueda = !string.IsNullOrWhiteSpace(Model.Busqueda);
+    var tituloMovimientos = char.ToUpper(t.MovimientoPlural[0]) + t.MovimientoPlural[1..];
+}
+
+@await Html.PartialAsync("~/Views/Shared/Contraparte/_Estilos.cshtml")
+
+<style>
+    .cp-busqueda {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-bottom: 1rem;
+    }
+
+    .cp-busqueda-campo {
+        position: relative;
+        flex: 1;
+        min-width: 220px;
+        max-width: 460px;
+    }
+
+        .cp-busqueda-campo i {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--g-muted);
+            pointer-events: none;
+        }
+
+        .cp-busqueda-campo input {
+            width: 100%;
+            height: 44px;
+            padding: 0 12px 0 38px;
+            border: 1px solid var(--g-input-border);
+            border-radius: 8px;
+            font-size: 15px;
+            font-family: inherit;
+            color: var(--g-text);
+            background: var(--g-white);
+        }
+
+            .cp-busqueda-campo input::placeholder {
+                color: #64748B;
+            }
+
+            .cp-busqueda-campo input:focus {
+                outline: none;
+                border-color: var(--g-teal);
+                box-shadow: 0 0 0 3px rgba(4,120,87,0.25);
+            }
+
+    .cp-limpiar {
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--g-muted);
+        padding: 10px 6px;
+    }
+
+        .cp-limpiar:hover {
+            color: var(--g-teal);
+        }
+
+    .cp-panel {
+        background: var(--g-white);
+        border: 1px solid var(--g-border);
+        border-radius: 14px;
+        overflow: hidden;
+        container-type: inline-size;
+    }
+
+    .cp-tabla-wrap {
+        overflow-x: auto;
+    }
+
+    .cp-tabla {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 480px;
+    }
+
+        .cp-tabla th {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--g-muted);
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            text-align: left;
+            padding: 10px 1.25rem;
+            background: var(--g-bg);
+            border-bottom: 1px solid var(--g-border);
+            white-space: nowrap;
+        }
+
+        .cp-tabla td {
+            padding: 12px 1.25rem;
+            font-size: 14px;
+            color: var(--g-text);
+            border-bottom: 1px solid var(--g-border);
+            vertical-align: middle;
+        }
+
+        .cp-tabla tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .cp-tabla tbody tr:hover td {
+            background: var(--g-bg);
+        }
+
+    .cp-nombre {
+        font-weight: 600;
+    }
+
+    .cp-sub {
+        font-size: 12px;
+        color: var(--g-muted);
+        margin-top: 2px;
+    }
+
+    .cp-doc {
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+    }
+
+    .cp-mov {
+        white-space: nowrap;
+    }
+
+    .cp-mov-ninguno {
+        color: var(--g-muted);
+    }
+
+    .cp-acciones {
+        display: flex;
+        gap: 4px;
+        justify-content: flex-end;
+    }
+
+    .cp-icono-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        border: none;
+        background: none;
+        color: var(--g-muted);
+        font-size: 16px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        text-decoration: none;
+        transition: background var(--transition), color var(--transition);
+    }
+
+        .cp-icono-btn:hover {
+            background: rgba(4,120,87,0.08);
+            color: var(--g-teal);
+        }
+
+        .cp-icono-btn.peligro:hover {
+            background: rgba(220,38,38,0.08);
+            color: var(--g-danger-text);
+        }
+
+        .cp-icono-btn:focus-visible,
+        .cp-limpiar:focus-visible {
+            outline: 2px solid var(--g-teal);
+            outline-offset: 1px;
+        }
+
+    .cp-vacio {
+        text-align: center;
+        padding: 2.5rem 1.25rem;
+        color: var(--g-muted);
+        font-size: 15px;
+    }
+
+        .cp-vacio > i {
+            font-size: 30px;
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        .cp-vacio a {
+            color: var(--g-teal);
+            font-weight: 600;
+        }
+
+    .cp-paginacion {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 10px 1.25rem;
+        border-top: 1px solid var(--g-border);
+        font-size: 14px;
+        color: var(--g-muted);
+    }
+
+        .cp-paginacion .btn-g-outline {
+            min-height: 36px;
+            padding: 6px 12px;
+        }
+
+        .cp-paginacion .cp-pag-espacio {
+            width: 110px;
+        }
+
+    .cp-modal .modal-content {
+        border: none;
+        border-radius: 14px;
+    }
+
+    .cp-modal .modal-body {
+        padding: 1.75rem 1.5rem 1rem;
+        text-align: center;
+    }
+
+    .cp-modal-icono {
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        background: rgba(220,38,38,0.1);
+        color: var(--g-danger-text);
+        font-size: 22px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1rem;
+    }
+
+    .cp-modal h2 {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--g-navy);
+        margin-bottom: 8px;
+    }
+
+    .cp-modal p {
+        font-size: 14px;
+        color: var(--g-muted);
+        margin: 0;
+    }
+
+    .cp-modal .modal-footer {
+        border-top: none;
+        padding: 0.5rem 1.5rem 1.5rem;
+        display: flex;
+        gap: 10px;
+    }
+
+        .cp-modal .modal-footer > * {
+            flex: 1;
+            margin: 0;
+        }
+
+    /* Depende del ancho del panel (no de la ventana): con sidebar el panel se angosta antes */
+    @@container (max-width: 720px) {
+        .cp-col-direccion {
+            display: none;
+        }
+    }
+</style>
+
+<div class="cp-page">
+
+    <div class="cp-header">
+        <div>
+            <h1><i class="bi @t.Icono" aria-hidden="true"></i> @t.Plural</h1>
+            <p>
+                @if (hayBusqueda)
+                {
+                    <span>@Model.Total @(Model.Total == 1 ? "resultado" : "resultados") para «@Model.Busqueda»</span>
+                }
+                else
+                {
+                    <span>@Model.Total @(Model.Total == 1 ? t.Singular + " registrado" : pluralMin + " registrados")</span>
+                }
+            </p>
+        </div>
+        <a class="btn-g-primary" asp-controller="@t.Controlador" asp-action="Crear">
+            <i class="bi bi-plus-lg" aria-hidden="true"></i> Nuevo @t.Singular
+        </a>
+    </div>
+
+    @if (TempData["Exito"] is string exito)
+    {
+        <div class="cp-aviso exito" role="status">
+            <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+            <span>@exito</span>
+            <button type="button" aria-label="Cerrar mensaje" onclick="this.parentElement.remove()"><i class="bi bi-x" aria-hidden="true"></i></button>
+        </div>
+    }
+    @if (TempData["Error"] is string error)
+    {
+        <div class="cp-aviso error" role="alert">
+            <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+            <span>@error</span>
+            <button type="button" aria-label="Cerrar mensaje" onclick="this.parentElement.remove()"><i class="bi bi-x" aria-hidden="true"></i></button>
+        </div>
+    }
+
+    <form class="cp-busqueda" method="get" role="search" asp-controller="@t.Controlador" asp-action="Index">
+        <label for="q" class="visually-hidden">Buscar @pluralMin por nombre o @t.DocEtiqueta</label>
+        <div class="cp-busqueda-campo">
+            <i class="bi bi-search" aria-hidden="true"></i>
+            <input id="q" name="q" type="search" value="@Model.Busqueda"
+                   placeholder="Buscar por nombre o @t.DocEtiqueta" autocomplete="off" />
+        </div>
+        <button type="submit" class="btn-g-outline">Buscar</button>
+        @if (hayBusqueda)
+        {
+            <a class="cp-limpiar" asp-controller="@t.Controlador" asp-action="Index">Limpiar búsqueda</a>
+        }
+    </form>
+
+    <section class="cp-panel" aria-label="Lista de @pluralMin">
+        @if (Model.Filas.Count == 0)
+        {
+            <div class="cp-vacio">
+                @if (hayBusqueda)
+                {
+                    <i class="bi bi-search" aria-hidden="true"></i>
+                    <p>No encontramos @pluralMin con «@Model.Busqueda».</p>
+                    <p>Revisa cómo está escrito o busca por @t.DocEtiqueta.
+                        <a asp-controller="@t.Controlador" asp-action="Index">Ver todos</a></p>
+                }
+                else
+                {
+                    <i class="bi @t.Icono" aria-hidden="true"></i>
+                    <p>Aún no hay @pluralMin registrados.</p>
+                    <a asp-controller="@t.Controlador" asp-action="Crear">Registrar el primero</a>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="cp-tabla-wrap">
+                <table class="cp-tabla">
+                    <caption class="visually-hidden">@t.Plural, página @Model.Pagina de @Model.TotalPaginas</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">Nombre</th>
+                            <th scope="col">@t.DocEtiqueta</th>
+                            <th scope="col" class="cp-col-direccion">Dirección</th>
+                            <th scope="col">@tituloMovimientos</th>
+                            <th scope="col"><span class="visually-hidden">Acciones</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var f in Model.Filas)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="cp-nombre">@f.Nombre</div>
+                                    @if (!string.IsNullOrEmpty(f.Contacto))
+                                    {
+                                        <div class="cp-sub">@f.Contacto</div>
+                                    }
+                                </td>
+                                <td class="cp-doc">@f.Documento</td>
+                                <td class="cp-col-direccion">@(f.Direccion ?? "—")</td>
+                                <td class="cp-mov">
+                                    @if (f.Movimientos == 0)
+                                    {
+                                        <span class="cp-mov-ninguno">Sin @t.MovimientoPlural</span>
+                                    }
+                                    else
+                                    {
+                                        <div>@f.Movimientos @(f.Movimientos == 1 ? t.MovimientoSingular : t.MovimientoPlural)</div>
+                                        <div class="cp-sub">Última: @f.UltimoMovimiento?.ToString("dd/MM/yyyy")</div>
+                                    }
+                                </td>
+                                <td>
+                                    <div class="cp-acciones">
+                                        <a class="cp-icono-btn" asp-controller="@t.Controlador" asp-action="Editar" asp-route-id="@f.Id"
+                                           aria-label="Editar @f.Nombre" title="Editar">
+                                            <i class="bi bi-pencil" aria-hidden="true"></i>
+                                        </a>
+                                        @if (f.Movimientos == 0)
+                                        {
+                                            <button type="button" class="cp-icono-btn peligro" data-bs-toggle="modal" data-bs-target="#modalEliminar"
+                                                    data-nombre="@f.Nombre" data-url="@Url.Action("Eliminar", t.Controlador, new { id = f.Id })"
+                                                    aria-label="Eliminar @f.Nombre" title="Eliminar">
+                                                <i class="bi bi-trash3" aria-hidden="true"></i>
+                                            </button>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @if (Model.TotalPaginas > 1)
+            {
+                <nav class="cp-paginacion" aria-label="Paginación">
+                    @if (Model.Pagina > 1)
+                    {
+                        <a class="btn-g-outline" asp-controller="@t.Controlador" asp-action="Index"
+                           asp-route-q="@Model.Busqueda" asp-route-pagina="@(Model.Pagina - 1)">
+                            <i class="bi bi-chevron-left" aria-hidden="true"></i> Anterior
+                        </a>
+                    }
+                    else
+                    {
+                        <span class="cp-pag-espacio"></span>
+                    }
+                    <span>Página @Model.Pagina de @Model.TotalPaginas</span>
+                    @if (Model.Pagina < Model.TotalPaginas)
+                    {
+                        <a class="btn-g-outline" asp-controller="@t.Controlador" asp-action="Index"
+                           asp-route-q="@Model.Busqueda" asp-route-pagina="@(Model.Pagina + 1)">
+                            Siguiente <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                        </a>
+                    }
+                    else
+                    {
+                        <span class="cp-pag-espacio"></span>
+                    }
+                </nav>
+            }
+        }
+    </section>
+</div>
+
+<div class="modal fade cp-modal" id="modalEliminar" tabindex="-1" aria-labelledby="modalEliminarTitulo" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="post" id="formEliminar">
+                @Html.AntiForgeryToken()
+                <div class="modal-body">
+                    <div class="cp-modal-icono" aria-hidden="true"><i class="bi bi-trash3"></i></div>
+                    <h2 id="modalEliminarTitulo">¿Eliminar este @t.Singular?</h2>
+                    <p>Se eliminará <strong id="nombreEliminar"></strong>. Esta acción no se puede deshacer.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-g-outline" data-bs-dismiss="modal" id="btnCancelarEliminar">Cancelar</button>
+                    <button type="submit" class="btn-g-danger">Sí, eliminar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const modalEliminar = document.getElementById('modalEliminar');
+        modalEliminar.addEventListener('show.bs.modal', function (e) {
+            const boton = e.relatedTarget;
+            document.getElementById('formEliminar').action = boton.dataset.url;
+            document.getElementById('nombreEliminar').textContent = boton.dataset.nombre;
+        });
+        // En una acción destructiva el foco inicial va a "Cancelar", no al botón que borra
+        modalEliminar.addEventListener('shown.bs.modal', function () {
+            document.getElementById('btnCancelarEliminar').focus();
+        });
+    </script>
+}

@@ -1,0 +1,267 @@
+@using GestionAlmacen_Golocentro.ViewModels
+@model ContraparteFormViewModel
+@{
+    var t = Model.Tipo;
+    var esNuevo = Model.Id == null;
+    ViewData["Title"] = (esNuevo ? "Nuevo " : "Editar ") + t.Singular;
+
+    string? Error(string campo) => ViewData.ModelState[campo]?.Errors.FirstOrDefault()?.ErrorMessage;
+    string? Describe(string campo, string? extra = null)
+    {
+        var ids = new[] { extra, Error(campo) != null ? campo + "-error" : null }.Where(x => x != null);
+        var valor = string.Join(" ", ids);
+        return valor.Length == 0 ? null : valor;
+    }
+
+    var errores = ViewData.ModelState
+        .Where(kv => kv.Value!.Errors.Count > 0)
+        .SelectMany(kv => kv.Value!.Errors.Select(e => (Campo: string.IsNullOrEmpty(kv.Key) ? "Nombre" : kv.Key, e.ErrorMessage)))
+        .ToList();
+}
+
+@await Html.PartialAsync("~/Views/Shared/Contraparte/_Estilos.cshtml")
+
+<style>
+    .cp-form-card {
+        max-width: 640px;
+        background: var(--g-white);
+        border: 1px solid var(--g-border);
+        border-radius: 14px;
+        padding: 1.5rem;
+    }
+
+    .cp-resumen {
+        max-width: 640px;
+        background: rgba(220,38,38,0.06);
+        border: 1px solid rgba(220,38,38,0.3);
+        border-radius: 10px;
+        padding: 12px 16px;
+        margin-bottom: 1rem;
+        color: var(--g-danger-text);
+    }
+
+        .cp-resumen h2 {
+            font-size: 15px;
+            font-weight: 600;
+            margin: 0 0 6px;
+        }
+
+        .cp-resumen ul {
+            margin: 0;
+            padding-left: 1.1rem;
+            font-size: 14px;
+        }
+
+        .cp-resumen a {
+            color: var(--g-danger-text);
+        }
+
+        .cp-resumen:focus-visible {
+            outline: 2px solid var(--g-danger-text);
+            outline-offset: 2px;
+        }
+
+    .cp-nota {
+        font-size: 13px;
+        color: var(--g-muted);
+        margin-bottom: 1.25rem;
+    }
+
+    .cp-campo {
+        margin-bottom: 1.1rem;
+    }
+
+        .cp-campo label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--g-text);
+            margin-bottom: 6px;
+        }
+
+    .cp-req {
+        color: var(--g-danger-text);
+    }
+
+    .cp-opcional {
+        font-weight: 400;
+        color: var(--g-muted);
+        font-size: 13px;
+    }
+
+    .cp-campo input,
+    .cp-campo textarea {
+        width: 100%;
+        min-height: 44px;
+        padding: 10px 12px;
+        border: 1px solid var(--g-input-border);
+        border-radius: 8px;
+        font-size: 15px;
+        font-family: inherit;
+        color: var(--g-text);
+        background: var(--g-white);
+        transition: border-color var(--transition), box-shadow var(--transition);
+    }
+
+    .cp-campo textarea {
+        resize: vertical;
+        min-height: 72px;
+    }
+
+        .cp-campo input:focus,
+        .cp-campo textarea:focus {
+            outline: none;
+            border-color: var(--g-teal);
+            box-shadow: 0 0 0 3px rgba(4,120,87,0.25);
+        }
+
+        .cp-campo input[aria-invalid="true"],
+        .cp-campo textarea[aria-invalid="true"] {
+            border-color: var(--g-danger);
+        }
+
+    .cp-ayuda {
+        font-size: 13px;
+        color: var(--g-muted);
+        margin-top: 4px;
+    }
+
+    .cp-error {
+        font-size: 13px;
+        color: var(--g-danger-text);
+        margin-top: 4px;
+        display: flex;
+        align-items: flex-start;
+        gap: 6px;
+    }
+
+        .cp-error i {
+            margin-top: 2px;
+        }
+
+    .cp-botones {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 1.5rem;
+        flex-wrap: wrap;
+    }
+
+    @@media (max-width: 576px) {
+        .cp-botones > * {
+            flex: 1;
+        }
+    }
+</style>
+
+<div class="cp-page">
+
+    <a class="cp-volver" asp-controller="@t.Controlador" asp-action="Index">
+        <i class="bi bi-arrow-left" aria-hidden="true"></i> Volver a @t.Plural.ToLowerInvariant()
+    </a>
+
+    <div class="cp-header">
+        <div>
+            <h1><i class="bi @t.Icono" aria-hidden="true"></i> @(esNuevo ? "Nuevo " + t.Singular : "Editar " + t.Singular)</h1>
+            @if (!esNuevo)
+            {
+                <p>@Model.Nombre</p>
+            }
+        </div>
+    </div>
+
+    @if (errores.Count > 0)
+    {
+        <div class="cp-resumen" role="alert" tabindex="-1" id="resumenErrores" aria-labelledby="resumenTitulo">
+            <h2 id="resumenTitulo">Revisa estos datos antes de guardar:</h2>
+            <ul>
+                @foreach (var e in errores)
+                {
+                    <li><a href="#@e.Campo">@e.ErrorMessage</a></li>
+                }
+            </ul>
+        </div>
+    }
+
+    <form class="cp-form-card" method="post" novalidate id="formContraparte"
+          asp-controller="@t.Controlador" asp-action="@(esNuevo ? "Crear" : "Editar")" asp-route-id="@Model.Id">
+        @Html.AntiForgeryToken()
+
+        <p class="cp-nota">Los campos con <span class="cp-req" aria-hidden="true">*</span><span class="visually-hidden">asterisco</span> son obligatorios.</p>
+
+        <div class="cp-campo">
+            <label for="Nombre">Nombre o razón social <span class="cp-req" aria-hidden="true">*</span></label>
+            <input id="Nombre" name="Nombre" type="text" value="@Model.Nombre" maxlength="150"
+                   autocomplete="organization" required aria-required="true"
+                   aria-invalid="@(Error("Nombre") != null ? "true" : null)"
+                   aria-describedby="@Describe("Nombre")" />
+            @if (Error("Nombre") is string errNombre)
+            {
+                <p class="cp-error" id="Nombre-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @errNombre</p>
+            }
+        </div>
+
+        <div class="cp-campo">
+            <label for="Documento">@t.DocEtiqueta <span class="cp-req" aria-hidden="true">*</span></label>
+            <input id="Documento" name="Documento" type="text" value="@Model.Documento"
+                   inputmode="numeric" maxlength="@t.DocMaxLength" autocomplete="off" spellcheck="false"
+                   required aria-required="true"
+                   aria-invalid="@(Error("Documento") != null ? "true" : null)"
+                   aria-describedby="@Describe("Documento", "Documento-ayuda")" />
+            <p class="cp-ayuda" id="Documento-ayuda">@t.DocAyuda</p>
+            @if (Error("Documento") is string errDoc)
+            {
+                <p class="cp-error" id="Documento-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @errDoc</p>
+            }
+        </div>
+
+        <div class="cp-campo">
+            <label for="Contacto">Contacto <span class="cp-opcional">(opcional)</span></label>
+            <input id="Contacto" name="Contacto" type="text" value="@Model.Contacto" maxlength="100"
+                   aria-invalid="@(Error("Contacto") != null ? "true" : null)"
+                   aria-describedby="@Describe("Contacto", "Contacto-ayuda")" />
+            <p class="cp-ayuda" id="Contacto-ayuda">Persona, teléfono o correo.</p>
+            @if (Error("Contacto") is string errContacto)
+            {
+                <p class="cp-error" id="Contacto-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @errContacto</p>
+            }
+        </div>
+
+        <div class="cp-campo">
+            <label for="Direccion">Dirección <span class="cp-opcional">(opcional)</span></label>
+            <textarea id="Direccion" name="Direccion" rows="2" maxlength="200" autocomplete="street-address"
+                      aria-invalid="@(Error("Direccion") != null ? "true" : null)"
+                      aria-describedby="@Describe("Direccion")">@Model.Direccion</textarea>
+            @if (Error("Direccion") is string errDireccion)
+            {
+                <p class="cp-error" id="Direccion-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @errDireccion</p>
+            }
+        </div>
+
+        <div class="cp-botones">
+            <a class="btn-g-outline" asp-controller="@t.Controlador" asp-action="Index">Cancelar</a>
+            <button type="submit" class="btn-g-primary" id="btnGuardar">
+                <i class="bi bi-check-lg" aria-hidden="true"></i> @(esNuevo ? "Registrar " + t.Singular : "Guardar cambios")
+            </button>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <script>
+        document.getElementById('resumenErrores')?.focus();
+
+        const btnGuardar = document.getElementById('btnGuardar');
+        const contenidoGuardar = btnGuardar.innerHTML;
+        document.getElementById('formContraparte').addEventListener('submit', function () {
+            btnGuardar.disabled = true;
+            btnGuardar.setAttribute('aria-busy', 'true');
+            btnGuardar.innerHTML = '<span class="cp-spinner" aria-hidden="true"></span> Guardando…';
+        });
+        window.addEventListener('pageshow', function () {
+            btnGuardar.disabled = false;
+            btnGuardar.removeAttribute('aria-busy');
+            btnGuardar.innerHTML = contenidoGuardar;
+        });
+    </script>
+}
