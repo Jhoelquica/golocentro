@@ -199,12 +199,15 @@
     .perfil-actions {
         padding: 0.5rem 1.5rem 1.5rem;
         display: flex;
+        flex-wrap: wrap;
         gap: 10px;
     }
 
+    /* Ancho según el texto: así "Cambiar contraseña" no se parte en dos líneas */
     .btn-g-primary,
     .btn-g-outline {
-        flex: 1;
+        flex: 1 1 auto;
+        white-space: nowrap;
         min-height: 44px;
         padding: 10px;
         border-radius: 8px;
