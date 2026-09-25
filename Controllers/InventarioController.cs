@@ -180,6 +180,15 @@ namespace GestionAlmacen_Golocentro.Controllers
             return RedirectToAction(nameof(Index), new { sede = datos.SedeId });
         }
 
+        // El conteo lo pide al volver a la pestaña: así aparece un producto recién creado en Productos
+        // sin recargar la página (y sin perder lo ya contado).
+        [HttpGet]
+        public async Task<IActionResult> Catalogo() =>
+            Json(await _context.Productos
+                .OrderBy(p => p.Nombre)
+                .Select(p => new ProductoCatalogo(p.IdProducto, p.Nombre, p.Codigo))
+                .ToListAsync());
+
         [NonAction]
         private int? SedeDelUsuario()
         {

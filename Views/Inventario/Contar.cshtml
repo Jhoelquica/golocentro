@@ -446,7 +446,8 @@
 
 @section Scripts {
     <script>
-        const catalogo = @Json.Serialize(d.Catalogo);
+        let catalogo = @Json.Serialize(d.Catalogo);
+        const urlCatalogo = '@Url.Action("Catalogo", "Inventario")';
         const lista = document.getElementById('listaConteo');
         const listaVacia = document.getElementById('listaVacia');
         const resumen = document.getElementById('resumenConteo');
@@ -633,6 +634,19 @@
             if (e.key === 'Enter') {
                 e.preventDefault();
                 resultados.querySelector('button')?.click();
+            }
+        });
+
+        // Al volver de crear un producto en otra pestaña, traer el catálogo actualizado
+        document.addEventListener('visibilitychange', async () => {
+            if (document.visibilityState !== 'visible') return;
+            try {
+                const respuesta = await fetch(urlCatalogo);
+                if (!respuesta.ok) return;
+                catalogo = await respuesta.json();
+                if (inputBuscar.value.trim()) buscar();
+            } catch {
+                // Sin conexión: se sigue con el catálogo que ya estaba cargado
             }
         });
 
