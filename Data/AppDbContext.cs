@@ -30,6 +30,8 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<Movimiento> Movimientos { get; set; }
 
+    public virtual DbSet<NotaVentum> NotaVenta { get; set; }
+
     public virtual DbSet<PlanoLinea> PlanoLineas { get; set; }
 
     public virtual DbSet<Producto> Productos { get; set; }
@@ -168,6 +170,9 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.IdCliente)
                 .UseIdentityAlwaysColumn()
                 .HasColumnName("id_cliente");
+            entity.Property(e => e.Celular)
+                .HasMaxLength(15)
+                .HasColumnName("celular");
             entity.Property(e => e.Contacto)
                 .HasMaxLength(100)
                 .HasColumnName("contacto");
@@ -364,6 +369,44 @@ public partial class AppDbContext : DbContext
                 .HasForeignKey(d => d.IdUsuario)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("movimiento_id_usuario_fkey");
+        });
+
+        modelBuilder.Entity<NotaVentum>(entity =>
+        {
+            entity.HasKey(e => e.IdNota).HasName("nota_venta_pkey");
+
+            entity.ToTable("nota_venta");
+
+            entity.HasIndex(e => e.IdMovimiento, "uq_notaventa_movimiento").IsUnique();
+
+            entity.HasIndex(e => new { e.Serie, e.Numero }, "uq_notaventa_numero").IsUnique();
+
+            entity.Property(e => e.IdNota)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("id_nota");
+            entity.Property(e => e.Descuento)
+                .HasPrecision(10, 2)
+                .HasColumnName("descuento");
+            entity.Property(e => e.IdMovimiento).HasColumnName("id_movimiento");
+            entity.Property(e => e.MetodoPago)
+                .HasMaxLength(15)
+                .HasColumnName("metodo_pago");
+            entity.Property(e => e.Numero).HasColumnName("numero");
+            entity.Property(e => e.Serie)
+                .HasMaxLength(4)
+                .HasDefaultValueSql("'NV01'::character varying")
+                .HasColumnName("serie");
+            entity.Property(e => e.Subtotal)
+                .HasPrecision(10, 2)
+                .HasColumnName("subtotal");
+            entity.Property(e => e.Total)
+                .HasPrecision(10, 2)
+                .HasColumnName("total");
+
+            entity.HasOne(d => d.IdMovimientoNavigation).WithOne(p => p.NotaVentum)
+                .HasForeignKey<NotaVentum>(d => d.IdMovimiento)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("nota_venta_id_movimiento_fkey");
         });
 
         modelBuilder.Entity<PlanoLinea>(entity =>

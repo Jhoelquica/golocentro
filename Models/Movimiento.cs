@@ -34,4 +34,6 @@ public partial class Movimiento
     public virtual Sede IdSedeNavigation { get; set; } = null!;
 
     public virtual Usuario IdUsuarioNavigation { get; set; } = null!;
+
+    public virtual NotaVentum? NotaVentum { get; set; }
 }
