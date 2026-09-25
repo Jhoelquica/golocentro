@@ -491,9 +491,14 @@
                 <p class="mp-detalle-desc" id="detalleDesc"></p>
                 <ul class="mp-detalle-lista" id="detalleLista"></ul>
                 <p class="mp-nada" id="detalleVacia" hidden>Zona vacía: hay espacio libre.</p>
-                <a class="btn-g-outline" id="detalleMover" href="#">
-                    <i class="bi bi-arrow-left-right" aria-hidden="true"></i> Mover desde esta zona
-                </a>
+                <div style="display:flex; gap:8px; flex-wrap:wrap">
+                    <a class="btn-g-outline" id="detalleMover" href="#">
+                        <i class="bi bi-arrow-left-right" aria-hidden="true"></i> Mover desde esta zona
+                    </a>
+                    <a class="btn-g-outline" id="detalleContar" href="#">
+                        <i class="bi bi-clipboard-check" aria-hidden="true"></i> Contar esta zona
+                    </a>
+                </div>
             </section>
         </div>
     }
@@ -506,6 +511,7 @@
             const zonas = @Json.Serialize(Model.Zonas);
             const productos = @Json.Serialize(Model.Productos);
             const urlMover = '@Url.Action("Mover", "Mapa")';
+            const urlContar = '@Url.Action("Contar", "Inventario")';
             const sedeId = @Model.SedeId;
 
             const zonaPorId = new Map(zonas.map(z => [z.id, z]));
@@ -630,6 +636,7 @@
                 const moverZona = document.getElementById('detalleMover');
                 moverZona.hidden = vacia;
                 moverZona.href = `${urlMover}?origen=${zona.id}&sede=${sedeId}`;
+                document.getElementById('detalleContar').href = `${urlContar}/${zona.id}`;
 
                 if (llevarAlPlano) {
                     elementosZona.get(id)?.scrollIntoView({ block: 'nearest', behavior: movimientoSuave ? 'smooth' : 'auto' });

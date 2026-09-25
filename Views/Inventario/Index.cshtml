@@ -1,0 +1,268 @@
+@using GestionAlmacen_Golocentro.ViewModels
+@model ConteoIndexViewModel
+@{
+    ViewData["Title"] = "Conteo de inventario";
+}
+
+@functions {
+    static string Cuando(DateTime f)
+    {
+        if (f.Date == DateTime.Today) return "Hoy, " + f.ToString("HH:mm");
+        if (f.Date == DateTime.Today.AddDays(-1)) return "Ayer, " + f.ToString("HH:mm");
+        return f.ToString("dd/MM/yyyy");
+    }
+}
+
+@await Html.PartialAsync("~/Views/Shared/Contraparte/_Estilos.cshtml")
+
+<style>
+    .ci-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
+        gap: 1rem;
+        align-items: start;
+    }
+
+    @@media (max-width: 1100px) {
+        .ci-layout {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .ci-guia {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        background: rgba(4,120,87,0.06);
+        border: 1px solid rgba(4,120,87,0.2);
+        border-radius: 10px;
+        padding: 10px 14px;
+        font-size: 14px;
+        color: var(--g-text);
+        margin-bottom: 1rem;
+    }
+
+        .ci-guia i {
+            color: var(--g-teal);
+            font-size: 18px;
+            margin-top: 1px;
+        }
+
+    .ci-panel {
+        background: var(--g-white);
+        border: 1px solid var(--g-border);
+        border-radius: 14px;
+        overflow: hidden;
+        container-type: inline-size;
+    }
+
+    .ci-tabla {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+        .ci-tabla th {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--g-muted);
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            text-align: left;
+            padding: 10px 1rem;
+            background: var(--g-bg);
+            border-bottom: 1px solid var(--g-border);
+            white-space: nowrap;
+        }
+
+        .ci-tabla td {
+            padding: 10px 1rem;
+            font-size: 14px;
+            color: var(--g-text);
+            border-bottom: 1px solid var(--g-border);
+            vertical-align: middle;
+        }
+
+        .ci-tabla tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .ci-tabla tbody tr:hover td {
+            background: var(--g-bg);
+        }
+
+    .ci-codigo {
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .ci-sub {
+        font-size: 12px;
+        color: var(--g-muted);
+        margin-top: 2px;
+    }
+
+    .ci-num {
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+    }
+
+    .ci-nunca {
+        font-size: 12px;
+        font-weight: 600;
+        color: #92400E;
+        background: rgba(245,158,11,0.15);
+        padding: 2px 8px;
+        border-radius: 20px;
+        white-space: nowrap;
+    }
+
+    .ci-accion {
+        text-align: right;
+    }
+
+        .ci-accion .btn-g-outline {
+            min-height: 36px;
+            padding: 6px 14px;
+        }
+
+    @@container (max-width: 560px) {
+        .ci-col-unidades {
+            display: none;
+        }
+    }
+
+    .ci-recientes {
+        background: var(--g-white);
+        border: 1px solid var(--g-border);
+        border-radius: 14px;
+        padding: 1rem 1.1rem;
+    }
+
+        .ci-recientes h2 {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--g-navy);
+            margin: 0 0 6px;
+        }
+
+        .ci-recientes ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .ci-recientes li {
+            padding: 10px 0;
+            border-top: 1px solid var(--g-border);
+            font-size: 14px;
+        }
+</style>
+
+<div class="cp-page">
+
+    <div class="cp-header">
+        <div>
+            <h1><i class="bi bi-clipboard-check" aria-hidden="true"></i> Conteo de inventario</h1>
+            <p>@(Model.SedeId == null ? "No hay zonas registradas" : "Elige la zona que vas a contar · " + Model.SedeNombre)</p>
+        </div>
+        @if (Model.PuedeElegirSede)
+        {
+            <form method="get" asp-action="Index">
+                <label for="sede" class="visually-hidden">Sede</label>
+                <select id="sede" name="sede" class="mv-select" style="width:auto; min-height:44px; border:1px solid var(--g-input-border); border-radius:8px; padding:0 10px" onchange="this.form.submit()">
+                    @foreach (var s in Model.Sedes)
+                    {
+                        <option value="@s.Id" selected="@(s.Id == Model.SedeId)">@s.Nombre</option>
+                    }
+                </select>
+            </form>
+        }
+    </div>
+
+    @if (TempData["Exito"] is string exito)
+    {
+        <div class="cp-aviso exito" role="status">
+            <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+            <span>@exito</span>
+            <button type="button" aria-label="Cerrar mensaje" onclick="this.parentElement.remove()"><i class="bi bi-x" aria-hidden="true"></i></button>
+        </div>
+    }
+
+    @if (Model.SedeId != null)
+    {
+        <p class="ci-guia">
+            <i class="bi bi-info-circle" aria-hidden="true"></i>
+            <span>Cuenta lo que hay físicamente en la zona y escríbelo. El stock del sistema se corrige con lo que cuentes, sin contar como compra ni venta.</span>
+        </p>
+
+        <div class="ci-layout">
+            <section class="ci-panel" aria-label="Zonas del almacén">
+                <table class="ci-tabla">
+                    <caption class="visually-hidden">Zonas de @Model.SedeNombre y su último conteo</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">Zona</th>
+                            <th scope="col">Productos</th>
+                            <th scope="col" class="ci-col-unidades">Unidades</th>
+                            <th scope="col">Último conteo</th>
+                            <th scope="col"><span class="visually-hidden">Acción</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var z in Model.Zonas)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="ci-codigo">@(z.Codigo + (z.EsRecepcion ? " · Recepción" : ""))</div>
+                                    @if (!string.IsNullOrEmpty(z.Descripcion) && !z.EsRecepcion)
+                                    {
+                                        <div class="ci-sub">@z.Descripcion</div>
+                                    }
+                                </td>
+                                <td class="ci-num">@(z.Productos == 0 ? "—" : z.Productos.ToString())</td>
+                                <td class="ci-num ci-col-unidades">@(z.Unidades == 0 ? "—" : z.Unidades.ToString())</td>
+                                <td>
+                                    @if (z.UltimoConteo is DateTime fecha)
+                                    {
+                                        <span class="ci-num">@Cuando(fecha)</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="ci-nunca">Nunca</span>
+                                    }
+                                </td>
+                                <td class="ci-accion">
+                                    <a class="btn-g-outline" asp-action="Contar" asp-route-id="@z.Id" aria-label="Contar zona @z.Codigo">Contar</a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </section>
+
+            <section class="ci-recientes" aria-labelledby="tituloRecientes">
+                <h2 id="tituloRecientes">Últimos conteos</h2>
+                @if (Model.Recientes.Count == 0)
+                {
+                    <p class="cp-ayuda">Todavía no se ha contado ninguna zona.</p>
+                }
+                else
+                {
+                    <ul>
+                        @foreach (var r in Model.Recientes)
+                        {
+                            <li>
+                                <div><strong>@(r.Zona ?? "—")</strong> · @MotivosAjuste.Texto(r.Motivo)</div>
+                                <div class="ci-sub">
+                                    @r.Contados @(r.Contados == 1 ? "producto" : "productos"),
+                                    @(r.Cambios == 0 ? "todo coincidía" : r.Cambios + (r.Cambios == 1 ? " corregido" : " corregidos"))
+                                </div>
+                                <div class="ci-sub"><time datetime="@r.Fecha.ToString("yyyy-MM-ddTHH:mm")">@Cuando(r.Fecha)</time> · @r.Usuario</div>
+                            </li>
+                        }
+                    </ul>
+                }
+            </section>
+        </div>
+    }
+</div>

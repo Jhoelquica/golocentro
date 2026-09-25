@@ -485,6 +485,11 @@
                     <i class="bi bi-map"></i> Mapa Almacén
                 </a>
 
+                <a class="g-nav-link @(currentController == "Inventario" ? "active" : "")"
+                   asp-controller="Inventario" asp-action="Index">
+                    <i class="bi bi-clipboard-check"></i> Conteo
+                </a>
+
                 <a class="g-nav-link @(currentController == "Alerta" ? "active" : "")"
                    asp-controller="Alerta" asp-action="Index">
                     <i class="bi bi-bell"></i> Alertas

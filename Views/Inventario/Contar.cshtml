@@ -1,0 +1,666 @@
+@using GestionAlmacen_Golocentro.ViewModels
+@model ConteoFormViewModel
+@{
+    var d = Model.Datos;
+    ViewData["Title"] = "Contar zona " + d.ZonaCodigo;
+    var catalogo = d.Catalogo.ToDictionary(p => p.Id);
+
+    // Primero lo que el sistema tiene en la zona, luego lo agregado; ambos por nombre
+    var filas = Model.Lineas
+        .Where(kv => catalogo.ContainsKey(kv.Value.ProductoId))
+        .Select(kv => new { Clave = "p" + kv.Value.ProductoId, Linea = kv.Value, Producto = catalogo[kv.Value.ProductoId] })
+        .OrderBy(f => d.EnSistema.ContainsKey(f.Linea.ProductoId) ? 0 : 1)
+        .ThenBy(f => f.Producto.Nombre)
+        .ToList();
+
+    string? Error(string campo) => ViewData.ModelState[campo]?.Errors.FirstOrDefault()?.ErrorMessage;
+
+    var errores = ViewData.ModelState
+        .Where(kv => kv.Value!.Errors.Count > 0)
+        .SelectMany(kv => kv.Value!.Errors.Select(e => (Destino: kv.Key switch
+        {
+            "" => "listaConteo",
+            "Motivo" => "Motivo",
+            "Observaciones" => "Observaciones",
+            var k when k.StartsWith("Lineas[") => "cant-" + k.Substring(7, k.IndexOf(']') - 7),
+            _ => "listaConteo"
+        }, e.ErrorMessage)))
+        .ToList();
+}
+
+@await Html.PartialAsync("~/Views/Shared/Contraparte/_Estilos.cshtml")
+
+<style>
+    .ct-card {
+        max-width: 760px;
+        background: var(--g-white);
+        border: 1px solid var(--g-border);
+        border-radius: 14px;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+    }
+
+        .ct-card h2 {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--g-navy);
+            margin: 0 0 4px;
+        }
+
+    .ct-lista {
+        list-style: none;
+        margin: 10px 0 0;
+        padding: 0;
+    }
+
+        .ct-lista:focus {
+            outline: none;
+        }
+
+    .ct-fila {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px 16px;
+        padding: 12px 0;
+        border-top: 1px solid var(--g-border);
+    }
+
+    .ct-info {
+        flex: 1 1 220px;
+        min-width: 0;
+    }
+
+    .ct-nombre {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--g-text);
+    }
+
+    .ct-cod {
+        font-size: 12px;
+        font-weight: 400;
+        color: var(--g-muted);
+        margin-left: 4px;
+    }
+
+    .ct-sistema {
+        font-size: 13px;
+        color: var(--g-muted);
+        margin-top: 2px;
+    }
+
+    .ct-nuevo {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--g-teal);
+        background: rgba(4,120,87,0.1);
+        padding: 1px 8px;
+        border-radius: 20px;
+    }
+
+    .ct-captura {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .ct-stepper {
+        display: inline-flex;
+        align-items: stretch;
+        border: 1px solid var(--g-input-border);
+        border-radius: 8px;
+        overflow: hidden;
+        background: var(--g-white);
+    }
+
+        .ct-stepper:focus-within {
+            border-color: var(--g-teal);
+            box-shadow: 0 0 0 3px rgba(4,120,87,0.25);
+        }
+
+        .ct-stepper.invalido {
+            border-color: var(--g-danger);
+        }
+
+        .ct-stepper button {
+            width: 44px;
+            min-height: 44px;
+            border: none;
+            background: var(--g-bg);
+            color: var(--g-navy);
+            font-size: 20px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+            .ct-stepper button:hover {
+                background: rgba(4,120,87,0.1);
+                color: var(--g-teal);
+            }
+
+            .ct-stepper button:focus-visible {
+                outline: 2px solid var(--g-teal);
+                outline-offset: -2px;
+            }
+
+        .ct-stepper input {
+            width: 76px;
+            border: none;
+            border-left: 1px solid var(--g-border);
+            border-right: 1px solid var(--g-border);
+            text-align: center;
+            font-size: 16px;
+            font-weight: 600;
+            font-family: inherit;
+            color: var(--g-text);
+            font-variant-numeric: tabular-nums;
+            -moz-appearance: textfield;
+        }
+
+            .ct-stepper input::-webkit-outer-spin-button,
+            .ct-stepper input::-webkit-inner-spin-button {
+                -webkit-appearance: none;
+                margin: 0;
+            }
+
+            .ct-stepper input:focus {
+                outline: none;
+            }
+
+    .ct-accion {
+        min-height: 44px;
+        padding: 6px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--g-input-border);
+        background: var(--g-white);
+        color: var(--g-navy);
+        font-size: 13px;
+        font-weight: 600;
+        font-family: inherit;
+        cursor: pointer;
+        white-space: nowrap;
+    }
+
+        .ct-accion:hover {
+            border-color: var(--g-teal);
+            color: var(--g-teal);
+        }
+
+        .ct-accion.quitar:hover {
+            border-color: var(--g-danger);
+            color: var(--g-danger-text);
+        }
+
+        .ct-accion:focus-visible {
+            outline: 2px solid var(--g-teal);
+            outline-offset: 2px;
+        }
+
+    .ct-dif {
+        min-width: 110px;
+        font-size: 13px;
+        font-weight: 600;
+        padding: 3px 10px;
+        border-radius: 20px;
+        text-align: center;
+        white-space: nowrap;
+    }
+
+        .ct-dif.pendiente {
+            color: var(--g-muted);
+            background: var(--g-bg);
+        }
+
+        .ct-dif.coincide {
+            color: var(--g-teal);
+            background: rgba(4,120,87,0.1);
+        }
+
+        .ct-dif.sobra {
+            color: #1E40AF;
+            background: rgba(59,130,246,0.12);
+        }
+
+        .ct-dif.falta {
+            color: #92400E;
+            background: rgba(245,158,11,0.15);
+        }
+
+    .ct-fila .cp-error {
+        flex-basis: 100%;
+        margin-top: 0;
+    }
+
+    .ct-vacio {
+        font-size: 14px;
+        color: var(--g-muted);
+        padding: 12px 0 4px;
+        border-top: 1px solid var(--g-border);
+        margin: 10px 0 0;
+    }
+
+    .ct-buscar {
+        position: relative;
+        margin-top: 10px;
+    }
+
+        .ct-buscar i {
+            position: absolute;
+            left: 12px;
+            top: 22px;
+            transform: translateY(-50%);
+            color: var(--g-muted);
+            pointer-events: none;
+        }
+
+        .ct-buscar input {
+            padding-left: 38px !important;
+        }
+
+    .ct-resultados {
+        list-style: none;
+        margin: 6px 0 0;
+        padding: 0;
+    }
+
+        .ct-resultados button {
+            width: 100%;
+            min-height: 44px;
+            text-align: left;
+            padding: 8px 12px;
+            border: none;
+            border-bottom: 1px solid var(--g-border);
+            background: var(--g-white);
+            font-size: 14px;
+            font-family: inherit;
+            color: var(--g-text);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+            .ct-resultados button:hover,
+            .ct-resultados button:focus-visible {
+                background: rgba(4,120,87,0.06);
+                outline: none;
+            }
+
+            .ct-resultados button i {
+                color: var(--g-teal);
+            }
+
+    .ct-resumen {
+        font-size: 14px;
+        color: var(--g-muted);
+        margin: 0 0 12px;
+    }
+
+        .ct-resumen strong {
+            color: var(--g-text);
+        }
+
+    .ct-crear {
+        font-size: 13px;
+        color: var(--g-muted);
+        margin: 8px 0 0;
+    }
+
+        .ct-crear a {
+            color: var(--g-teal);
+            font-weight: 600;
+        }
+</style>
+
+<div class="cp-page" style="max-width:760px">
+
+    <a class="cp-volver" asp-action="Index" asp-route-sede="@d.SedeId">
+        <i class="bi bi-arrow-left" aria-hidden="true"></i> Volver a las zonas
+    </a>
+
+    <div class="cp-header">
+        <div>
+            <h1><i class="bi bi-clipboard-check" aria-hidden="true"></i> Contar zona @d.ZonaCodigo</h1>
+            <p>@(d.EsRecepcion ? "Recepción" : d.ZonaDescripcion) · @d.SedeNombre</p>
+        </div>
+    </div>
+
+    @if (errores.Count > 0)
+    {
+        <div class="cp-resumen" role="alert" tabindex="-1" id="resumenErrores" aria-labelledby="resumenTitulo">
+            <h2 id="resumenTitulo">Revisa esto antes de guardar:</h2>
+            <ul>
+                @foreach (var e in errores)
+                {
+                    <li><a href="#@e.Destino">@e.ErrorMessage</a></li>
+                }
+            </ul>
+        </div>
+    }
+
+    <form method="post" asp-action="Contar" asp-route-id="@d.ZonaId" novalidate id="formConteo">
+        @Html.AntiForgeryToken()
+
+        <section class="ct-card" aria-labelledby="tituloProductos">
+            <h2 id="tituloProductos">Productos en la zona</h2>
+            <p class="cp-ayuda">Escribe lo que contaste de cada uno. Si ya no hay, pon 0.</p>
+
+            <ul class="ct-lista" id="listaConteo" tabindex="-1">
+                @foreach (var f in filas)
+                {
+                    var enSistema = d.EnSistema.GetValueOrDefault(f.Linea.ProductoId);
+                    var estaEnSistema = d.EnSistema.ContainsKey(f.Linea.ProductoId);
+                    var campo = $"Lineas[{f.Clave}].Cantidad";
+                    var error = Error(campo);
+                    <li class="ct-fila" data-clave="@f.Clave" data-sistema="@enSistema">
+                        <input type="hidden" name="Lineas[@f.Clave].ProductoId" value="@f.Linea.ProductoId" />
+                        <div class="ct-info">
+                            <div class="ct-nombre">@f.Producto.Nombre<span class="ct-cod">@f.Producto.Codigo</span></div>
+                            <div class="ct-sistema">
+                                @if (estaEnSistema)
+                                {
+                                    <span>En sistema: <strong>@enSistema</strong></span>
+                                }
+                                else
+                                {
+                                    <span class="ct-nuevo">Encontrado aquí</span>
+                                }
+                            </div>
+                        </div>
+                        <div class="ct-captura">
+                            <label class="visually-hidden" for="cant-@f.Clave">Cantidad contada de @f.Producto.Nombre</label>
+                            <div class="ct-stepper @(error != null ? "invalido" : "")">
+                                <button type="button" class="ct-menos" aria-label="Uno menos de @f.Producto.Nombre">−</button>
+                                <input id="cant-@f.Clave" name="@campo" type="number" min="0" step="1" inputmode="numeric"
+                                       value="@f.Linea.Cantidad" placeholder="?"
+                                       aria-invalid="@(error != null ? "true" : null)"
+                                       aria-describedby="@("dif-" + f.Clave + (error != null ? " err-" + f.Clave : ""))" />
+                                <button type="button" class="ct-mas" aria-label="Uno más de @f.Producto.Nombre">+</button>
+                            </div>
+                            @if (estaEnSistema)
+                            {
+                                <button type="button" class="ct-accion ct-igual" aria-label="Igual que el sistema: @enSistema">= sistema</button>
+                            }
+                            else
+                            {
+                                <button type="button" class="ct-accion quitar ct-quitar" aria-label="Quitar @f.Producto.Nombre del conteo">Quitar</button>
+                            }
+                            <span class="ct-dif pendiente" id="dif-@f.Clave">Sin contar</span>
+                        </div>
+                        @if (error != null)
+                        {
+                            <p class="cp-error" id="err-@f.Clave"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @error</p>
+                        }
+                    </li>
+                }
+            </ul>
+            <p class="ct-vacio" id="listaVacia" hidden="@(filas.Count > 0)">
+                El sistema no tiene productos en esta zona. Agrega abajo lo que encuentres.
+            </p>
+        </section>
+
+        <section class="ct-card" aria-labelledby="tituloAgregar">
+            <h2 id="tituloAgregar">¿Encontraste algo más?</h2>
+            <p class="cp-ayuda">Busca los productos que están en la zona pero el sistema no tiene.</p>
+            <div class="cp-campo ct-buscar">
+                <label for="buscarProducto" class="visually-hidden">Buscar producto por nombre o código</label>
+                <i class="bi bi-search" aria-hidden="true"></i>
+                <input id="buscarProducto" type="search" autocomplete="off" placeholder="Nombre o código del producto" aria-controls="resultadosProducto" />
+            </div>
+            <p class="cp-ayuda" id="estadoBusqueda" role="status" aria-live="polite"></p>
+            <ul class="ct-resultados" id="resultadosProducto"></ul>
+            <p class="ct-crear">¿No está en el catálogo? Regístralo en <a asp-controller="Producto" asp-action="Create" target="_blank">Productos (nueva pestaña)</a> y vuelve a buscarlo.</p>
+        </section>
+
+        <section class="ct-card" aria-labelledby="tituloGuardar">
+            <h2 id="tituloGuardar" class="visually-hidden">Guardar conteo</h2>
+            <div class="cp-campo">
+                <label for="Motivo">Motivo <span class="cp-req" aria-hidden="true">*</span></label>
+                <select id="Motivo" name="Motivo" class="mv-select" style="width:100%; min-height:44px; border:1px solid var(--g-input-border); border-radius:8px; padding:0 10px; font-size:15px"
+                        aria-invalid="@(Error("Motivo") != null ? "true" : null)">
+                    @foreach (var (valor, texto) in MotivosAjuste.Todos)
+                    {
+                        <option value="@valor" selected="@(valor == Model.Motivo)">@texto</option>
+                    }
+                </select>
+            </div>
+            <div class="cp-campo">
+                <label for="Observaciones">Observación <span class="cp-opcional">(opcional)</span></label>
+                <input id="Observaciones" name="Observaciones" type="text" maxlength="200" value="@Model.Observaciones"
+                       aria-describedby="Observaciones-ayuda" />
+                <p class="cp-ayuda" id="Observaciones-ayuda">Por ejemplo: "cajas dañadas por humedad".</p>
+            </div>
+
+            <p class="ct-resumen" id="resumenConteo" aria-live="polite"></p>
+            <div class="cp-botones">
+                <a class="btn-g-outline" asp-action="Index" asp-route-sede="@d.SedeId">Cancelar</a>
+                <button type="submit" class="btn-g-primary" id="btnGuardar">
+                    <i class="bi bi-check-lg" aria-hidden="true"></i> <span id="textoGuardar">Guardar conteo</span>
+                </button>
+            </div>
+        </section>
+    </form>
+</div>
+
+@section Scripts {
+    <script>
+        const catalogo = @Json.Serialize(d.Catalogo);
+        const lista = document.getElementById('listaConteo');
+        const listaVacia = document.getElementById('listaVacia');
+        const resumen = document.getElementById('resumenConteo');
+        const textoGuardar = document.getElementById('textoGuardar');
+        const inputBuscar = document.getElementById('buscarProducto');
+        const resultados = document.getElementById('resultadosProducto');
+        const estadoBusqueda = document.getElementById('estadoBusqueda');
+        let hayCambiosSinGuardar = false;
+        let enviando = false;
+
+        function crear(etiqueta, clase, texto) {
+            const el = document.createElement(etiqueta);
+            if (clase) el.className = clase;
+            if (texto !== undefined) el.textContent = texto;
+            return el;
+        }
+
+        function actualizarFila(fila) {
+            const input = fila.querySelector('input[type=number]');
+            const dif = fila.querySelector('.ct-dif');
+            const sistema = Number(fila.dataset.sistema || 0);
+            const valor = input.value === '' ? null : Number(input.value);
+
+            dif.className = 'ct-dif';
+            if (valor === null || Number.isNaN(valor)) {
+                dif.classList.add('pendiente');
+                dif.textContent = 'Sin contar';
+            } else if (valor === sistema) {
+                dif.classList.add('coincide');
+                dif.textContent = 'Coincide';
+            } else if (valor > sistema) {
+                dif.classList.add('sobra');
+                dif.textContent = `+${valor - sistema} (hay más)`;
+            } else {
+                dif.classList.add('falta');
+                dif.textContent = `−${sistema - valor} (falta)`;
+            }
+        }
+
+        function actualizarResumen() {
+            const filas = [...lista.querySelectorAll('.ct-fila')];
+            listaVacia.hidden = filas.length > 0;
+            let pendientes = 0, cambios = 0, coinciden = 0;
+            filas.forEach(fila => {
+                const input = fila.querySelector('input[type=number]');
+                if (input.value === '') { pendientes++; return; }
+                Number(input.value) === Number(fila.dataset.sistema || 0) ? coinciden++ : cambios++;
+            });
+
+            const partes = [];
+            if (pendientes) partes.push(`${pendientes} sin contar`);
+            if (cambios) partes.push(`${cambios} ${cambios === 1 ? 'cambio' : 'cambios'}`);
+            if (coinciden) partes.push(`${coinciden} ${coinciden === 1 ? 'coincide' : 'coinciden'}`);
+            resumen.textContent = partes.length ? partes.join(' · ') : 'Todavía no hay productos en el conteo.';
+            textoGuardar.textContent = cambios
+                ? `Guardar conteo (${cambios} ${cambios === 1 ? 'cambio' : 'cambios'})`
+                : 'Guardar conteo';
+        }
+
+        function prepararFila(fila) {
+            const input = fila.querySelector('input[type=number]');
+            const sistema = Number(fila.dataset.sistema || 0);
+            const cambiar = nuevo => {
+                input.value = Math.max(0, nuevo);
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            };
+            fila.querySelector('.ct-menos').addEventListener('click', () => cambiar((input.value === '' ? sistema : Number(input.value)) - 1));
+            fila.querySelector('.ct-mas').addEventListener('click', () => cambiar((input.value === '' ? sistema : Number(input.value)) + 1));
+            fila.querySelector('.ct-igual')?.addEventListener('click', () => cambiar(sistema));
+            fila.querySelector('.ct-quitar')?.addEventListener('click', () => {
+                fila.remove();
+                hayCambiosSinGuardar = true;
+                actualizarResumen();
+                inputBuscar.focus();
+            });
+            input.addEventListener('input', () => {
+                hayCambiosSinGuardar = true;
+                actualizarFila(fila);
+                actualizarResumen();
+            });
+            actualizarFila(fila);
+        }
+
+        function agregarProducto(producto) {
+            const clave = 'p' + producto.id;
+            const existente = lista.querySelector(`[data-clave="${clave}"]`);
+            if (existente) {
+                existente.querySelector('input[type=number]').focus();
+                return;
+            }
+
+            const fila = crear('li', 'ct-fila');
+            fila.dataset.clave = clave;
+            fila.dataset.sistema = '0';
+
+            const oculto = crear('input');
+            oculto.type = 'hidden';
+            oculto.name = `Lineas[${clave}].ProductoId`;
+            oculto.value = producto.id;
+
+            const info = crear('div', 'ct-info');
+            const nombre = crear('div', 'ct-nombre', producto.nombre);
+            nombre.append(crear('span', 'ct-cod', producto.codigo));
+            const sistema = crear('div', 'ct-sistema');
+            sistema.append(crear('span', 'ct-nuevo', 'Encontrado aquí'));
+            info.append(nombre, sistema);
+
+            const captura = crear('div', 'ct-captura');
+            const etiqueta = crear('label', 'visually-hidden', `Cantidad contada de ${producto.nombre}`);
+            etiqueta.htmlFor = `cant-${clave}`;
+            const stepper = crear('div', 'ct-stepper');
+            const menos = crear('button', 'ct-menos', '−');
+            menos.type = 'button';
+            menos.setAttribute('aria-label', `Uno menos de ${producto.nombre}`);
+            const input = crear('input');
+            Object.assign(input, { id: `cant-${clave}`, name: `Lineas[${clave}].Cantidad`, type: 'number', min: 0, step: 1, placeholder: '?' });
+            input.setAttribute('inputmode', 'numeric');
+            input.setAttribute('aria-describedby', `dif-${clave}`);
+            const mas = crear('button', 'ct-mas', '+');
+            mas.type = 'button';
+            mas.setAttribute('aria-label', `Uno más de ${producto.nombre}`);
+            stepper.append(menos, input, mas);
+            const quitar = crear('button', 'ct-accion quitar ct-quitar', 'Quitar');
+            quitar.type = 'button';
+            quitar.setAttribute('aria-label', `Quitar ${producto.nombre} del conteo`);
+            const dif = crear('span', 'ct-dif pendiente', 'Sin contar');
+            dif.id = `dif-${clave}`;
+            captura.append(etiqueta, stepper, quitar, dif);
+
+            fila.append(oculto, info, captura);
+            lista.append(fila);
+            prepararFila(fila);
+            hayCambiosSinGuardar = true;
+            actualizarResumen();
+            input.focus();
+        }
+
+        function normalizar(texto) {
+            return (texto || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+        }
+
+        function buscar() {
+            const consulta = normalizar(inputBuscar.value);
+            resultados.replaceChildren();
+            if (!consulta) {
+                estadoBusqueda.textContent = '';
+                return;
+            }
+            const enLista = new Set([...lista.querySelectorAll('.ct-fila')].map(f => f.dataset.clave));
+            const encontrados = catalogo
+                .filter(p => normalizar(p.nombre).includes(consulta) || normalizar(p.codigo).includes(consulta))
+                .slice(0, 8);
+            if (!encontrados.length) {
+                estadoBusqueda.textContent = `No encontramos «${inputBuscar.value.trim()}» en el catálogo.`;
+                return;
+            }
+            estadoBusqueda.textContent = `${encontrados.length} ${encontrados.length === 1 ? 'resultado' : 'resultados'}.`;
+            encontrados.forEach(p => {
+                const item = crear('li');
+                const boton = crear('button');
+                boton.type = 'button';
+                const yaEsta = enLista.has('p' + p.id);
+                const icono = crear('i', `bi ${yaEsta ? 'bi-check2' : 'bi-plus-circle'}`);
+                icono.setAttribute('aria-hidden', 'true');
+                boton.append(icono, `${p.nombre} · ${p.codigo}${yaEsta ? ' (ya está en el conteo)' : ''}`);
+                boton.addEventListener('click', () => {
+                    agregarProducto(p);
+                    inputBuscar.value = '';
+                    resultados.replaceChildren();
+                    estadoBusqueda.textContent = `${p.nombre} está en el conteo.`;
+                });
+                item.append(boton);
+                resultados.append(item);
+            });
+        }
+
+        let temporizador;
+        inputBuscar.addEventListener('input', () => {
+            clearTimeout(temporizador);
+            temporizador = setTimeout(buscar, 120);
+        });
+        // Enter en el buscador no debe enviar el conteo
+        inputBuscar.addEventListener('keydown', e => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                resultados.querySelector('button')?.click();
+            }
+        });
+
+        lista.querySelectorAll('.ct-fila').forEach(prepararFila);
+        actualizarResumen();
+
+        const formConteo = document.getElementById('formConteo');
+        const btnGuardar = document.getElementById('btnGuardar');
+        formConteo.addEventListener('submit', () => {
+            enviando = true;
+            btnGuardar.disabled = true;
+            btnGuardar.setAttribute('aria-busy', 'true');
+            textoGuardar.textContent = 'Guardando…';
+        });
+        window.addEventListener('pageshow', () => {
+            enviando = false;
+            btnGuardar.disabled = false;
+            btnGuardar.removeAttribute('aria-busy');
+            actualizarResumen();
+        });
+        // Un conteo a medias se pierde si se sale sin guardar
+        window.addEventListener('beforeunload', e => {
+            if (hayCambiosSinGuardar && !enviando) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+
+        document.getElementById('resumenErrores')?.focus();
+    </script>
+}
