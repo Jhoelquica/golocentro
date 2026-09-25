@@ -59,6 +59,21 @@ namespace GestionAlmacen_Golocentro.Controllers
             return (sedes[0], null);
         }
 
+        // Stock actual (entidades rastreadas) de cada par producto+ubicación; los pares sin fila no aparecen.
+        [NonAction]
+        private async Task<Dictionary<(int, int), ProductoUbicacion>> CargarStocks(IEnumerable<(int ProductoId, int UbicacionId)> pares)
+        {
+            var lista = pares.Distinct().ToList();
+            var idsProducto = lista.Select(p => p.ProductoId).Distinct().ToList();
+            var idsUbicacion = lista.Select(p => p.UbicacionId).Distinct().ToList();
+
+            var filas = await _context.ProductoUbicacions
+                .Where(pu => idsProducto.Contains(pu.IdProducto) && idsUbicacion.Contains(pu.IdUbicacion))
+                .ToListAsync();
+
+            return filas.ToDictionary(pu => (pu.IdProducto, pu.IdUbicacion));
+        }
+
         // Para la dueña (sin sede) se muestra la sede de cada ubicación, porque ve las de todas.
         [NonAction]
         private List<(int Id, string Texto)> UbicacionesParaUsuario(int? sedeId)
@@ -129,8 +144,10 @@ namespace GestionAlmacen_Golocentro.Controllers
             if (redirectSiFalla != null)
                 return redirectSiFalla;
 
-            // 1. Validar que haya al menos un detalle y que sus ubicaciones sean de una sola sede
+            // 1. Validar que haya al menos un detalle, que los productos existan
+            //    y que las ubicaciones sean de una sola sede
             int? sedeMovimiento = null;
+            Dictionary<int, decimal> precios = new();
             if (model.Detalles == null || !model.Detalles.Any())
             {
                 ModelState.AddModelError("", "Debe agregar al menos un producto.");
@@ -141,6 +158,13 @@ namespace GestionAlmacen_Golocentro.Controllers
                 if (errorSede != null)
                     ModelState.AddModelError("", errorSede);
                 sedeMovimiento = sedeResuelta;
+
+                var idsProducto = model.Detalles.Select(d => d.ProductoId).Distinct().ToList();
+                precios = await _context.Productos
+                    .Where(p => idsProducto.Contains(p.IdProducto))
+                    .ToDictionaryAsync(p => p.IdProducto, p => p.PrecioUnitario);
+                if (precios.Count != idsProducto.Count)
+                    ModelState.AddModelError("", "Selecciona un producto válido en cada fila.");
             }
 
             if (!ModelState.IsValid)
@@ -149,7 +173,7 @@ namespace GestionAlmacen_Golocentro.Controllers
                 return View(model);
             }
 
-            // 2. Crear el movimiento
+            // 2. Crear el movimiento con sus detalles y actualizar el stock en un solo guardado
             var movimiento = new Movimiento
             {
                 Tipo = "Entrada",
@@ -161,34 +185,30 @@ namespace GestionAlmacen_Golocentro.Controllers
                 Observaciones = model.NumeroFactura
             };
             _context.Movimientos.Add(movimiento);
-            await _context.SaveChangesAsync();
 
-            // 3. Procesar cada detalle
+            // El diccionario evita duplicar la fila de stock si el mismo producto+ubicación viene dos veces
+            var stocks = await CargarStocks(model.Detalles!.Select(d => (d.ProductoId, d.UbicacionId)));
             foreach (var detalleVM in model.Detalles!)
             {
-                var detalle = new DetalleMovimiento
+                var clave = (detalleVM.ProductoId, detalleVM.UbicacionId);
+                if (!stocks.TryGetValue(clave, out var stock))
                 {
-                    IdMovimiento = movimiento.IdMovimiento,
+                    stock = new ProductoUbicacion { IdProducto = detalleVM.ProductoId, IdUbicacion = detalleVM.UbicacionId };
+                    _context.ProductoUbicacions.Add(stock);
+                    stocks[clave] = stock;
+                }
+
+                movimiento.DetalleMovimientos.Add(new DetalleMovimiento
+                {
                     IdProducto = detalleVM.ProductoId,
+                    IdUbicacion = detalleVM.UbicacionId,
                     Cantidad = detalleVM.Cantidad,
-                    IdUbicacion = detalleVM.UbicacionId
-                };
-                _context.DetalleMovimientos.Add(detalle);
+                    PrecioUnitarioSnapshot = precios[detalleVM.ProductoId],
+                    StockAnterior = stock.CantidadActual
+                });
 
-                // Actualizar stock en ProductoUbicacion
-                var stockActual = await _context.ProductoUbicacions
-                    .FirstOrDefaultAsync(pu => pu.IdProducto == detalleVM.ProductoId && pu.IdUbicacion == detalleVM.UbicacionId);
-
-                if (stockActual != null)
-                    stockActual.CantidadActual += detalleVM.Cantidad;
-                else
-                    _context.ProductoUbicacions.Add(new ProductoUbicacion
-                    {
-                        IdProducto = detalleVM.ProductoId,
-                        IdUbicacion = detalleVM.UbicacionId,
-                        CantidadActual = detalleVM.Cantidad,
-                        UltimaActualizacion = DateTime.Now
-                    });
+                stock.CantidadActual += detalleVM.Cantidad;
+                stock.UltimaActualizacion = DateTime.Now;
             }
 
             await _context.SaveChangesAsync();
@@ -346,6 +366,8 @@ namespace GestionAlmacen_Golocentro.Controllers
 
             // Validaciones
             int? sedeMovimiento = null;
+            var productos = new Dictionary<int, (string Nombre, decimal Precio)>();
+            var stocks = new Dictionary<(int, int), ProductoUbicacion>();
             if (model.Items == null || !model.Items.Any())
             {
                 ModelState.AddModelError("", "Debe agregar al menos un producto.");
@@ -356,26 +378,33 @@ namespace GestionAlmacen_Golocentro.Controllers
                 if (errorSede != null)
                     ModelState.AddModelError("", errorSede);
                 sedeMovimiento = sedeResuelta;
+
+                // El precio sale de la BD: el del formulario viaja en un input oculto y se puede alterar
+                var idsProducto = model.Items.Select(i => i.ProductoId).Distinct().ToList();
+                productos = (await _context.Productos
+                        .Where(p => idsProducto.Contains(p.IdProducto))
+                        .Select(p => new { p.IdProducto, p.Nombre, p.PrecioUnitario })
+                        .ToListAsync())
+                    .ToDictionary(p => p.IdProducto, p => (p.Nombre, p.PrecioUnitario));
+                if (productos.Count != idsProducto.Count)
+                    ModelState.AddModelError("", "Uno de los productos del carrito ya no existe.");
+
+                // Se valida la suma por producto+ubicación: dos filas iguales no deben pasar por separado
+                stocks = await CargarStocks(model.Items.Select(i => (i.ProductoId, i.UbicacionId)));
+                foreach (var pedido in model.Items.GroupBy(i => (i.ProductoId, i.UbicacionId)))
+                {
+                    var disponible = stocks.TryGetValue(pedido.Key, out var fila) ? fila.CantidadActual : 0;
+                    var solicitado = pedido.Sum(i => i.Cantidad);
+                    if (solicitado > disponible)
+                    {
+                        var nombre = productos.TryGetValue(pedido.Key.ProductoId, out var p) ? p.Nombre : "un producto";
+                        ModelState.AddModelError("", $"Stock insuficiente para '{nombre}' en la ubicación seleccionada. Disponible: {disponible}, solicitado: {solicitado}.");
+                    }
+                }
             }
 
             if (!model.ClienteId.HasValue)
                 ModelState.AddModelError("ClienteId", "Debe seleccionar un cliente.");
-
-            // Validar stock para cada item
-            if (model.Items != null)
-            {
-                foreach (var item in model.Items)
-                {
-                    var stock = await _context.ProductoUbicacions
-                        .FirstOrDefaultAsync(pu => pu.IdProducto == item.ProductoId && pu.IdUbicacion == item.UbicacionId);
-
-                    if (stock == null || stock.CantidadActual < item.Cantidad)
-                    {
-                        var producto = await _context.Productos.FindAsync(item.ProductoId);
-                        ModelState.AddModelError("", $"Stock insuficiente para '{producto?.Nombre}' en la ubicación seleccionada. Disponible: {stock?.CantidadActual ?? 0}");
-                    }
-                }
-            }
 
             if (!ModelState.IsValid)
             {
@@ -383,7 +412,7 @@ namespace GestionAlmacen_Golocentro.Controllers
                 return View(model);
             }
 
-            // Crear movimiento
+            // Crear el movimiento con sus detalles y descontar el stock en un solo guardado
             var movimiento = new Movimiento
             {
                 Tipo = "Salida",
@@ -395,28 +424,25 @@ namespace GestionAlmacen_Golocentro.Controllers
                 Observaciones = model.NumeroComprobante
             };
             _context.Movimientos.Add(movimiento);
-            await _context.SaveChangesAsync();
 
-            // Procesar cada item
             decimal total = 0;
-            foreach (var item in model.Items)
+            foreach (var item in model.Items!)
             {
-                var detalle = new DetalleMovimiento
+                var stock = stocks[(item.ProductoId, item.UbicacionId)];
+                var precio = productos[item.ProductoId].Precio;
+
+                movimiento.DetalleMovimientos.Add(new DetalleMovimiento
                 {
-                    IdMovimiento = movimiento.IdMovimiento,
                     IdProducto = item.ProductoId,
+                    IdUbicacion = item.UbicacionId,
                     Cantidad = item.Cantidad,
-                    IdUbicacion = item.UbicacionId
-                };
-                _context.DetalleMovimientos.Add(detalle);
+                    PrecioUnitarioSnapshot = precio,
+                    StockAnterior = stock.CantidadActual
+                });
 
-                // Restar stock
-                var stock = await _context.ProductoUbicacions
-                    .FirstOrDefaultAsync(pu => pu.IdProducto == item.ProductoId && pu.IdUbicacion == item.UbicacionId);
-                if (stock != null)
-                    stock.CantidadActual -= item.Cantidad;
-
-                total += item.Cantidad * item.PrecioUnitario;
+                stock.CantidadActual -= item.Cantidad;
+                stock.UltimaActualizacion = DateTime.Now;
+                total += item.Cantidad * precio;
             }
 
             await _context.SaveChangesAsync();
