@@ -387,10 +387,21 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.Descuento)
                 .HasPrecision(10, 2)
                 .HasColumnName("descuento");
+            entity.Property(e => e.Estado)
+                .HasMaxLength(10)
+                .HasDefaultValueSql("'emitida'::character varying")
+                .HasColumnName("estado");
+            entity.Property(e => e.FechaAnulacion)
+                .HasColumnType("timestamp(6) without time zone")
+                .HasColumnName("fecha_anulacion");
             entity.Property(e => e.IdMovimiento).HasColumnName("id_movimiento");
+            entity.Property(e => e.IdUsuarioAnulacion).HasColumnName("id_usuario_anulacion");
             entity.Property(e => e.MetodoPago)
                 .HasMaxLength(15)
                 .HasColumnName("metodo_pago");
+            entity.Property(e => e.MotivoAnulacion)
+                .HasMaxLength(200)
+                .HasColumnName("motivo_anulacion");
             entity.Property(e => e.Numero).HasColumnName("numero");
             entity.Property(e => e.Serie)
                 .HasMaxLength(4)
@@ -407,6 +418,10 @@ public partial class AppDbContext : DbContext
                 .HasForeignKey<NotaVentum>(d => d.IdMovimiento)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("nota_venta_id_movimiento_fkey");
+
+            entity.HasOne(d => d.IdUsuarioAnulacionNavigation).WithMany(p => p.NotaVenta)
+                .HasForeignKey(d => d.IdUsuarioAnulacion)
+                .HasConstraintName("nota_venta_id_usuario_anulacion_fkey");
         });
 
         modelBuilder.Entity<PlanoLinea>(entity =>

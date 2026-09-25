@@ -31,6 +31,8 @@ public partial class Usuario
 
     public virtual ICollection<Movimiento> Movimientos { get; set; } = new List<Movimiento>();
 
+    public virtual ICollection<NotaVentum> NotaVenta { get; set; } = new List<NotaVentum>();
+
     public virtual ICollection<Reporte> Reportes { get; set; } = new List<Reporte>();
 
     public virtual ICollection<Traslado> Traslados { get; set; } = new List<Traslado>();

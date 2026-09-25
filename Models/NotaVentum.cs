@@ -21,5 +21,15 @@ public partial class NotaVentum
 
     public string MetodoPago { get; set; } = null!;
 
+    public string Estado { get; set; } = null!;
+
+    public DateTime? FechaAnulacion { get; set; }
+
+    public int? IdUsuarioAnulacion { get; set; }
+
+    public string? MotivoAnulacion { get; set; }
+
     public virtual Movimiento IdMovimientoNavigation { get; set; } = null!;
+
+    public virtual Usuario? IdUsuarioAnulacionNavigation { get; set; }
 }
