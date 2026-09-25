@@ -1,74 +1,353 @@
-﻿@model IEnumerable<GestionAlmacen_Golocentro.ViewModels.AlertaViewModel>
+@using System.Globalization
+@using GestionAlmacen_Golocentro.Services
+@using GestionAlmacen_Golocentro.ViewModels
+@model AlertasViewModel
 @{
-    ViewData["Title"] = "Panel de Alertas";
+    ViewData["Title"] = "Alertas";
+    var inv = CultureInfo.InvariantCulture;
+    var sinStock = Model.Reponer.Count(a => a.Estado == EstadoStock.SinStock);
+    var bajos = Model.Reponer.Count - sinStock;
+    var vencidos = Model.Vencer.Count(a => a.Dias < 0);
+    var porVencer = Model.Vencer.Count - vencidos;
+    var total = Model.Reponer.Count + Model.Vencer.Count;
+    string Desde(DateTime f) => f.Date == DateTime.Today ? "desde hoy" : $"desde el {f:dd/MM}";
+    string TextoVence(AlertaItem a) => a.Dias switch
+    {
+        < 0 => $"Venció el {a.Vencimiento:dd/MM/yyyy}",
+        0 => "Vence hoy",
+        1 => "Vence mañana",
+        int d => $"Vence en {d} días ({a.Vencimiento:dd/MM})",
+        _ => ""
+    };
 }
 
-<div class="container">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2><i class="bi bi-exclamation-triangle-fill text-warning"></i> @ViewData["Title"]</h2>
-        <form method="post" asp-action="GenerarAlertas">
-            @Html.AntiForgeryToken()
-            <button type="submit" class="btn btn-primary">
-                <i class="bi bi-arrow-repeat"></i> Actualizar Alertas
-            </button>
-        </form>
+@await Html.PartialAsync("~/Views/Shared/_EstilosGestion.cshtml")
+
+<style>
+    .al-page {
+        max-width: 1000px;
+    }
+
+    .al-resumen {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 12px;
+        margin-bottom: 1rem;
+    }
+
+    .al-dato {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        background: var(--g-white);
+        border: 1px solid var(--g-border);
+        border-radius: 14px;
+        padding: 12px 16px;
+    }
+
+        .al-dato > i {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            flex: none;
+        }
+
+        .al-dato.rojo > i {
+            background: rgba(220,38,38,0.1);
+            color: var(--g-danger-text);
+        }
+
+        .al-dato.ambar > i {
+            background: rgba(245,158,11,0.16);
+            color: #92400E;
+        }
+
+    .al-dato-valor {
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--g-navy);
+        line-height: 1.1;
+    }
+
+    .al-dato-etiqueta {
+        font-size: 13px;
+        color: var(--g-muted);
+    }
+
+    .al-seccion {
+        background: var(--g-white);
+        border: 1px solid var(--g-border);
+        border-radius: 14px;
+        margin-bottom: 1rem;
+        overflow: hidden;
+    }
+
+    .al-cab {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 14px 1.25rem 10px;
+        border-bottom: 1px solid var(--g-border);
+    }
+
+        .al-cab h2 {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--g-navy);
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .al-cab p {
+            font-size: 13px;
+            color: var(--g-muted);
+            margin: 0;
+        }
+
+    .al-lista {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+
+    .al-item {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 6px 16px;
+        align-items: center;
+        padding: 12px 1.25rem;
+        border-bottom: 1px solid var(--g-border);
+    }
+
+        .al-item:last-child {
+            border-bottom: none;
+        }
+
+    .al-nombre {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--g-text);
+    }
+
+    .al-linea {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 12px;
+        align-items: center;
+        margin-top: 4px;
+        font-size: 13px;
+        color: var(--g-muted);
+    }
+
+    .al-estado {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 2px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+        .al-estado.rojo {
+            background: rgba(220,38,38,0.1);
+            color: var(--g-danger-text);
+        }
+
+        .al-estado.ambar {
+            background: rgba(245,158,11,0.16);
+            color: #92400E;
+        }
+
+    .al-acciones {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+
+        .al-acciones .btn-g-outline {
+            min-height: 40px;
+            padding: 8px 12px;
+            font-size: 13px;
+        }
+
+    @@media (max-width: 640px) {
+        .al-item {
+            grid-template-columns: 1fr;
+        }
+
+        .al-acciones {
+            justify-content: flex-start;
+        }
+    }
+
+    .al-resueltas summary {
+        cursor: pointer;
+        padding: 14px 1.25rem;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--g-teal);
+    }
+
+        .al-resueltas summary:focus-visible {
+            outline: 2px solid var(--g-teal);
+            outline-offset: -2px;
+        }
+
+    .al-resuelta {
+        padding: 10px 1.25rem;
+        border-top: 1px solid var(--g-border);
+        font-size: 14px;
+    }
+
+        .al-resuelta .cp-sub {
+            margin-top: 2px;
+        }
+</style>
+
+<div class="cp-page al-page">
+    <div class="cp-header">
+        <div>
+            <h1><i class="bi bi-bell" aria-hidden="true"></i> Alertas</h1>
+            <p>@Model.SedeNombre · se actualizan solas con cada venta, entrada o conteo</p>
+        </div>
     </div>
 
-    @if (TempData["Mensaje"] != null)
+    <div class="al-resumen">
+        <div class="al-dato rojo">
+            <i class="bi bi-x-circle" aria-hidden="true"></i>
+            <div><div class="al-dato-valor">@sinStock</div><div class="al-dato-etiqueta">sin stock</div></div>
+        </div>
+        <div class="al-dato ambar">
+            <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
+            <div><div class="al-dato-valor">@bajos</div><div class="al-dato-etiqueta">con stock bajo</div></div>
+        </div>
+        <div class="al-dato ambar">
+            <i class="bi bi-hourglass-split" aria-hidden="true"></i>
+            <div><div class="al-dato-valor">@porVencer</div><div class="al-dato-etiqueta">por vencer (30 días)</div></div>
+        </div>
+        <div class="al-dato rojo">
+            <i class="bi bi-calendar-x" aria-hidden="true"></i>
+            <div><div class="al-dato-valor">@vencidos</div><div class="al-dato-etiqueta">vencidos con stock</div></div>
+        </div>
+    </div>
+
+    @if (total == 0)
     {
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            @TempData["Mensaje"]
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <div class="cp-panel">
+            <div class="cp-vacio">
+                <i class="bi bi-check-circle" aria-hidden="true" style="color:var(--g-teal)"></i>
+                Todo en orden: no hay productos por reponer ni por vencer.
+            </div>
         </div>
     }
 
-    <p class="text-muted mb-3">
-        Sede: <strong>@ViewBag.SedeNombre</strong>
-    </p>
-
-    @if (!Model.Any())
+    @if (Model.Reponer.Count > 0)
     {
-        <div class="alert alert-info"><i class="bi bi-check-circle"></i> No hay alertas activas en este momento.</div>
+        <section class="al-seccion" aria-labelledby="tituloReponer">
+            <div class="al-cab">
+                <h2 id="tituloReponer"><i class="bi bi-box-seam" aria-hidden="true"></i> Por reponer</h2>
+                <p>Stock en su mínimo o por debajo · lo agotado primero</p>
+            </div>
+            <ul class="al-lista">
+                @foreach (var a in Model.Reponer)
+                {
+                    var agotado = a.Estado == EstadoStock.SinStock;
+                    <li class="al-item">
+                        <div>
+                            <div class="al-nombre">@a.Nombre</div>
+                            <div class="al-linea">
+                                <span class="al-estado @(agotado ? "rojo" : "ambar")">
+                                    <i class="bi @(agotado ? "bi-x-circle" : "bi-exclamation-triangle")" aria-hidden="true"></i>
+                                    @(agotado ? "Sin stock" : $"Quedan {a.Stock} {a.Unidad}")
+                                </span>
+                                <span>mínimo @a.Minimo</span>
+                                <span>@(string.IsNullOrEmpty(a.Zonas) ? "no está en ninguna zona" : a.Zonas)</span>
+                                <span>@(a.Codigo + (Model.VariasSedes ? " · " + a.Sede : ""))</span>
+                                <span>@Desde(a.Desde)</span>
+                            </div>
+                        </div>
+                        <div class="al-acciones">
+                            <a class="btn-g-outline" asp-controller="Movimiento" asp-action="Entrada">
+                                <i class="bi bi-box-arrow-in-down" aria-hidden="true"></i> Registrar entrada
+                            </a>
+                            @if (Model.PuedeVerKardex)
+                            {
+                                <a class="cp-icono-btn" asp-controller="Reporte" asp-action="Kardex" asp-route-producto="@a.IdProducto"
+                                   title="Ver kardex" aria-label="Ver el kardex de @a.Nombre"><i class="bi bi-clock-history" aria-hidden="true"></i></a>
+                            }
+                        </div>
+                    </li>
+                }
+            </ul>
+        </section>
     }
-    else
+
+    @if (Model.Vencer.Count > 0)
     {
-        <div class="table-responsive">
-            <table class="table table-striped table-hover">
-                <thead class="table-dark">
-                    <tr>
-                        <th>Tipo</th>
-                        <th>Mensaje</th>
-                        <th>Producto</th>
-                        <th>Fecha</th>
-                        <th>Sede</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var alerta in Model)
-                    {
-                        string icono = alerta.Tipo switch
-                        {
-                            "stock_minimo" => "bi bi-exclamation-triangle text-danger",
-                            "vencimiento" => "bi bi-calendar-x text-warning",
-                            "sobrestock" => "bi bi-arrow-up-circle text-info",
-                            _ => "bi bi-bell"
-                        };
-                        <tr>
-                            <td><i class="@icono fs-5"></i> @alerta.Tipo</td>
-                            <td>@alerta.Mensaje</td>
-                            <td>@alerta.ProductoNombre</td>
-                            <td>@alerta.Fecha?.ToString("dd/MM/yyyy HH:mm")</td>
-                            <td>@alerta.SedeNombre</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
+        <section class="al-seccion" aria-labelledby="tituloVencer">
+            <div class="al-cab">
+                <h2 id="tituloVencer"><i class="bi bi-hourglass-split" aria-hidden="true"></i> Por vencer</h2>
+                <p>Con stock y vencimiento en 30 días o menos · lo más próximo primero</p>
+            </div>
+            <ul class="al-lista">
+                @foreach (var a in Model.Vencer)
+                {
+                    var vencido = a.Dias < 0;
+                    <li class="al-item">
+                        <div>
+                            <div class="al-nombre">@a.Nombre</div>
+                            <div class="al-linea">
+                                <span class="al-estado @(vencido || a.Dias <= 7 ? "rojo" : "ambar")">
+                                    <i class="bi @(vencido ? "bi-calendar-x" : "bi-hourglass-split")" aria-hidden="true"></i> @TextoVence(a)
+                                </span>
+                                <span>hay @a.Stock @a.Unidad en @a.Zonas</span>
+                                @if (!string.IsNullOrWhiteSpace(a.Lote))
+                                {
+                                    <span>lote @a.Lote</span>
+                                }
+                                <span>@(a.Codigo + (Model.VariasSedes ? " · " + a.Sede : ""))</span>
+                            </div>
+                        </div>
+                        <div class="al-acciones">
+                            <a class="btn-g-outline" asp-controller="Mapa" asp-action="Index" asp-route-buscar="@a.Codigo">
+                                <i class="bi bi-map" aria-hidden="true"></i> Ver en el mapa
+                            </a>
+                            @if (Model.PuedeVerKardex)
+                            {
+                                <a class="cp-icono-btn" asp-controller="Reporte" asp-action="Kardex" asp-route-producto="@a.IdProducto"
+                                   title="Ver kardex" aria-label="Ver el kardex de @a.Nombre"><i class="bi bi-clock-history" aria-hidden="true"></i></a>
+                            }
+                        </div>
+                    </li>
+                }
+            </ul>
+        </section>
+    }
+
+    @if (Model.Resueltas.Count > 0)
+    {
+        <details class="al-seccion al-resueltas">
+            <summary>Resueltas en los últimos 7 días (@Model.Resueltas.Count)</summary>
+            @foreach (var r in Model.Resueltas)
+            {
+                <div class="al-resuelta">
+                    <div>@r.Mensaje</div>
+                    <div class="cp-sub">
+                        @($"Desde el {r.Desde.ToString("dd/MM HH:mm", inv)} · se resolvió el {r.Resuelta.ToString("dd/MM HH:mm", inv)}" + (Model.VariasSedes ? " · " + r.Sede : ""))
+                    </div>
+                </div>
+            }
+        </details>
     }
 </div>
-
-@section Scripts {
-    <script>
-        // Funcionalidad adicional (marcar resueltas, etc.)
-    </script>
-}

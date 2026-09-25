@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using GestionAlmacen_Golocentro.Data;
+using GestionAlmacen_Golocentro.Services;
 using GestionAlmacen_Golocentro.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
@@ -19,6 +20,9 @@ namespace GestionAlmacen_Golocentro.Controllers
 
         public async Task<IActionResult> Index()
         {
+            // Las alertas del resumen deben reflejar el stock de ahora
+            await AlertasStock.Sincronizar(_context);
+
             string? sedeIdClaim = User.FindFirst("SedeId")?.Value;
             int? sedeId = string.IsNullOrEmpty(sedeIdClaim) ? null : int.Parse(sedeIdClaim);
 
