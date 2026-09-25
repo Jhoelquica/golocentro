@@ -525,6 +525,14 @@
                        asp-controller="Reporte" asp-action="Index">
                         <i class="bi bi-file-earmark-bar-graph"></i> Reportes
                     </a>
+
+                    @if (User.IsInRole("duena"))
+                    {
+                        <a class="g-nav-link @(currentController == "Usuario" ? "active" : "")"
+                           asp-controller="Usuario" asp-action="Index">
+                            <i class="bi bi-person-badge"></i> Usuarios
+                        </a>
+                    }
                 }
 
             </nav>

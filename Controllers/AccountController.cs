@@ -6,6 +6,8 @@ using GestionAlmacen_Golocentro.Data;
 using GestionAlmacen_Golocentro.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
+using GestionAlmacen_Golocentro.Helpers;
+using GestionAlmacen_Golocentro.ViewModels;
 
 namespace GestionAlmacen_Golocentro.Controllers
 {
@@ -147,9 +149,11 @@ namespace GestionAlmacen_Golocentro.Controllers
 
             // Buscar usuario en la base de datos
             // OJO: la propiedad se llama "Usuario1", no "NombreUsuario"
-            // Primero buscamos solo por usuario (no por contraseña, porque ahora está hasheada)
+            // Primero buscamos solo por usuario (no por contraseña, porque ahora está hasheada).
+            // Sin distinguir mayúsculas: los usuarios nuevos se guardan en minúsculas.
+            var nombreBuscado = nombreUsuario.Trim().ToLower();
             var usuario = await _context.Usuarios
-                .FirstOrDefaultAsync(u => u.Usuario1 == nombreUsuario);
+                .FirstOrDefaultAsync(u => u.Usuario1.ToLower() == nombreBuscado);
 
             if (usuario == null || !BCrypt.Net.BCrypt.Verify(contraseña, usuario.Contrasena))
             {
@@ -163,58 +167,67 @@ namespace GestionAlmacen_Golocentro.Controllers
                 return View();
             }
 
-            // Obtener la sede del usuario (si tiene id_sede)
-            Sede sede = null;
-            if (usuario.IdSede.HasValue)
-            {
-                sede = await _context.Sedes.FindAsync(usuario.IdSede.Value);
-            }
-
-            // Crear claims base
-            var claims = new List<Claim>
-    {
-        new Claim(ClaimTypes.Name, usuario.Usuario1),  // nombre de usuario
-        new Claim(ClaimTypes.Role, usuario.Rol ?? "trabajador"),
-        new Claim("UsuarioId", usuario.IdUsuario.ToString()),
-        // Como solo hay "Nombre", usamos eso para el nombre completo
-        new Claim("NombreCompleto", usuario.Nombre),
-        // FotoUrl puede ser null, así que usamos ?? para evitar problemas
-        new Claim("FotoUrl", usuario.FotoUrl ?? "")
-    };
-
-            // Agregar claims de sede
-            if (sede != null)
-            {
-                claims.Add(new Claim("SedeId", sede.IdSede.ToString()));
-                claims.Add(new Claim("SedeNombre", sede.Nombre));
-            }
-            else
-            {
-                // duena (id_sede NULL)
-                claims.Add(new Claim("SedeId", ""));
-                claims.Add(new Claim("SedeNombre", "Todas las sedes"));
-            }
-
-            var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-            var authProperties = new AuthenticationProperties
-            {
-                IsPersistent = true,
-                ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8)
-            };
-
-            await HttpContext.SignInAsync(
-                CookieAuthenticationDefaults.AuthenticationScheme,
-                new ClaimsPrincipal(claimsIdentity),
-                authProperties);
+            await IniciarSesion(usuario);
 
             if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
                 return LocalRedirect(returnUrl);
 
-            // Redirigir según el rol
-            if (usuario.Rol == "duena" || usuario.Rol == "encargada")
-                return RedirectToAction("Index", "Home");
-            else
-                return RedirectToAction("Index", "Movimiento");
+            // Todos los roles empiezan en el dashboard (tiene los accesos a vender, entradas y stock)
+            return RedirectToAction("Index", "Home");
+        }
+
+        // La sede y el sello de la contraseña van en la cookie; Program.cs los revisa en cada página
+        [NonAction]
+        private async Task IniciarSesion(Usuario usuario)
+        {
+            var sede = usuario.IdSede.HasValue ? await _context.Sedes.FindAsync(usuario.IdSede.Value) : null;
+            var identidad = new ClaimsIdentity(SesionHelper.Claims(usuario, sede), CookieAuthenticationDefaults.AuthenticationScheme);
+
+            await HttpContext.SignInAsync(
+                CookieAuthenticationDefaults.AuthenticationScheme,
+                new ClaimsPrincipal(identidad),
+                new AuthenticationProperties
+                {
+                    IsPersistent = true,
+                    ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8)
+                });
+        }
+
+        // ── CAMBIAR MI CONTRASEÑA ───────────────────────────
+        [Authorize]
+        public IActionResult CambiarContrasena() => View(new CambiarContrasenaViewModel());
+
+        [HttpPost]
+        [Authorize]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CambiarContrasena(CambiarContrasenaViewModel model)
+        {
+            if (!int.TryParse(User.FindFirst("UsuarioId")?.Value, out var idUsuario))
+                return RedirectToAction(nameof(Login));
+            var usuario = await _context.Usuarios.FindAsync(idUsuario);
+            if (usuario == null)
+                return RedirectToAction(nameof(Login));
+
+            if (string.IsNullOrEmpty(model.Actual))
+                ModelState.AddModelError(nameof(model.Actual), "Escribe tu contraseña actual.");
+            else if (!BCrypt.Net.BCrypt.Verify(model.Actual, usuario.Contrasena))
+                ModelState.AddModelError(nameof(model.Actual), "La contraseña actual no es correcta.");
+
+            foreach (var (campo, mensaje) in SesionHelper.ValidarContrasena(model.Nueva, model.Confirmar, usuario.Usuario1, nameof(model.Nueva), nameof(model.Confirmar)))
+                ModelState.AddModelError(campo, mensaje);
+            if (ModelState.IsValid && model.Nueva == model.Actual)
+                ModelState.AddModelError(nameof(model.Nueva), "La nueva contraseña debe ser distinta de la actual.");
+
+            if (!ModelState.IsValid)
+                return View(new CambiarContrasenaViewModel());
+
+            usuario.Contrasena = BCrypt.Net.BCrypt.HashPassword(model.Nueva);
+            await _context.SaveChangesAsync();
+
+            // Con la contraseña nueva cambia el sello: se renueva esta sesión y las demás quedan cerradas
+            await IniciarSesion(usuario);
+            TempData["Success"] = "Contraseña cambiada. Las sesiones abiertas en otros equipos se cerraron.";
+            return RedirectToAction(nameof(Perfil));
         }
 
         // GET: Account/Logout

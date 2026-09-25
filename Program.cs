@@ -1,6 +1,9 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using GestionAlmacen_Golocentro.Data;
-using Microsoft.AspNetCore.Authentication.Cookies; // Agregar este using
+using GestionAlmacen_Golocentro.Helpers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,7 +11,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// ========== NUEVO: Configurar autenticaci髇 por cookies ==========
+// Autenticaci贸n por cookies
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
@@ -16,8 +19,39 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.LogoutPath = "/Account/Logout";
         options.AccessDeniedPath = "/Account/AccessDenied";
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
+
+        // En cada p谩gina se revisa la cuenta: si la due帽a la desactiv贸, le cambi贸 el rol o la sede,
+        // o se cambi贸 la contrase帽a, la sesi贸n abierta se cierra y hay que volver a entrar.
+        options.Events = new CookieAuthenticationEvents
+        {
+            OnValidatePrincipal = async contexto =>
+            {
+                var principal = contexto.Principal!;
+                if (!int.TryParse(principal.FindFirst("UsuarioId")?.Value, out var idUsuario))
+                {
+                    contexto.RejectPrincipal();
+                    return;
+                }
+
+                var db = contexto.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
+                var cuenta = await db.Usuarios
+                    .Where(u => u.IdUsuario == idUsuario)
+                    .Select(u => new { u.Estado, u.Rol, u.IdSede, u.Contrasena })
+                    .FirstOrDefaultAsync();
+
+                var vigente = cuenta != null
+                    && cuenta.Estado == "activo"
+                    && cuenta.Rol == principal.FindFirst(ClaimTypes.Role)?.Value
+                    && (cuenta.IdSede?.ToString() ?? "") == (principal.FindFirst("SedeId")?.Value ?? "")
+                    && SesionHelper.Sello(cuenta.Contrasena) == principal.FindFirst(SesionHelper.ClaimSello)?.Value;
+                if (!vigente)
+                {
+                    contexto.RejectPrincipal();
+                    await contexto.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                }
+            }
+        };
     });
-// =================================================================
 
 builder.Services.AddControllersWithViews();
 
@@ -33,10 +67,8 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
 
-// ========== NUEVO: Habilitar autenticaci髇 y autorizaci髇 ==========
 app.UseAuthentication();
 app.UseAuthorization();
-// =================================================================
 
 app.MapControllerRoute(
     name: "default",

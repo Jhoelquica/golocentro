@@ -1,0 +1,94 @@
+@using GestionAlmacen_Golocentro.ViewModels
+@model RestablecerContrasenaViewModel
+@{
+    ViewData["Title"] = "Restablecer contraseña";
+    string? Error(string campo) => ViewData.ModelState[campo]?.Errors.FirstOrDefault()?.ErrorMessage;
+    string? Describe(string campo, string? extra = null)
+    {
+        var ids = new[] { extra, Error(campo) != null ? campo + "-error" : null }.Where(x => x != null);
+        var valor = string.Join(" ", ids);
+        return valor.Length == 0 ? null : valor;
+    }
+    var errores = ViewData.ModelState
+        .Where(kv => kv.Value!.Errors.Count > 0)
+        .SelectMany(kv => kv.Value!.Errors.Select(e => (Campo: kv.Key, e.ErrorMessage)))
+        .ToList();
+}
+
+@await Html.PartialAsync("~/Views/Shared/_EstilosGestion.cshtml")
+
+<div class="cp-page">
+    <a class="cp-volver" asp-action="Index"><i class="bi bi-arrow-left" aria-hidden="true"></i> Volver a usuarios</a>
+
+    <div class="cp-header">
+        <div>
+            <h1><i class="bi bi-key" aria-hidden="true"></i> Restablecer contraseña</h1>
+            <p>@Model.Nombre · usuario «@Model.NombreUsuario»</p>
+        </div>
+    </div>
+
+    @if (errores.Count > 0)
+    {
+        <div class="cp-resumen" role="alert" tabindex="-1" id="resumenErrores" aria-labelledby="resumenTitulo">
+            <h2 id="resumenTitulo">Revisa estos datos antes de guardar:</h2>
+            <ul>
+                @foreach (var e in errores)
+                {
+                    <li><a href="#@e.Campo">@e.ErrorMessage</a></li>
+                }
+            </ul>
+        </div>
+    }
+
+    <form class="cp-form-card" method="post" novalidate id="formClave" asp-action="Contrasena" asp-route-id="@Model.Id">
+        <p class="cp-nota">
+            Úsalo cuando la persona olvidó su contraseña. Asigna una nueva y pásasela en privado;
+            si tenía una sesión abierta, se cerrará. Después podrá cambiarla desde Mi perfil.
+        </p>
+
+        @* Para que el gestor de contraseñas del navegador no la confunda con la cuenta de la dueña *@
+        <input type="text" name="usuarioCuenta" value="@Model.NombreUsuario" autocomplete="username" hidden readonly />
+
+        <div class="cp-campo">
+            <label for="Nueva">Nueva contraseña <span class="cp-req" aria-hidden="true">*</span></label>
+            <div class="cp-clave">
+                <input id="Nueva" name="Nueva" type="password" autocomplete="new-password" maxlength="72" required aria-required="true"
+                       aria-invalid="@(Error("Nueva") != null ? "true" : null)"
+                       aria-describedby="@Describe("Nueva", "Nueva-ayuda")" />
+                <button type="button" class="cp-clave-ver" aria-controls="Nueva" aria-pressed="false" aria-label="Mostrar contraseña"><i class="bi bi-eye" aria-hidden="true"></i></button>
+            </div>
+            <p class="cp-ayuda" id="Nueva-ayuda">Mínimo 8 caracteres, distinta del usuario.</p>
+            @if (Error("Nueva") is string eNueva)
+            {
+                <p class="cp-error" id="Nueva-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @eNueva</p>
+            }
+        </div>
+
+        <div class="cp-campo">
+            <label for="Confirmar">Repite la contraseña <span class="cp-req" aria-hidden="true">*</span></label>
+            <div class="cp-clave">
+                <input id="Confirmar" name="Confirmar" type="password" autocomplete="new-password" maxlength="72" required aria-required="true"
+                       aria-invalid="@(Error("Confirmar") != null ? "true" : null)"
+                       aria-describedby="@Describe("Confirmar")" />
+                <button type="button" class="cp-clave-ver" aria-controls="Confirmar" aria-pressed="false" aria-label="Mostrar contraseña"><i class="bi bi-eye" aria-hidden="true"></i></button>
+            </div>
+            @if (Error("Confirmar") is string eConfirmar)
+            {
+                <p class="cp-error" id="Confirmar-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @eConfirmar</p>
+            }
+        </div>
+
+        <div class="cp-botones">
+            <a class="btn-g-outline" asp-action="Index">Cancelar</a>
+            <button type="submit" class="btn-g-primary"><i class="bi bi-check-lg" aria-hidden="true"></i> Guardar contraseña</button>
+        </div>
+    </form>
+</div>
+
+@await Html.PartialAsync("~/Views/Shared/_MostrarContrasena.cshtml")
+
+@section Scripts {
+    <script>
+        document.getElementById('resumenErrores')?.focus();
+    </script>
+}
