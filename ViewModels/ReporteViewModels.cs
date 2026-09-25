@@ -81,6 +81,46 @@ namespace GestionAlmacen_Golocentro.ViewModels
         public int Unidades { get; set; }
     }
 
+    // ---- Kardex por producto ----
+    public record KardexProductoOpcion(int Id, string Codigo, string Nombre, int Stock);
+
+    // Entra/Sale en null cuando el movimiento no cambia el stock de la sede (traslado entre zonas, conteo sin diferencia)
+    public record MovimientoKardex(
+        DateTime Fecha, string Tipo, string TipoTexto, string Documento, string? Detalle, string Zona,
+        int? Entra, int? Sale, int Saldo, string Usuario, string Sede, string? Enlace);
+
+    public static class TipoKardex
+    {
+        public const string Entrada = "entrada";
+        public const string Venta = "venta";
+        public const string Anulacion = "anulacion";
+        public const string Conteo = "conteo";
+        public const string Traslado = "traslado";
+        public const string Salida = "salida";
+    }
+
+    public class ReporteKardexViewModel
+    {
+        public FiltroReporte Filtro { get; set; } = new();
+        public List<KardexProductoOpcion> Productos { get; set; } = new();
+        public int? ProductoId { get; set; }
+        public string ProductoNombre { get; set; } = "";
+        public string ProductoCodigo { get; set; } = "";
+        public string Unidad { get; set; } = "";
+        public int SaldoInicial { get; set; }
+        public int Entradas { get; set; }
+        public int Ventas { get; set; }
+        public int Devoluciones { get; set; }
+        public int Ajustes { get; set; }
+        public int SaldoFinal { get; set; }
+        public int StockActual { get; set; }
+        public string ZonasActuales { get; set; } = "";
+
+        // El saldo inicial salió negativo: hubo cambios de stock sin registro (p. ej. datos borrados o cargados directo en la BD)
+        public bool Descuadre { get; set; }
+        public List<MovimientoKardex> Filas { get; set; } = new();
+    }
+
     // ---- Stock valorizado ----
     public static class EstadoStock
     {
@@ -100,7 +140,7 @@ namespace GestionAlmacen_Golocentro.ViewModels
     }
 
     public record StockReporteFila(
-        string Codigo, string Nombre, string Tipo, string Unidad, int Stock, int Minimo,
+        int Id, string Codigo, string Nombre, string Tipo, string Unidad, int Stock, int Minimo,
         decimal Precio, decimal Valor, string Zonas, string Estado, DateOnly? Vencimiento);
 
     public class ReporteStockViewModel

@@ -133,7 +133,8 @@
                             var vencePronto = p.Vencimiento is DateOnly v && v.DayNumber - hoy.DayNumber <= 30;
                             <tr>
                                 <td>
-                                    <div class="cp-nombre">@p.Nombre</div>
+                                    <a class="rp-enlace" asp-action="Kardex" asp-route-producto="@p.Id" asp-route-sede="@(f.PuedeElegirSede ? f.SedeId : null)"
+                                       title="Ver su kardex" aria-label="Ver el kardex de @p.Nombre">@p.Nombre</a>
                                     <div class="cp-sub">@p.Codigo · @p.Tipo</div>
                                 </td>
                                 <td class="rp-num">@p.Stock.ToString("N0", inv) <span class="cp-sub">@p.Unidad</span></td>
@@ -155,7 +156,7 @@
                     </tbody>
                 </table>
             </div>
-            <p class="rp-nota-pie">Valor = stock × precio de venta. Las fechas en rojo vencen en 30 días o menos.</p>
+            <p class="rp-nota-pie">Valor = stock × precio de venta. Las fechas en rojo vencen en 30 días o menos. Toca un producto para ver su kardex.</p>
         }
     </section>
 </div>
