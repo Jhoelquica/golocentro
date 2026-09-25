@@ -511,12 +511,12 @@
     <div class="metric-card">
         <div class="metric-icon salida" aria-hidden="true"><i class="bi bi-box-arrow-up"></i></div>
         <div class="metric-body">
-            <div class="metric-label">Salidas hoy</div>
+            <div class="metric-label">Ventas hoy</div>
             <div class="metric-value">@Model.SalidasHoy</div>
             <div class="metric-sub">Últimos 7 días: @salidasSemana</div>
         </div>
         @{ var maxSalidas = Math.Max(1, Model.UltimosSieteDias.Max(d => d.Salidas)); }
-        <div class="spark salida" role="img" aria-label="@(EtiquetaSerie("Salidas", d => d.Salidas))">
+        <div class="spark salida" role="img" aria-label="@(EtiquetaSerie("Ventas", d => d.Salidas))">
             @foreach (var d in Model.UltimosSieteDias)
             {
                 <span class="spark-bar" style="height:@(d.Salidas * 100 / maxSalidas)%"
@@ -557,10 +557,10 @@
         <div class="action-label">Nueva entrada</div>
         <div class="action-sub">Registrar ingreso</div>
     </a>
-    <a class="action-card" asp-controller="Movimiento" asp-action="Salida">
-        <div class="action-icon" aria-hidden="true"><i class="bi bi-box-arrow-up"></i></div>
-        <div class="action-label">Nueva salida</div>
-        <div class="action-sub">Registrar despacho</div>
+    <a class="action-card" asp-controller="Venta" asp-action="Nueva">
+        <div class="action-icon" aria-hidden="true"><i class="bi bi-cart3"></i></div>
+        <div class="action-label">Nueva venta</div>
+        <div class="action-sub">Con nota de venta</div>
     </a>
     <a class="action-card" asp-controller="Producto" asp-action="Stock">
         <div class="action-icon" aria-hidden="true"><i class="bi bi-bar-chart-line"></i></div>
@@ -601,14 +601,14 @@
                     var esEntrada = mov.Tipo == "Entrada";
                     var contraparte = mov.Contraparte ?? (esEntrada ? "Sin proveedor" : "Sin cliente");
                     <li>
-                        <a class="actividad-item" asp-controller="Movimiento" asp-action="Detalle" asp-route-id="@mov.IdMovimiento">
+                        <a class="actividad-item" asp-controller="@(esEntrada ? "Movimiento" : "Venta")" asp-action="@(esEntrada ? "Detalle" : "Nota")" asp-route-id="@mov.IdMovimiento">
                             <span class="actividad-icono @(esEntrada ? "entrada" : "salida")" aria-hidden="true">
                                 <i class="bi @(esEntrada ? "bi-box-arrow-in-down" : "bi-box-arrow-up")"></i>
                             </span>
                             <span class="actividad-texto">
                                 <span class="actividad-titulo">@contraparte</span>
                                 <span class="actividad-meta">
-                                    <span class="chip @(esEntrada ? "entrada" : "salida")">@mov.Tipo</span>
+                                    <span class="chip @(esEntrada ? "entrada" : "salida")">@(esEntrada ? "Entrada" : "Venta")</span>
                                     @mov.CantidadProductos @(mov.CantidadProductos == 1 ? "producto" : "productos") · @mov.Usuario
                                 </span>
                             </span>

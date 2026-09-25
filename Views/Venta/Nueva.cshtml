@@ -1,0 +1,1343 @@
+@using System.Globalization
+@using GestionAlmacen_Golocentro.ViewModels
+@model VentaFormViewModel
+@{
+    ViewData["Title"] = "Nueva venta";
+
+    var errores = ViewData.ModelState.Values
+        .SelectMany(v => v.Errors.Select(e => e.ErrorMessage))
+        .Distinct()
+        .ToList();
+
+    var iconoMetodo = new Dictionary<string, string>
+    {
+        ["efectivo"] = "bi-cash-coin",
+        ["yape"] = "bi-qr-code-scan",
+        ["plin"] = "bi-phone",
+        ["transferencia"] = "bi-bank",
+        ["tarjeta"] = "bi-credit-card"
+    };
+    var metodoElegido = MetodosPago.EsValido(Model.MetodoPago) ? Model.MetodoPago : "efectivo";
+    var sinStock = Model.Datos.Productos.Count == 0;
+}
+
+@await Html.PartialAsync("~/Views/Shared/_EstilosGestion.cshtml")
+
+<style>
+    .vn-page {
+        max-width: 1180px;
+    }
+
+    .vn-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 360px;
+        gap: 20px;
+        align-items: start;
+    }
+
+    .vn-col {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        min-width: 0;
+    }
+
+    .vn-cobro {
+        position: sticky;
+        top: calc(var(--topbar-h) + 16px);
+    }
+
+    @@media (max-width: 991.98px) {
+        .vn-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .vn-cobro {
+            position: static;
+        }
+    }
+
+    .vn-card {
+        background: var(--g-white);
+        border: 1px solid var(--g-border);
+        border-radius: 14px;
+        padding: 1.25rem;
+    }
+
+    .vn-titulo {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--g-navy);
+        margin: 0 0 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+        .vn-titulo > i {
+            color: var(--g-teal);
+        }
+
+    /* Buscadores */
+    .vn-buscar {
+        position: relative;
+    }
+
+        .vn-buscar > i {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--g-muted);
+            pointer-events: none;
+        }
+
+        .vn-buscar input {
+            width: 100%;
+            height: 48px;
+            padding: 0 12px 0 40px;
+            border: 1px solid var(--g-input-border);
+            border-radius: 10px;
+            font-size: 16px;
+            font-family: inherit;
+            color: var(--g-text);
+            background: var(--g-white);
+        }
+
+            .vn-buscar input::placeholder {
+                color: #64748B;
+            }
+
+    .vn-card input:focus,
+    .vn-card select:focus,
+    .vn-card textarea:focus {
+        outline: none;
+        border-color: var(--g-teal);
+        box-shadow: 0 0 0 3px rgba(4,120,87,0.25);
+    }
+
+    .vn-resultados {
+        list-style: none;
+        margin: 10px 0 0;
+        padding: 0;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 8px;
+    }
+
+    .vn-opcion {
+        width: 100%;
+        min-height: 56px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        column-gap: 10px;
+        row-gap: 2px;
+        align-items: center;
+        text-align: left;
+        padding: 9px 12px;
+        border: 1px solid var(--g-border);
+        border-radius: 10px;
+        background: var(--g-white);
+        font-family: inherit;
+        cursor: pointer;
+        transition: border-color var(--transition), background var(--transition);
+    }
+
+        .vn-opcion:hover {
+            border-color: var(--g-teal);
+            background: rgba(4,120,87,0.04);
+        }
+
+        .vn-opcion:focus-visible {
+            outline: 2px solid var(--g-teal);
+            outline-offset: 1px;
+        }
+
+    .vn-opcion-nombre {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--g-text);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .vn-opcion-meta {
+        grid-row: 2;
+        font-size: 12px;
+        color: var(--g-muted);
+    }
+
+    .vn-opcion-precio {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--g-teal);
+        font-variant-numeric: tabular-nums;
+    }
+
+    .vn-opcion > i {
+        grid-column: 2;
+        grid-row: 2;
+        justify-self: end;
+        color: var(--g-teal);
+    }
+
+    .vn-mas {
+        font-size: 13px;
+        color: var(--g-muted);
+        margin: 8px 0 0;
+    }
+
+        .vn-mas:empty {
+            display: none;
+        }
+
+    /* Carrito */
+    .vn-subtitulo {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--g-text);
+        margin: 20px 0 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .vn-contador {
+        min-width: 24px;
+        padding: 0 8px;
+        border-radius: 999px;
+        background: var(--g-bg);
+        border: 1px solid var(--g-border);
+        font-size: 12px;
+        text-align: center;
+    }
+
+    .vn-carrito {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .vn-carrito-vacio {
+        border: 1px dashed var(--g-input-border);
+        border-radius: 10px;
+        padding: 1.25rem;
+        text-align: center;
+        color: var(--g-muted);
+        font-size: 14px;
+    }
+
+        .vn-carrito-vacio i {
+            display: block;
+            font-size: 24px;
+            margin-bottom: 4px;
+        }
+
+    .vn-linea {
+        border: 1px solid var(--g-border);
+        border-radius: 10px;
+        padding: 12px;
+        background: var(--g-bg);
+    }
+
+        .vn-linea.vn-destacar {
+            animation: vn-destello 0.9s ease;
+        }
+
+    @@keyframes vn-destello {
+        from {
+            box-shadow: 0 0 0 3px rgba(4,120,87,0.4);
+        }
+
+        to {
+            box-shadow: 0 0 0 0 rgba(4,120,87,0);
+        }
+    }
+
+    @@media (prefers-reduced-motion: reduce) {
+        .vn-linea.vn-destacar {
+            animation: none;
+        }
+    }
+
+    .vn-linea-cab {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 8px;
+        margin-bottom: 8px;
+    }
+
+    .vn-linea-nombre {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--g-text);
+    }
+
+    .vn-linea-campos {
+        display: grid;
+        grid-template-columns: minmax(120px, 1.1fr) 148px minmax(110px, 1fr) minmax(84px, auto);
+        gap: 10px;
+        align-items: end;
+    }
+
+    @@media (max-width: 640px) {
+        .vn-linea-campos {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+
+    .vn-f label,
+    .vn-f-etiqueta {
+        display: block;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--g-muted);
+        margin-bottom: 4px;
+    }
+
+    .vn-f select,
+    .vn-f input {
+        width: 100%;
+        height: 44px;
+        padding: 0 10px;
+        border: 1px solid var(--g-input-border);
+        border-radius: 8px;
+        font-size: 15px;
+        font-family: inherit;
+        color: var(--g-text);
+        background: var(--g-white);
+        font-variant-numeric: tabular-nums;
+    }
+
+        .vn-f input[aria-invalid="true"],
+        .vn-descuento input[aria-invalid="true"] {
+            border-color: var(--g-danger);
+            box-shadow: 0 0 0 1px var(--g-danger);
+        }
+
+    .vn-stepper {
+        display: flex;
+    }
+
+        .vn-stepper button {
+            flex: none;
+            width: 44px;
+            height: 44px;
+            border: 1px solid var(--g-input-border);
+            background: var(--g-white);
+            color: var(--g-navy);
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+            .vn-stepper button:first-child {
+                border-radius: 8px 0 0 8px;
+                border-right: none;
+            }
+
+            .vn-stepper button:last-child {
+                border-radius: 0 8px 8px 0;
+                border-left: none;
+            }
+
+            .vn-stepper button:hover {
+                color: var(--g-teal);
+                background: rgba(4,120,87,0.06);
+            }
+
+            .vn-stepper button:focus-visible {
+                outline: 2px solid var(--g-teal);
+                outline-offset: -2px;
+            }
+
+        .vn-f .vn-stepper input {
+            border-radius: 0;
+            text-align: center;
+            padding: 0 4px;
+        }
+
+    /* Sin flechitas del navegador: tapan el monto y la cantidad ya tiene sus botones */
+    .vn-card input[type="number"] {
+        -moz-appearance: textfield;
+    }
+
+        .vn-card input[type="number"]::-webkit-outer-spin-button,
+        .vn-card input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+    .vn-moneda {
+        position: relative;
+    }
+
+        .vn-moneda > span {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--g-muted);
+            pointer-events: none;
+        }
+
+        .vn-f .vn-moneda input,
+        .vn-descuento .vn-moneda input {
+            padding-left: 32px;
+        }
+
+    .vn-f-importe {
+        text-align: right;
+    }
+
+    .vn-importe {
+        display: block;
+        height: 44px;
+        line-height: 44px;
+        font-size: 16px;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        color: var(--g-navy);
+    }
+
+    .vn-linea-aviso {
+        margin: 8px 0 0;
+        font-size: 13px;
+        color: var(--g-muted);
+    }
+
+        .vn-linea-aviso:empty {
+            display: none;
+        }
+
+        .vn-linea-aviso.error {
+            color: var(--g-danger-text);
+            font-weight: 500;
+        }
+
+    /* Cobro */
+    .vn-bloque {
+        border: none;
+        padding: 0;
+        margin: 0 0 18px;
+        min-width: 0;
+    }
+
+        .vn-bloque legend {
+            float: none;
+            width: auto;
+            padding: 0;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--g-text);
+            margin-bottom: 8px;
+        }
+
+    /* El radio sigue siendo enfocable con teclado; la etiqueta es lo que se ve */
+    .vn-radio {
+        position: absolute;
+        opacity: 0;
+        width: 1px;
+        height: 1px;
+        pointer-events: none;
+    }
+
+    .vn-segmento {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px;
+        padding: 4px;
+        background: var(--g-bg);
+        border: 1px solid var(--g-border);
+        border-radius: 10px;
+    }
+
+        .vn-segmento label {
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 6px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--g-muted);
+            text-align: center;
+            cursor: pointer;
+        }
+
+        .vn-segmento .vn-radio:checked + label {
+            background: var(--g-white);
+            color: var(--g-teal);
+            box-shadow: 0 1px 3px rgba(15,23,42,0.14);
+        }
+
+    .vn-radio:focus-visible + label {
+        outline: 2px solid var(--g-teal);
+        outline-offset: 2px;
+    }
+
+    .vn-cliente {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        margin-top: 10px;
+        padding: 10px 12px;
+        border: 1px solid var(--g-teal);
+        border-radius: 10px;
+        background: rgba(4,120,87,0.05);
+    }
+
+        .vn-cliente .cp-nombre {
+            font-size: 14px;
+        }
+
+    .vn-btn-sm {
+        min-height: 36px;
+        padding: 6px 12px;
+    }
+
+    .vn-buscador-cliente {
+        margin-top: 10px;
+    }
+
+        .vn-buscador-cliente .vn-resultados {
+            grid-template-columns: 1fr;
+            margin-bottom: 8px;
+        }
+
+            .vn-buscador-cliente .vn-resultados:empty {
+                display: none;
+            }
+
+    .vn-metodos {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+
+        .vn-metodos label {
+            min-height: 48px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border: 1px solid var(--g-input-border);
+            border-radius: 10px;
+            background: var(--g-white);
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--g-text);
+            cursor: pointer;
+        }
+
+            .vn-metodos label:last-of-type {
+                grid-column: span 2;
+            }
+
+            .vn-metodos label i {
+                font-size: 18px;
+                color: var(--g-muted);
+            }
+
+        .vn-metodos .vn-radio:checked + label {
+            border-color: var(--g-teal);
+            background: rgba(4,120,87,0.08);
+            color: var(--g-teal);
+            box-shadow: inset 0 0 0 1px var(--g-teal);
+        }
+
+            .vn-metodos .vn-radio:checked + label i {
+                color: var(--g-teal);
+            }
+
+    .vn-totales {
+        border-top: 1px dashed var(--g-input-border);
+        padding-top: 12px;
+        margin-bottom: 14px;
+    }
+
+    .vn-total-fila {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        padding: 4px 0;
+        font-size: 14px;
+        color: var(--g-text);
+        font-variant-numeric: tabular-nums;
+    }
+
+    .vn-descuento label {
+        font-weight: 400;
+        margin: 0;
+    }
+
+    .vn-descuento .vn-moneda {
+        width: 132px;
+    }
+
+    .vn-descuento input {
+        width: 100%;
+        height: 40px;
+        padding: 0 10px;
+        border: 1px solid var(--g-input-border);
+        border-radius: 8px;
+        font-size: 15px;
+        font-family: inherit;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .vn-error {
+        font-size: 13px;
+        color: var(--g-danger-text);
+        text-align: right;
+    }
+
+        .vn-error:empty {
+            display: none;
+        }
+
+    .vn-total {
+        margin-top: 6px;
+        padding-top: 10px;
+        border-top: 1px solid var(--g-border);
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--g-navy);
+    }
+
+    .vn-motivo {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--g-danger-text);
+        margin: 0 0 10px;
+    }
+
+        .vn-motivo:empty {
+            display: none;
+        }
+
+    .vn-registrar {
+        width: 100%;
+        min-height: 52px;
+        font-size: 16px;
+    }
+
+    .vn-card .cp-campo input[type="file"] {
+        padding: 9px 10px;
+        font-size: 14px;
+    }
+
+    .vn-sin-stock {
+        max-width: 640px;
+    }
+</style>
+
+<div class="cp-page vn-page">
+    <a class="cp-volver" asp-action="Index"><i class="bi bi-arrow-left" aria-hidden="true"></i> Ventas</a>
+    <header class="cp-header">
+        <div>
+            <h1><i class="bi bi-cart3" aria-hidden="true"></i> Nueva venta</h1>
+            <p>Agrega los productos, elige cómo paga el cliente y registra. Después podrás imprimir o enviar la nota de venta.</p>
+        </div>
+    </header>
+
+    @if (errores.Count > 0)
+    {
+        <div class="cp-resumen" id="resumenErrores" role="alert" tabindex="-1">
+            <h2>No se pudo registrar la venta</h2>
+            <ul>
+                @foreach (var error in errores)
+                {
+                    <li>@error</li>
+                }
+            </ul>
+        </div>
+    }
+
+    @if (sinStock)
+    {
+        <div class="cp-panel vn-sin-stock">
+            <div class="cp-vacio">
+                <i class="bi bi-box-seam" aria-hidden="true"></i>
+                No hay productos con stock en tu sede para vender.<br />
+                <a asp-controller="Movimiento" asp-action="Entrada">Registrar una entrada</a>
+            </div>
+        </div>
+    }
+    else
+    {
+        <form method="post" asp-action="Nueva" enctype="multipart/form-data" id="formVenta" novalidate>
+            <div class="vn-grid">
+                <div class="vn-col">
+                    <section class="vn-card" aria-labelledby="tituloProductos">
+                        <h2 class="vn-titulo" id="tituloProductos"><i class="bi bi-box-seam" aria-hidden="true"></i> Productos</h2>
+                        <div class="vn-buscar">
+                            <i class="bi bi-search" aria-hidden="true"></i>
+                            <input type="search" id="buscarProducto" autocomplete="off" placeholder="Buscar por nombre o código"
+                                   aria-label="Buscar producto" aria-controls="resultadosProducto" aria-describedby="ayudaBuscar" />
+                        </div>
+                        <p class="cp-ayuda" id="ayudaBuscar">Toca un producto para agregarlo; si ya está, suma uno más. Enter agrega el primero de la lista.</p>
+                        <ul class="vn-resultados" id="resultadosProducto" aria-label="Productos con stock"></ul>
+                        <p class="vn-mas" id="masResultados"></p>
+
+                        <h3 class="vn-subtitulo">En esta venta <span class="vn-contador" id="contadorLineas">0</span></h3>
+                        <ol class="vn-carrito" id="carrito" aria-label="Productos de la venta"></ol>
+                        <div class="vn-carrito-vacio" id="carritoVacio">
+                            <i class="bi bi-cart3" aria-hidden="true"></i>
+                            Todavía no agregaste productos.
+                        </div>
+                    </section>
+
+                    <section class="vn-card" aria-labelledby="tituloEntrega">
+                        <h2 class="vn-titulo" id="tituloEntrega"><i class="bi bi-camera" aria-hidden="true"></i> Entrega <span class="cp-opcional">(opcional)</span></h2>
+                        <div class="cp-campo">
+                            <label for="Observaciones">Observaciones</label>
+                            <textarea id="Observaciones" name="Observaciones" rows="2" maxlength="200"
+                                      placeholder="Ej.: entregar en la tienda de la esquina" aria-describedby="ayudaObservaciones">@Model.Observaciones</textarea>
+                            <div class="cp-ayuda" id="ayudaObservaciones">Sale impresa en la nota de venta.</div>
+                        </div>
+                        <div class="cp-campo mb-0">
+                            <label for="Evidencia">Foto de la entrega</label>
+                            <input type="file" id="Evidencia" name="Evidencia" accept="image/jpeg,image/png,image/webp" aria-describedby="ayudaFoto" />
+                            <div class="cp-ayuda" id="ayudaFoto">
+                                Para validar que se entregó todo bien. Queda en el sistema, no sale en la nota. También puedes subirla después, desde la nota.
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                <div class="vn-col vn-cobro">
+                    <section class="vn-card" aria-label="Cobro">
+                        <fieldset class="vn-bloque">
+                            <legend>Cliente</legend>
+                            <div class="vn-segmento">
+                                <input type="radio" class="vn-radio" name="tipoCliente" id="tipoGeneral" value="general" />
+                                <label for="tipoGeneral"><i class="bi bi-people" aria-hidden="true"></i> Público en general</label>
+                                <input type="radio" class="vn-radio" name="tipoCliente" id="tipoDatos" value="datos" />
+                                <label for="tipoDatos"><i class="bi bi-person-vcard" aria-hidden="true"></i> Con sus datos</label>
+                            </div>
+
+                            <div id="panelCliente" hidden>
+                                <div class="vn-cliente" id="clienteElegido" hidden>
+                                    <div>
+                                        <div class="cp-nombre" id="clienteNombre"></div>
+                                        <div class="cp-sub" id="clienteDetalle"></div>
+                                    </div>
+                                    <button type="button" class="btn-g-outline vn-btn-sm" id="btnCambiarCliente">Cambiar</button>
+                                </div>
+                                <div class="vn-buscador-cliente" id="buscadorCliente">
+                                    <div class="vn-buscar">
+                                        <i class="bi bi-search" aria-hidden="true"></i>
+                                        <input type="search" id="buscarCliente" autocomplete="off" placeholder="Nombre, DNI o RUC"
+                                               aria-label="Buscar cliente" aria-controls="resultadosCliente" />
+                                    </div>
+                                    <ul class="vn-resultados" id="resultadosCliente" aria-label="Clientes encontrados"></ul>
+                                    <p class="vn-mas" id="avisoCliente" aria-live="polite"></p>
+                                    <button type="button" class="btn-g-outline w-100 mt-2" id="btnNuevoCliente">
+                                        <i class="bi bi-person-plus" aria-hidden="true"></i> Nuevo cliente
+                                    </button>
+                                </div>
+                            </div>
+                            <input type="hidden" name="ClienteId" id="ClienteId" value="@Model.ClienteId" />
+                        </fieldset>
+
+                        <fieldset class="vn-bloque">
+                            <legend>Método de pago</legend>
+                            <div class="vn-metodos">
+                                @foreach (var (valor, texto) in MetodosPago.Todos)
+                                {
+                                    <input type="radio" class="vn-radio" name="MetodoPago" id="pago-@valor" value="@valor" checked="@(valor == metodoElegido)" />
+                                    <label for="pago-@valor"><i class="bi @iconoMetodo[valor]" aria-hidden="true"></i> @texto</label>
+                                }
+                            </div>
+                        </fieldset>
+
+                        <div class="vn-totales">
+                            <div class="vn-total-fila">
+                                <span>Subtotal</span>
+                                <span id="txtSubtotal">S/ 0.00</span>
+                            </div>
+                            <div class="vn-total-fila vn-descuento">
+                                <label for="Descuento">Descuento</label>
+                                <div class="vn-moneda">
+                                    <span aria-hidden="true">S/</span>
+                                    <input type="number" id="Descuento" name="Descuento" min="0" step="0.01" inputmode="decimal" placeholder="0.00"
+                                           value="@(Model.Descuento is decimal d && d > 0 ? d.ToString("0.00", CultureInfo.InvariantCulture) : null)"
+                                           aria-describedby="errorDescuento" />
+                                </div>
+                            </div>
+                            <div class="vn-error" id="errorDescuento"></div>
+                            <div class="vn-total-fila vn-total">
+                                <span>Total</span>
+                                <span id="txtTotal">S/ 0.00</span>
+                            </div>
+                        </div>
+
+                        <p class="vn-motivo" id="motivo" role="alert"></p>
+                        <button type="submit" class="btn-g-primary vn-registrar" id="btnRegistrar">
+                            <i class="bi bi-bag-check" aria-hidden="true"></i> <span id="txtRegistrar">Registrar venta</span>
+                        </button>
+                    </section>
+                </div>
+            </div>
+        </form>
+
+        <div class="modal fade" id="modalCliente" tabindex="-1" aria-labelledby="tituloModalCliente" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content" style="border:none;border-radius:14px">
+                    <form id="formCliente" novalidate>
+                        <div class="modal-header">
+                            <h2 class="modal-title fs-5" id="tituloModalCliente"><i class="bi bi-person-plus" aria-hidden="true"></i> Nuevo cliente</h2>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="cp-aviso error" id="errorGeneralCliente" role="alert" hidden></div>
+                            <div class="cp-campo">
+                                <label for="cliNombre">Nombre o razón social <span class="cp-req" aria-hidden="true">*</span></label>
+                                <input type="text" id="cliNombre" name="Nombre" maxlength="150" required aria-required="true" autocomplete="off" data-campo="Nombre" />
+                                <div class="cp-error" id="cliNombre-error"></div>
+                            </div>
+                            <div class="cp-campo">
+                                <label for="cliDoc">DNI o RUC <span class="cp-req" aria-hidden="true">*</span></label>
+                                <input type="text" id="cliDoc" name="RucDni" maxlength="11" inputmode="numeric" required aria-required="true" autocomplete="off"
+                                       data-campo="RucDni" data-ayuda="cliDoc-ayuda" aria-describedby="cliDoc-ayuda" />
+                                <div class="cp-ayuda" id="cliDoc-ayuda">DNI de 8 dígitos o RUC de 11.</div>
+                                <div class="cp-error" id="cliDoc-error"></div>
+                            </div>
+                            <div class="cp-campo mb-0">
+                                <label for="cliCelular">Celular <span class="cp-opcional">(opcional, para enviarle la nota por WhatsApp)</span></label>
+                                <input type="tel" id="cliCelular" name="Celular" maxlength="9" inputmode="numeric" autocomplete="off"
+                                       data-campo="Celular" data-ayuda="cliCelular-ayuda" aria-describedby="cliCelular-ayuda" />
+                                <div class="cp-ayuda" id="cliCelular-ayuda">9 dígitos, empieza con 9.</div>
+                                <div class="cp-error" id="cliCelular-error"></div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn-g-outline" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="submit" class="btn-g-primary" id="btnGuardarCliente"><i class="bi bi-check-lg" aria-hidden="true"></i> Guardar y elegir</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    @if (!sinStock)
+    {
+        <script>
+            // Json.Serialize escapa < > & para que un nombre con una etiqueta de cierre no rompa el bloque
+            const productos = @Json.Serialize(Model.Datos.Productos);
+            const clientes = @Json.Serialize(Model.Datos.Clientes);
+            const clienteGeneralId = @Model.Datos.ClienteGeneralId;
+            const itemsPrevios = @Json.Serialize(Model.Items);
+            const productoPorId = new Map(productos.map(p => [p.id, p]));
+
+            const redondear = n => Math.round(n * 100) / 100;
+            const soles = n => 'S/ ' + redondear(n).toFixed(2);
+            const normalizar = t => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+            const decimalesOk = n => Math.abs(n * 100 - Math.round(n * 100)) < 1e-6;
+
+            const form = document.getElementById('formVenta');
+            const carrito = document.getElementById('carrito');
+            const carritoVacio = document.getElementById('carritoVacio');
+            const buscarProducto = document.getElementById('buscarProducto');
+            const listaProductos = document.getElementById('resultadosProducto');
+            const masResultados = document.getElementById('masResultados');
+            const inputDescuento = document.getElementById('Descuento');
+            const errorDescuento = document.getElementById('errorDescuento');
+            const motivo = document.getElementById('motivo');
+            const btnRegistrar = document.getElementById('btnRegistrar');
+            const MAX_RESULTADOS = 8;
+
+            const lineas = () => [...carrito.children];
+            const campo = (li, nombre) => li.querySelector(`[data-campo="${nombre}"]`);
+            const cantidadDe = li => parseInt(campo(li, 'Cantidad').value, 10);
+            const precioDe = li => parseFloat(campo(li, 'Precio').value);
+            const zonaDe = li => Number(campo(li, 'UbicacionId').value);
+
+            function stockZona(productoId, zonaId) {
+                return productoPorId.get(productoId)?.zonas.find(z => z.id === zonaId)?.cantidad ?? 0;
+            }
+
+            // Lo pedido de un producto en una zona, sumando todas las filas del carrito
+            function pedidoEnZona(productoId, zonaId) {
+                return lineas()
+                    .filter(li => Number(li.dataset.producto) === productoId && zonaDe(li) === zonaId)
+                    .reduce((s, li) => s + (cantidadDe(li) || 0), 0);
+            }
+
+            function disponible(p) {
+                return p.zonas.reduce((s, z) => s + Math.max(0, z.cantidad - pedidoEnZona(p.id, z.id)), 0);
+            }
+
+            // ===== Búsqueda de productos =====
+            function filtrarProductos() {
+                const texto = buscarProducto.value.trim();
+                const q = normalizar(texto);
+                const coinciden = productos.filter(p => !q || normalizar(p.nombre).includes(q) || normalizar(p.codigo).includes(q));
+
+                listaProductos.replaceChildren(...coinciden.slice(0, MAX_RESULTADOS).map(p => {
+                    const li = document.createElement('li');
+                    const boton = document.createElement('button');
+                    boton.type = 'button';
+                    boton.className = 'vn-opcion';
+                    boton.innerHTML = '<span class="vn-opcion-nombre"></span><span class="vn-opcion-precio"></span>'
+                        + '<span class="vn-opcion-meta"></span><i class="bi bi-plus-lg" aria-hidden="true"></i>';
+                    boton.querySelector('.vn-opcion-nombre').textContent = p.nombre;
+                    boton.querySelector('.vn-opcion-precio').textContent = soles(p.precio);
+                    const libre = disponible(p);
+                    boton.querySelector('.vn-opcion-meta').textContent = `${p.codigo} · ${libre > 0 ? `quedan ${libre}` : 'todo en la venta'}`;
+                    boton.setAttribute('aria-label', `Agregar ${p.nombre}, ${soles(p.precio)}, quedan ${libre}`);
+                    boton.addEventListener('click', () => agregarProducto(p.id));
+                    li.append(boton);
+                    return li;
+                }));
+
+                if (coinciden.length === 0)
+                    masResultados.textContent = `No hay stock de «${texto}» en tu sede.`;
+                else if (coinciden.length > MAX_RESULTADOS)
+                    masResultados.textContent = `Y ${coinciden.length - MAX_RESULTADOS} más: escribe para acotar.`;
+                else
+                    masResultados.textContent = '';
+            }
+
+            buscarProducto.addEventListener('input', filtrarProductos);
+            buscarProducto.addEventListener('keydown', e => {
+                if (e.key !== 'Enter') return;
+                e.preventDefault();
+                listaProductos.querySelector('button')?.click();
+            });
+
+            // ===== Carrito =====
+            let secuencia = 0;
+
+            function destacar(li) {
+                li.classList.remove('vn-destacar');
+                void li.offsetWidth;
+                li.classList.add('vn-destacar');
+            }
+
+            function agregarProducto(id) {
+                const p = productoPorId.get(id);
+                const existentes = lineas().filter(li => Number(li.dataset.producto) === id);
+
+                // Ya está en la venta: suma uno en la fila cuya zona aún tiene stock
+                const conLugar = existentes.find(li => stockZona(id, zonaDe(li)) - pedidoEnZona(id, zonaDe(li)) > 0);
+                if (conLugar) {
+                    const input = campo(conLugar, 'Cantidad');
+                    input.value = (parseInt(input.value, 10) || 0) + 1;
+                    actualizar();
+                    destacar(conLugar);
+                    anunciar(`${p.nombre}: ${input.value}.`);
+                    return;
+                }
+
+                // Zona sin usar todavía (el producto está repartido en varias zonas)
+                const usadas = new Set(existentes.map(zonaDe));
+                const zona = p.zonas.find(z => !usadas.has(z.id) && z.cantidad > 0);
+                if (!zona) {
+                    destacar(existentes[0]);
+                    anunciar(`Ya no queda más stock de ${p.nombre}.`);
+                    return;
+                }
+                crearLinea(p, zona.id, 1, p.precio);
+                anunciar(`${p.nombre} agregado.`);
+            }
+
+            function crearLinea(p, zonaId, cantidad, precio) {
+                const n = ++secuencia;
+                const li = document.createElement('li');
+                li.className = 'vn-linea';
+                li.dataset.producto = p.id;
+                li.innerHTML = `
+                    <div class="vn-linea-cab">
+                        <div>
+                            <div class="vn-linea-nombre"></div>
+                            <div class="cp-sub vn-linea-cod"></div>
+                        </div>
+                        <button type="button" class="cp-icono-btn peligro" data-accion="quitar"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                    </div>
+                    <div class="vn-linea-campos">
+                        <div class="vn-f">
+                            <label for="zona${n}">Sacar de</label>
+                            <select id="zona${n}" data-campo="UbicacionId"></select>
+                        </div>
+                        <div class="vn-f">
+                            <label for="cant${n}">Cantidad</label>
+                            <div class="vn-stepper">
+                                <button type="button" data-accion="menos" aria-label="Uno menos"><i class="bi bi-dash-lg" aria-hidden="true"></i></button>
+                                <input type="number" id="cant${n}" data-campo="Cantidad" min="1" step="1" inputmode="numeric" aria-describedby="aviso${n}" />
+                                <button type="button" data-accion="mas" aria-label="Uno más"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
+                            </div>
+                        </div>
+                        <div class="vn-f">
+                            <label for="precio${n}">Precio c/u</label>
+                            <div class="vn-moneda">
+                                <span aria-hidden="true">S/</span>
+                                <input type="number" id="precio${n}" data-campo="Precio" min="0" step="0.01" inputmode="decimal" aria-describedby="aviso${n}" />
+                            </div>
+                        </div>
+                        <div class="vn-f vn-f-importe">
+                            <span class="vn-f-etiqueta">Importe</span>
+                            <strong class="vn-importe">S/ 0.00</strong>
+                        </div>
+                    </div>
+                    <p class="vn-linea-aviso" id="aviso${n}"></p>
+                    <input type="hidden" data-campo="ProductoId" />`;
+
+                li.querySelector('.vn-linea-nombre').textContent = p.nombre;
+                li.querySelector('.vn-linea-cod').textContent = `${p.codigo} · precio de lista ${soles(p.precio)}`;
+                li.querySelector('[data-accion="quitar"]').setAttribute('aria-label', `Quitar ${p.nombre}`);
+
+                const selZona = campo(li, 'UbicacionId');
+                p.zonas.forEach(z => selZona.add(new Option(`${z.codigo} · hay ${z.cantidad}`, z.id)));
+                selZona.value = zonaId;
+                campo(li, 'Cantidad').value = cantidad;
+                campo(li, 'Precio').value = Number(precio).toFixed(2);
+                campo(li, 'ProductoId').value = p.id;
+
+                carrito.append(li);
+                actualizar();
+                destacar(li);
+            }
+
+            carrito.addEventListener('click', e => {
+                const boton = e.target.closest('[data-accion]');
+                if (!boton) return;
+                const li = boton.closest('.vn-linea');
+                const input = campo(li, 'Cantidad');
+                const actual = parseInt(input.value, 10) || 0;
+
+                if (boton.dataset.accion === 'quitar') {
+                    const nombre = li.querySelector('.vn-linea-nombre').textContent;
+                    const siguiente = li.nextElementSibling ?? li.previousElementSibling;
+                    li.remove();
+                    actualizar();
+                    anunciar(`${nombre} quitado de la venta.`);
+                    (siguiente?.querySelector('[data-accion="quitar"]') ?? buscarProducto).focus();
+                    return;
+                }
+                input.value = boton.dataset.accion === 'mas' ? actual + 1 : Math.max(1, actual - 1);
+                actualizar();
+            });
+            carrito.addEventListener('input', actualizar);
+            carrito.addEventListener('change', e => {
+                // Precio con 2 decimales al salir del campo
+                if (e.target.dataset.campo === 'Precio' && e.target.value !== '' && !isNaN(parseFloat(e.target.value)))
+                    e.target.value = parseFloat(e.target.value).toFixed(2);
+                actualizar();
+            });
+            inputDescuento.addEventListener('input', actualizar);
+
+            const avisoLector = document.createElement('p');
+            avisoLector.className = 'visually-hidden';
+            avisoLector.setAttribute('aria-live', 'polite');
+            document.body.append(avisoLector);
+            function anunciar(texto) {
+                avisoLector.textContent = '';
+                setTimeout(() => avisoLector.textContent = texto, 50);
+            }
+
+            // Recalcula importes y totales; devuelve el primer problema para bloquear el registro
+            function actualizar() {
+                let subtotal = 0;
+                let problema = null;
+
+                for (const li of lineas()) {
+                    const productoId = Number(li.dataset.producto);
+                    const p = productoPorId.get(productoId);
+                    const zonaId = zonaDe(li);
+                    const cantidad = cantidadDe(li);
+                    const precio = precioDe(li);
+                    const inputCant = campo(li, 'Cantidad');
+                    const inputPrecio = campo(li, 'Precio');
+                    const aviso = li.querySelector('.vn-linea-aviso');
+                    let error = null;
+                    let campoError = null;
+
+                    const pedido = pedidoEnZona(productoId, zonaId);
+                    const hay = stockZona(productoId, zonaId);
+                    const codigoZona = p.zonas.find(z => z.id === zonaId)?.codigo ?? '';
+                    if (!Number.isInteger(cantidad) || cantidad < 1) {
+                        error = 'La cantidad debe ser 1 o más.';
+                        campoError = inputCant;
+                    } else if (pedido > hay) {
+                        error = `Solo hay ${hay} en ${codigoZona}` + (pedido !== cantidad ? ` (en la venta suman ${pedido}).` : '.');
+                        campoError = inputCant;
+                    } else if (isNaN(precio) || precio < 0 || !decimalesOk(precio)) {
+                        error = 'El precio debe ser 0 o más, con máximo 2 decimales.';
+                        campoError = inputPrecio;
+                    }
+
+                    inputCant.setAttribute('aria-invalid', campoError === inputCant ? 'true' : 'false');
+                    inputPrecio.setAttribute('aria-invalid', campoError === inputPrecio ? 'true' : 'false');
+                    aviso.classList.toggle('error', !!error);
+                    if (error) {
+                        aviso.textContent = error;
+                        problema ??= { mensaje: `${p.nombre}: ${error}`, elemento: campoError };
+                    } else if (redondear(precio) !== redondear(p.precio)) {
+                        aviso.textContent = `Precio cambiado (lista ${soles(p.precio)}).`;
+                    } else {
+                        aviso.textContent = '';
+                    }
+
+                    const importe = error ? 0 : redondear(cantidad * precio);
+                    li.querySelector('.vn-importe').textContent = soles(importe);
+                    subtotal += importe;
+                }
+
+                subtotal = redondear(subtotal);
+                const textoDescuento = inputDescuento.value.trim();
+                const descuento = textoDescuento === '' ? 0 : parseFloat(textoDescuento);
+                let errorDesc = '';
+                if (isNaN(descuento) || descuento < 0 || !decimalesOk(descuento))
+                    errorDesc = 'El descuento debe ser 0 o más, con máximo 2 decimales.';
+                else if (!problema && descuento > subtotal)
+                    // Con una fila en error el subtotal no es real: primero se corrige la fila
+                    errorDesc = 'El descuento no puede ser mayor que el subtotal.';
+                errorDescuento.textContent = errorDesc;
+                inputDescuento.setAttribute('aria-invalid', errorDesc ? 'true' : 'false');
+                if (errorDesc) problema ??= { mensaje: errorDesc, elemento: inputDescuento };
+
+                const total = errorDesc ? subtotal : redondear(subtotal - descuento);
+                document.getElementById('txtSubtotal').textContent = soles(subtotal);
+                document.getElementById('txtTotal').textContent = soles(total);
+                document.getElementById('txtRegistrar').textContent = lineas().length ? `Registrar venta · ${soles(total)}` : 'Registrar venta';
+
+                const cantidadLineas = lineas().length;
+                document.getElementById('contadorLineas').textContent = cantidadLineas;
+                carritoVacio.hidden = cantidadLineas > 0;
+                filtrarProductos();
+
+                // El aviso de bloqueo se limpia en cuanto se corrige
+                if (motivo.textContent && !problema && cantidadLineas > 0) motivo.textContent = '';
+                return problema;
+            }
+
+            // ===== Cliente =====
+            const inputClienteId = document.getElementById('ClienteId');
+            const tipoGeneral = document.getElementById('tipoGeneral');
+            const tipoDatos = document.getElementById('tipoDatos');
+            const panelCliente = document.getElementById('panelCliente');
+            const clienteElegido = document.getElementById('clienteElegido');
+            const buscadorCliente = document.getElementById('buscadorCliente');
+            const buscarCliente = document.getElementById('buscarCliente');
+            const listaClientes = document.getElementById('resultadosCliente');
+            const avisoCliente = document.getElementById('avisoCliente');
+            let clienteConDatos = null;
+
+            function textoDocumento(c) {
+                const tipo = c.rucDni.length === 11 ? 'RUC' : c.rucDni.length === 8 ? 'DNI' : 'Doc.';
+                return `${tipo} ${c.rucDni}` + (c.celular ? ` · Cel. ${c.celular}` : '');
+            }
+
+            function mostrarCliente() {
+                const conDatos = tipoDatos.checked;
+                panelCliente.hidden = !conDatos;
+                clienteElegido.hidden = !clienteConDatos;
+                buscadorCliente.hidden = !!clienteConDatos;
+                if (clienteConDatos) {
+                    document.getElementById('clienteNombre').textContent = clienteConDatos.nombre;
+                    document.getElementById('clienteDetalle').textContent = textoDocumento(clienteConDatos);
+                }
+                inputClienteId.value = conDatos ? (clienteConDatos?.id ?? '') : clienteGeneralId;
+            }
+
+            function elegirCliente(c) {
+                clienteConDatos = c;
+                buscarCliente.value = '';
+                filtrarClientes();
+                mostrarCliente();
+                if (motivo.textContent) motivo.textContent = '';
+                document.getElementById('btnCambiarCliente').focus();
+                anunciar(`Cliente: ${c.nombre}.`);
+            }
+
+            function filtrarClientes() {
+                const texto = buscarCliente.value.trim();
+                const q = normalizar(texto);
+                if (q.length < 2) {
+                    listaClientes.replaceChildren();
+                    avisoCliente.textContent = texto ? 'Escribe al menos 2 letras o números.' : '';
+                    return;
+                }
+                const coinciden = clientes
+                    .filter(c => c.id !== clienteGeneralId)
+                    .filter(c => normalizar(c.nombre).includes(q) || c.rucDni.includes(texto) || (c.celular ?? '').includes(texto))
+                    .slice(0, 6);
+                listaClientes.replaceChildren(...coinciden.map(c => {
+                    const li = document.createElement('li');
+                    const boton = document.createElement('button');
+                    boton.type = 'button';
+                    boton.className = 'vn-opcion';
+                    boton.innerHTML = '<span class="vn-opcion-nombre"></span><span class="vn-opcion-meta"></span>';
+                    boton.querySelector('.vn-opcion-nombre').textContent = c.nombre;
+                    boton.querySelector('.vn-opcion-meta').textContent = textoDocumento(c);
+                    boton.addEventListener('click', () => elegirCliente(c));
+                    li.append(boton);
+                    return li;
+                }));
+                avisoCliente.textContent = coinciden.length ? '' : 'No hay clientes con ese dato. Puedes registrarlo como nuevo.';
+            }
+
+            tipoGeneral.addEventListener('change', mostrarCliente);
+            tipoDatos.addEventListener('change', () => {
+                mostrarCliente();
+                if (!clienteConDatos) buscarCliente.focus();
+            });
+            buscarCliente.addEventListener('input', filtrarClientes);
+            buscarCliente.addEventListener('keydown', e => {
+                if (e.key !== 'Enter') return;
+                e.preventDefault();
+                listaClientes.querySelector('button')?.click();
+            });
+            document.getElementById('btnCambiarCliente').addEventListener('click', () => {
+                clienteConDatos = null;
+                mostrarCliente();
+                buscarCliente.focus();
+            });
+
+            // ===== Nuevo cliente (modal, sin recargar para no perder la venta) =====
+            const modalCliente = document.getElementById('modalCliente');
+            const formCliente = document.getElementById('formCliente');
+            const btnGuardarCliente = document.getElementById('btnGuardarCliente');
+            const contenidoBotonCliente = btnGuardarCliente.innerHTML;
+            const errorGeneralCliente = document.getElementById('errorGeneralCliente');
+            const camposCliente = [...formCliente.querySelectorAll('[data-campo]')];
+
+            document.getElementById('btnNuevoCliente').addEventListener('click', () => {
+                // Lo que se buscó sirve de punto de partida: números al documento, texto al nombre
+                const buscado = buscarCliente.value.trim();
+                formCliente.reset();
+                limpiarErroresCliente();
+                if (/^\d+$/.test(buscado)) document.getElementById('cliDoc').value = buscado;
+                else document.getElementById('cliNombre').value = buscado;
+                bootstrap.Modal.getOrCreateInstance(modalCliente).show();
+            });
+
+            function limpiarErroresCliente() {
+                errorGeneralCliente.hidden = true;
+                errorGeneralCliente.textContent = '';
+                camposCliente.forEach(input => {
+                    input.removeAttribute('aria-invalid');
+                    document.getElementById(input.id + '-error').textContent = '';
+                    if (input.dataset.ayuda) input.setAttribute('aria-describedby', input.dataset.ayuda);
+                    else input.removeAttribute('aria-describedby');
+                });
+            }
+
+            function mostrarErroresCliente(errores) {
+                let primero = null;
+                for (const [nombre, mensaje] of Object.entries(errores)) {
+                    const input = camposCliente.find(i => i.dataset.campo === nombre);
+                    if (!input) {
+                        errorGeneralCliente.textContent = mensaje;
+                        errorGeneralCliente.hidden = false;
+                        primero ??= errorGeneralCliente;
+                        continue;
+                    }
+                    const idError = input.id + '-error';
+                    input.setAttribute('aria-invalid', 'true');
+                    input.setAttribute('aria-describedby', [input.dataset.ayuda, idError].filter(Boolean).join(' '));
+                    document.getElementById(idError).innerHTML = '<i class="bi bi-exclamation-circle" aria-hidden="true"></i> <span></span>';
+                    document.getElementById(idError).querySelector('span').textContent = mensaje;
+                    primero ??= input;
+                }
+                primero?.focus();
+            }
+
+            formCliente.addEventListener('submit', async e => {
+                e.preventDefault();
+                limpiarErroresCliente();
+                const datos = new FormData(formCliente);
+                datos.append('__RequestVerificationToken', form.querySelector('input[name="__RequestVerificationToken"]').value);
+
+                btnGuardarCliente.disabled = true;
+                btnGuardarCliente.innerHTML = '<span class="cp-spinner" aria-hidden="true"></span> Guardando…';
+                try {
+                    const respuesta = await fetch('@Url.Action("CrearClienteRapido", "Venta")', { method: 'POST', body: datos });
+                    const resultado = await respuesta.json();
+                    if (resultado.success) {
+                        clientes.push(resultado.cliente);
+                        bootstrap.Modal.getInstance(modalCliente).hide();
+                        elegirCliente(resultado.cliente);
+                    } else {
+                        mostrarErroresCliente(resultado.errores || {});
+                    }
+                } catch {
+                    // También cae aquí si la sesión expiró (la respuesta es la página de login, no JSON)
+                    mostrarErroresCliente({ '': 'No se pudo registrar el cliente. Revisa tu conexión o vuelve a iniciar sesión.' });
+                } finally {
+                    btnGuardarCliente.disabled = false;
+                    btnGuardarCliente.innerHTML = contenidoBotonCliente;
+                }
+            });
+            modalCliente.addEventListener('shown.bs.modal', () => {
+                const nombre = document.getElementById('cliNombre');
+                (nombre.value ? document.getElementById('cliDoc') : nombre).focus();
+            });
+
+            // ===== Registrar =====
+            form.addEventListener('submit', e => {
+                let problema = actualizar();
+                if (!lineas().length)
+                    problema = { mensaje: 'Agrega al menos un producto a la venta.', elemento: buscarProducto };
+                else if (tipoDatos.checked && !clienteConDatos)
+                    problema ??= { mensaje: 'Busca y elige al cliente, o marca «Público en general».', elemento: buscarCliente };
+
+                if (problema) {
+                    e.preventDefault();
+                    motivo.textContent = problema.mensaje;
+                    problema.elemento?.focus();
+                    return;
+                }
+
+                // Nombres en orden para que el model binding arme la lista Items
+                lineas().forEach((li, i) =>
+                    li.querySelectorAll('[data-campo]').forEach(c => c.name = `Items[${i}].${c.dataset.campo}`));
+                btnRegistrar.disabled = true;
+                btnRegistrar.innerHTML = '<span class="cp-spinner" aria-hidden="true"></span> Registrando venta…';
+            });
+
+            // Al volver con "Atrás" el navegador puede restaurar el botón deshabilitado
+            window.addEventListener('pageshow', e => {
+                if (!e.persisted) return;
+                btnRegistrar.disabled = false;
+                btnRegistrar.innerHTML = '<i class="bi bi-bag-check" aria-hidden="true"></i> <span id="txtRegistrar"></span>';
+                actualizar();
+            });
+
+            // ===== Estado inicial (también al volver con errores del servidor) =====
+            for (const item of itemsPrevios) {
+                const p = productoPorId.get(item.productoId);
+                if (!p) continue;
+                const zona = p.zonas.find(z => z.id === item.ubicacionId) ?? p.zonas[0];
+                crearLinea(p, zona.id, item.cantidad > 0 ? item.cantidad : 1, item.precio ?? p.precio);
+            }
+            const clientePrevio = clientes.find(c => c.id === Number(inputClienteId.value) && c.id !== clienteGeneralId);
+            if (clientePrevio) {
+                clienteConDatos = clientePrevio;
+                tipoDatos.checked = true;
+            } else {
+                tipoGeneral.checked = true;
+            }
+            mostrarCliente();
+            actualizar();
+            carrito.querySelectorAll('.vn-destacar').forEach(li => li.classList.remove('vn-destacar'));
+            document.getElementById('resumenErrores')?.focus();
+        </script>
+    }
+}

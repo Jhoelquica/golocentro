@@ -1,5 +1,6 @@
-﻿using GestionAlmacen_Golocentro.Data;
+using GestionAlmacen_Golocentro.Data;
 using GestionAlmacen_Golocentro.Models;
+using GestionAlmacen_Golocentro.Services;
 using GestionAlmacen_Golocentro.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -33,45 +34,6 @@ namespace GestionAlmacen_Golocentro.Controllers
 
             usuarioId = int.Parse(usuarioIdClaim);
             return null;
-        }
-
-        // La sede de un movimiento es la de sus ubicaciones (la dueña no tiene sede en el claim).
-        // Todas deben ser de una misma sede y, si el usuario tiene sede asignada, de la suya.
-        [NonAction]
-        private async Task<(int? SedeId, string? Error)> ResolverSedeMovimiento(IEnumerable<int> idsUbicacion, int? sedeUsuario)
-        {
-            var ids = idsUbicacion.Distinct().ToList();
-            var ubicaciones = await _context.Ubicaciones
-                .Where(u => ids.Contains(u.IdUbicacion))
-                .Select(u => new { u.IdUbicacion, u.IdSede })
-                .ToListAsync();
-
-            if (ubicaciones.Count != ids.Count)
-                return (null, "Selecciona una ubicación válida para cada producto.");
-
-            var sedes = ubicaciones.Select(u => u.IdSede).Distinct().ToList();
-            if (sedes.Count > 1)
-                return (null, "Todos los productos de un movimiento deben estar en ubicaciones de la misma sede. Registra un movimiento por cada sede.");
-
-            if (sedeUsuario.HasValue && sedes[0] != sedeUsuario.Value)
-                return (null, "Las ubicaciones seleccionadas no pertenecen a tu sede.");
-
-            return (sedes[0], null);
-        }
-
-        // Stock actual (entidades rastreadas) de cada par producto+ubicación; los pares sin fila no aparecen.
-        [NonAction]
-        private async Task<Dictionary<(int, int), ProductoUbicacion>> CargarStocks(IEnumerable<(int ProductoId, int UbicacionId)> pares)
-        {
-            var lista = pares.Distinct().ToList();
-            var idsProducto = lista.Select(p => p.ProductoId).Distinct().ToList();
-            var idsUbicacion = lista.Select(p => p.UbicacionId).Distinct().ToList();
-
-            var filas = await _context.ProductoUbicacions
-                .Where(pu => idsProducto.Contains(pu.IdProducto) && idsUbicacion.Contains(pu.IdUbicacion))
-                .ToListAsync();
-
-            return filas.ToDictionary(pu => (pu.IdProducto, pu.IdUbicacion));
         }
 
         // Para la dueña (sin sede) se muestra la sede de cada ubicación, porque ve las de todas.
@@ -112,32 +74,19 @@ namespace GestionAlmacen_Golocentro.Controllers
                 .ToDictionary(g => g.Key, g => g.Select(pu => new { u = pu.IdUbicacion, c = pu.CantidadActual }).ToList());
         }
 
-        // GET: Movimiento/ObtenerStock
-        [HttpGet]
-        public async Task<IActionResult> ObtenerStock(int productoId, int ubicacionId)
-        {
-            var stock = await _context.ProductoUbicacions
-                .FirstOrDefaultAsync(pu => pu.IdProducto == productoId && pu.IdUbicacion == ubicacionId);
-            return Json(new { stock = stock?.CantidadActual ?? 0 });
-        }
-
         // GET: Movimiento/Entrada
         public IActionResult Entrada()
         {
-            string sedeIdClaim = User.FindFirst("SedeId")?.Value;
-            int? sedeId = string.IsNullOrEmpty(sedeIdClaim) ? (int?)null : int.Parse(sedeIdClaim);
+            string? sedeIdClaim = User.FindFirst("SedeId")?.Value;
+            int? sedeId = string.IsNullOrEmpty(sedeIdClaim) ? null : int.Parse(sedeIdClaim);
 
-            // Productos
-            var productos = _context.Productos.ToList();
-            ViewBag.Productos = productos.Select(p => new SelectListItem
-            {
-                Value = p.IdProducto.ToString(),
-                Text = p.Nombre
-            }).ToList();
+            ViewBag.Productos = _context.Productos
+                .OrderBy(p => p.Nombre)
+                .Select(p => new SelectListItem { Value = p.IdProducto.ToString(), Text = p.Nombre })
+                .ToList();
 
             CargarZonasEntrada(sedeId);
 
-            // Proveedores
             ViewBag.Proveedores = _context.Proveedores.Select(p => new SelectListItem
             {
                 Value = p.IdProveedor.ToString(),
@@ -152,8 +101,8 @@ namespace GestionAlmacen_Golocentro.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Entrada(MovimientoEntradaViewModel model)
         {
-            string sedeIdClaim = User.FindFirst("SedeId")?.Value;
-            int? sedeId = string.IsNullOrEmpty(sedeIdClaim) ? (int?)null : int.Parse(sedeIdClaim);
+            string? sedeIdClaim = User.FindFirst("SedeId")?.Value;
+            int? sedeId = string.IsNullOrEmpty(sedeIdClaim) ? null : int.Parse(sedeIdClaim);
 
             var redirectSiFalla = ObtenerUsuarioIdOFallar(out int usuarioId);
             if (redirectSiFalla != null)
@@ -169,7 +118,7 @@ namespace GestionAlmacen_Golocentro.Controllers
             }
             else
             {
-                var (sedeResuelta, errorSede) = await ResolverSedeMovimiento(model.Detalles.Select(d => d.UbicacionId), sedeId);
+                var (sedeResuelta, errorSede) = await OperacionesAlmacen.ResolverSedeMovimiento(_context, model.Detalles.Select(d => d.UbicacionId), sedeId);
                 if (errorSede != null)
                     ModelState.AddModelError("", errorSede);
                 sedeMovimiento = sedeResuelta;
@@ -181,6 +130,9 @@ namespace GestionAlmacen_Golocentro.Controllers
                 if (precios.Count != idsProducto.Count)
                     ModelState.AddModelError("", "Selecciona un producto válido en cada fila.");
             }
+
+            if (OperacionesAlmacen.ValidarEvidencia(model.Evidencia) is string errorFoto)
+                ModelState.AddModelError(nameof(model.Evidencia), errorFoto);
 
             if (!ModelState.IsValid)
             {
@@ -202,7 +154,7 @@ namespace GestionAlmacen_Golocentro.Controllers
             _context.Movimientos.Add(movimiento);
 
             // El diccionario evita duplicar la fila de stock si el mismo producto+ubicación viene dos veces
-            var stocks = await CargarStocks(model.Detalles!.Select(d => (d.ProductoId, d.UbicacionId)));
+            var stocks = await OperacionesAlmacen.CargarStocks(_context, model.Detalles!.Select(d => (d.ProductoId, d.UbicacionId)));
             foreach (var detalleVM in model.Detalles!)
             {
                 var clave = (detalleVM.ProductoId, detalleVM.UbicacionId);
@@ -228,50 +180,18 @@ namespace GestionAlmacen_Golocentro.Controllers
 
             await _context.SaveChangesAsync();
 
-            // 4. Guardar evidencia (si existe)
-            if (model.Evidencia != null)
-                await GuardarEvidencia(movimiento.IdMovimiento, model.Evidencia, "Entrada");
+            if (model.Evidencia is { Length: > 0 })
+                await OperacionesAlmacen.GuardarEvidencia(_context, movimiento.IdMovimiento, model.Evidencia, "Entrada");
 
             TempData["Mensaje"] = "Entrada registrada correctamente.";
             return RedirectToAction("Index");
-        }
-       
-        //----------------------------------------------------------------------------------------
-        [NonAction]
-        private async Task GuardarEvidencia(int movimientoId, IFormFile archivo, string tipoMovimiento)
-        {
-            if (archivo == null || archivo.Length == 0) return;
-
-            string uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "evidencias");
-            if (!Directory.Exists(uploadsFolder))
-                Directory.CreateDirectory(uploadsFolder);
-
-            string uniqueFileName = $"{Guid.NewGuid()}_{Path.GetFileName(archivo.FileName)}";
-            string filePath = Path.Combine(uploadsFolder, uniqueFileName);
-
-            using (var stream = new FileStream(filePath, FileMode.Create))
-            {
-                await archivo.CopyToAsync(stream);
-            }
-
-            var evidencia = new Evidencium
-            {
-                IdMovimiento = movimientoId,
-                Tipo = tipoMovimiento,            // "Entrada" o "Salida"
-                UrlArchivo = $"/evidencias/{uniqueFileName}",
-                Fecha = DateTime.Now,
-                IdCamara = null,                  // si la columna ya permite NULL; sino asigna 1
-                IdDetalle = null                  // puede ser null
-            };
-            _context.Evidencia.Add(evidencia);
-            await _context.SaveChangesAsync();
         }
 
         // GET: Movimiento/Index (lista de movimientos)
         public async Task<IActionResult> Index(int? pagina, int tamanoPagina = 10)
         {
-            string sedeIdClaim = User.FindFirst("SedeId")?.Value;
-            int? sedeId = string.IsNullOrEmpty(sedeIdClaim) ? (int?)null : int.Parse(sedeIdClaim);
+            string? sedeIdClaim = User.FindFirst("SedeId")?.Value;
+            int? sedeId = string.IsNullOrEmpty(sedeIdClaim) ? null : int.Parse(sedeIdClaim);
 
             var query = _context.Movimientos
                 .Include(m => m.IdUsuarioNavigation)
@@ -302,190 +222,16 @@ namespace GestionAlmacen_Golocentro.Controllers
         [NonAction]
         private IActionResult CargarListasParaVista(int? sedeId)
         {
-            ViewBag.Productos = new SelectList(_context.Productos, "IdProducto", "Nombre");
+            ViewBag.Productos = new SelectList(_context.Productos.OrderBy(p => p.Nombre), "IdProducto", "Nombre");
             CargarZonasEntrada(sedeId);
 
             ViewBag.Proveedores = new SelectList(_context.Proveedores, "IdProveedor", "Nombre");
             return View("Entrada");
         }
-        //---------------------------------------------------------------------------------------
-        // GET: Movimiento/Salida (NUEVO - Versión carrito)
-        public IActionResult Salida()
-        {
-            string sedeIdClaim = User.FindFirst("SedeId")?.Value;
-            int? sedeId = string.IsNullOrEmpty(sedeIdClaim) ? (int?)null : int.Parse(sedeIdClaim);
 
-            // Clientes ordenados
-            ViewBag.Clientes = _context.Clientes
-                .OrderBy(c => c.Nombre)
-                .Select(c => new SelectListItem
-                {
-                    Value = c.IdCliente.ToString(),
-                    Text = c.Nombre
-                }).ToList();
+        // Las salidas ahora son ventas con nota de venta
+        public IActionResult Salida() => RedirectToAction("Nueva", "Venta");
 
-            // Productos ordenados (para búsqueda)
-            ViewBag.Productos = _context.Productos
-                .OrderBy(p => p.Nombre)
-                .Select(p => new
-                {
-                    id = p.IdProducto,
-                    nombre = p.Nombre,
-                    codigo = p.Codigo,
-                    precio = p.PrecioUnitario
-                }).ToList();
-
-            ViewBag.Ubicaciones = UbicacionesParaUsuario(sedeId)
-                .Select(u => new { id = u.Id, codigo = u.Texto })
-                .ToList();
-
-            return View(new SalidaCarritoViewModel());
-        }
-        // POST: Movimiento/CrearClienteRapido (AJAX — lo consume el modal de Salida.cshtml)
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> CrearClienteRapido(ClienteRapidoViewModel model)
-        {
-            if (!ModelState.IsValid)
-            {
-                var errores = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage);
-                return Json(new { success = false, errors = errores });
-            }
-
-            var cliente = new Cliente
-            {
-                Nombre = model.Nombre,
-                RucDni = model.RucDni,
-                Contacto = model.Contacto,
-                Direccion = model.Direccion
-            };
-            _context.Clientes.Add(cliente);
-            await _context.SaveChangesAsync();
-
-            return Json(new { success = true, clienteId = cliente.IdCliente, nombre = cliente.Nombre });
-        }
-
-        // POST: Movimiento/Salida (NUEVO - Versión carrito)
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Salida(SalidaCarritoViewModel model)
-        {
-            string sedeIdClaim = User.FindFirst("SedeId")?.Value;
-            int? sedeId = string.IsNullOrEmpty(sedeIdClaim) ? (int?)null : int.Parse(sedeIdClaim);
-
-            var redirectSiFalla = ObtenerUsuarioIdOFallar(out int usuarioId);
-            if (redirectSiFalla != null)
-                return redirectSiFalla;
-
-            // Validaciones
-            int? sedeMovimiento = null;
-            var productos = new Dictionary<int, (string Nombre, decimal Precio)>();
-            var stocks = new Dictionary<(int, int), ProductoUbicacion>();
-            if (model.Items == null || !model.Items.Any())
-            {
-                ModelState.AddModelError("", "Debe agregar al menos un producto.");
-            }
-            else
-            {
-                var (sedeResuelta, errorSede) = await ResolverSedeMovimiento(model.Items.Select(i => i.UbicacionId), sedeId);
-                if (errorSede != null)
-                    ModelState.AddModelError("", errorSede);
-                sedeMovimiento = sedeResuelta;
-
-                // El precio sale de la BD: el del formulario viaja en un input oculto y se puede alterar
-                var idsProducto = model.Items.Select(i => i.ProductoId).Distinct().ToList();
-                productos = (await _context.Productos
-                        .Where(p => idsProducto.Contains(p.IdProducto))
-                        .Select(p => new { p.IdProducto, p.Nombre, p.PrecioUnitario })
-                        .ToListAsync())
-                    .ToDictionary(p => p.IdProducto, p => (p.Nombre, p.PrecioUnitario));
-                if (productos.Count != idsProducto.Count)
-                    ModelState.AddModelError("", "Uno de los productos del carrito ya no existe.");
-
-                // Se valida la suma por producto+ubicación: dos filas iguales no deben pasar por separado
-                stocks = await CargarStocks(model.Items.Select(i => (i.ProductoId, i.UbicacionId)));
-                foreach (var pedido in model.Items.GroupBy(i => (i.ProductoId, i.UbicacionId)))
-                {
-                    var disponible = stocks.TryGetValue(pedido.Key, out var fila) ? fila.CantidadActual : 0;
-                    var solicitado = pedido.Sum(i => i.Cantidad);
-                    if (solicitado > disponible)
-                    {
-                        var nombre = productos.TryGetValue(pedido.Key.ProductoId, out var p) ? p.Nombre : "un producto";
-                        ModelState.AddModelError("", $"Stock insuficiente para '{nombre}' en la ubicación seleccionada. Disponible: {disponible}, solicitado: {solicitado}.");
-                    }
-                }
-            }
-
-            if (!model.ClienteId.HasValue)
-                ModelState.AddModelError("ClienteId", "Debe seleccionar un cliente.");
-
-            if (!ModelState.IsValid)
-            {
-                RecargarListasSalida(sedeId);
-                return View(model);
-            }
-
-            // Crear el movimiento con sus detalles y descontar el stock en un solo guardado
-            var movimiento = new Movimiento
-            {
-                Tipo = "Salida",
-                Fecha = DateTime.Now,
-                IdUsuario = usuarioId,
-                IdSede = sedeMovimiento!.Value,
-                IdCliente = model.ClienteId,
-                ComprobanteEmitido = !string.IsNullOrEmpty(model.NumeroComprobante),
-                Observaciones = model.NumeroComprobante
-            };
-            _context.Movimientos.Add(movimiento);
-
-            decimal total = 0;
-            foreach (var item in model.Items!)
-            {
-                var stock = stocks[(item.ProductoId, item.UbicacionId)];
-                var precio = productos[item.ProductoId].Precio;
-
-                movimiento.DetalleMovimientos.Add(new DetalleMovimiento
-                {
-                    IdProducto = item.ProductoId,
-                    IdUbicacion = item.UbicacionId,
-                    Cantidad = item.Cantidad,
-                    PrecioUnitarioSnapshot = precio,
-                    StockAnterior = stock.CantidadActual
-                });
-
-                stock.CantidadActual -= item.Cantidad;
-                stock.UltimaActualizacion = DateTime.Now;
-                total += item.Cantidad * precio;
-            }
-
-            await _context.SaveChangesAsync();
-
-            // Evidencia
-            if (model.Evidencia != null)
-                await GuardarEvidencia(movimiento.IdMovimiento, model.Evidencia, "Salida");
-
-            TempData["Mensaje"] = $"Salida registrada correctamente. Total: S/. {total:N2}";
-            return RedirectToAction("Index");
-        }
-
-        // Método auxiliar para recargar listas
-        private void RecargarListasSalida(int? sedeId)
-        {
-            ViewBag.Clientes = _context.Clientes
-                .OrderBy(c => c.Nombre)
-                .Select(c => new SelectListItem { Value = c.IdCliente.ToString(), Text = c.Nombre })
-                .ToList();
-
-            ViewBag.Productos = _context.Productos
-                .OrderBy(p => p.Nombre)
-                .Select(p => new { id = p.IdProducto, nombre = p.Nombre, codigo = p.Codigo, precio = p.PrecioUnitario })
-                .ToList();
-
-            ViewBag.Ubicaciones = UbicacionesParaUsuario(sedeId)
-                .Select(u => new { id = u.Id, codigo = u.Texto })
-                .ToList();
-        }
-        //--------------------detalle--------------------------------------
         // GET: Movimiento/Detalle/5
         public async Task<IActionResult> Detalle(int id)
         {
@@ -505,7 +251,7 @@ namespace GestionAlmacen_Golocentro.Controllers
                 return NotFound();
 
             // Verificar que el usuario tenga acceso a la sede del movimiento
-            string sedeIdClaim = User.FindFirst("SedeId")?.Value;
+            string? sedeIdClaim = User.FindFirst("SedeId")?.Value;
             if (!string.IsNullOrEmpty(sedeIdClaim))
             {
                 int sedeId = int.Parse(sedeIdClaim);
@@ -515,6 +261,5 @@ namespace GestionAlmacen_Golocentro.Controllers
 
             return View(movimiento);
         }
-
     }
 }

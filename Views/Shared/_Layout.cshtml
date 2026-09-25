@@ -468,9 +468,14 @@
                     <i class="bi bi-box-arrow-in-down"></i> Entradas
                 </a>
 
-                <a class="g-nav-link @(currentController == "Movimiento" && currentAction == "Salida" ? "active" : "")"
-                   asp-controller="Movimiento" asp-action="Salida">
-                    <i class="bi bi-box-arrow-up"></i> Salidas
+                <a class="g-nav-link @(currentController == "Venta" && currentAction == "Nueva" ? "active" : "")"
+                   asp-controller="Venta" asp-action="Nueva">
+                    <i class="bi bi-cart3"></i> Nueva venta
+                </a>
+
+                <a class="g-nav-link @(currentController == "Venta" && currentAction != "Nueva" ? "active" : "")"
+                   asp-controller="Venta" asp-action="Index">
+                    <i class="bi bi-receipt"></i> Ventas
                 </a>
 
                 <div class="g-nav-section">Inventario</div>
