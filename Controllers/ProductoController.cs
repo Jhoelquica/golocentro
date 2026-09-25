@@ -189,43 +189,57 @@ namespace GestionAlmacen_Golocentro.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        // GET: Producto/Stock
-        public async Task<IActionResult> Stock(string filtroNombre = "")
+        // Consulta de stock para todos los roles: cuánto hay de cada producto y en qué zonas.
+        // La dueña elige la sede (o todas); los demás ven la suya. Buscar y filtrar se hace en la página.
+        public async Task<IActionResult> Stock(int? sede, string? q, string? filtro)
         {
-            // Obtener sede del usuario
-            string sedeIdClaim = User.FindFirst("SedeId")?.Value;
-            int? sedeId = string.IsNullOrEmpty(sedeIdClaim) ? (int?)null : int.Parse(sedeIdClaim);
+            var sedeUsuario = SedeDelUsuario();
+            var sedes = await _context.Sedes.OrderBy(s => s.Nombre).Select(s => new SedeOpcion(s.IdSede, s.Nombre)).ToListAsync();
+            var sedeId = sedeUsuario ?? (sedes.Any(s => s.Id == sede) ? sede : null);
 
-            // Consulta base
-            var query = _context.ProductoUbicacions
-                .Include(pu => pu.IdProductoNavigation)
-                .Include(pu => pu.IdUbicacionNavigation)
-                    .ThenInclude(u => u.IdSedeNavigation)
-                .AsQueryable();
+            var zonas = (await _context.ProductoUbicacions
+                    .Where(pu => pu.CantidadActual > 0 && (sedeId == null || pu.IdUbicacionNavigation.IdSede == sedeId))
+                    .Select(pu => new
+                    {
+                        pu.IdProducto,
+                        pu.IdUbicacion,
+                        pu.IdUbicacionNavigation.CodigoEstante,
+                        Sede = pu.IdUbicacionNavigation.IdSedeNavigation.Nombre,
+                        pu.CantidadActual
+                    })
+                    .ToListAsync())
+                .GroupBy(z => z.IdProducto)
+                .ToDictionary(g => g.Key, g => g
+                    .OrderBy(z => z.Sede).ThenBy(z => z.CodigoEstante)
+                    .Select(z => new StockZonaItem(z.IdUbicacion, z.CodigoEstante, z.Sede, z.CantidadActual))
+                    .ToList());
 
-            // Filtrar por sede si el usuario no es duena
-            if (sedeId.HasValue)
+            var hoy = DateOnly.FromDateTime(DateTime.Today);
+            var productos = (await _context.Productos
+                    .OrderBy(p => p.Nombre)
+                    .Select(p => new { p.IdProducto, p.Codigo, p.Nombre, p.Tipo, p.UnidadMedida, p.StockMinimo, p.FechaVencimiento })
+                    .ToListAsync())
+                .Select(p =>
+                {
+                    var enZonas = zonas.GetValueOrDefault(p.IdProducto) ?? new();
+                    var stock = enZonas.Sum(z => z.Cantidad);
+                    return new StockProductoItem(p.IdProducto, p.Codigo, p.Nombre, p.Tipo, p.UnidadMedida, stock, p.StockMinimo,
+                        EstadoStock.De(stock, p.StockMinimo), p.FechaVencimiento,
+                        p.FechaVencimiento is DateOnly vence ? vence.DayNumber - hoy.DayNumber : null, enZonas);
+                })
+                .ToList();
+
+            return View(new StockConsultaViewModel
             {
-                query = query.Where(pu => pu.IdUbicacionNavigation.IdSede == sedeId.Value);
-            }
-
-            // Filtro adicional por nombre de producto (si se envía)
-            if (!string.IsNullOrWhiteSpace(filtroNombre))
-            {
-                query = query.Where(pu => pu.IdProductoNavigation.Nombre.Contains(filtroNombre));
-            }
-
-            // Proyectar al ViewModel
-            var stockList = await query.Select(pu => new StockViewModels
-            {
-                ProductoNombre = pu.IdProductoNavigation.Nombre,
-                CodigoUbicacion = pu.IdUbicacionNavigation.CodigoEstante,
-                SedeNombre = pu.IdUbicacionNavigation.IdSedeNavigation.Nombre,
-                StockActual = pu.CantidadActual // o pu.Stock, según tu modelo
-            }).ToListAsync();
-
-            ViewBag.FiltroNombre = filtroNombre;
-            return View(stockList);
+                Productos = productos,
+                SedeId = sedeId,
+                SedeNombre = sedes.FirstOrDefault(s => s.Id == sedeId)?.Nombre ?? "Todas las sedes",
+                PuedeElegirSede = sedeUsuario == null,
+                Sedes = sedes,
+                PuedeVerKardex = User.IsInRole("duena") || User.IsInRole("encargada"),
+                Busqueda = q,
+                Filtro = filtro is "reponer" or "sin_stock" or "vencer" ? filtro : "todos"
+            });
         }
 
         [NonAction]

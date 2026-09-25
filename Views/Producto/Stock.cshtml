@@ -1,76 +1,582 @@
-﻿@model IEnumerable<GestionAlmacen_Golocentro.ViewModels.StockViewModels>
+@using System.Globalization
+@using GestionAlmacen_Golocentro.ViewModels
+@model StockConsultaViewModel
 @{
-    ViewData["Title"] = "Consulta de Stock";
+    ViewData["Title"] = "Stock";
+    var inv = CultureInfo.InvariantCulture;
+    var todasLasSedes = Model.SedeId == null && Model.Sedes.Count > 1;
+    var filtros = new[]
+    {
+        (Clave: "todos", Texto: "Todos", Cantidad: Model.Productos.Count),
+        (Clave: "reponer", Texto: "Por reponer", Cantidad: Model.PorReponer),
+        (Clave: "sin_stock", Texto: "Sin stock", Cantidad: Model.SinStock),
+        (Clave: "vencer", Texto: "Por vencer", Cantidad: Model.PorVencer)
+    };
+    string Icono(string estado) => estado switch
+    {
+        EstadoStock.SinStock => "bi-x-circle",
+        EstadoStock.Bajo => "bi-exclamation-triangle",
+        _ => "bi-check-circle"
+    };
 }
 
-<div class="container">
-    <h2 class="mb-4"><i class="bi bi-boxes"></i> Stock Actual</h2>
+@await Html.PartialAsync("~/Views/Shared/_EstilosGestion.cshtml")
 
-    <!-- Filtro de búsqueda -->
-    <form method="get" asp-action="Stock" class="row g-3 mb-3">
-        <div class="col-md-6">
-            <div class="input-group">
-                <input type="text" name="filtroNombre" class="form-control"
-                       placeholder="Buscar por nombre de producto..." value="@ViewBag.FiltroNombre">
-                <button type="submit" class="btn btn-primary">
-                    <i class="bi bi-search"></i> Buscar
-                </button>
+<style>
+    .st-page {
+        max-width: 1180px;
+    }
+
+    .st-resumen {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 12px;
+        margin-bottom: 1rem;
+    }
+
+    .st-dato {
+        background: var(--g-white);
+        border: 1px solid var(--g-border);
+        border-radius: 14px;
+        padding: 12px 16px;
+    }
+
+    .st-dato-etiqueta {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--g-muted);
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+    }
+
+    .st-dato-valor {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--g-navy);
+        line-height: 1.25;
+    }
+
+    .st-herramientas {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 12px;
+    }
+
+    .st-buscar {
+        position: relative;
+        flex: 1;
+        min-width: 240px;
+        max-width: 460px;
+    }
+
+        .st-buscar > i {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--g-muted);
+            pointer-events: none;
+        }
+
+        .st-buscar input {
+            width: 100%;
+            height: 48px;
+            padding: 0 12px 0 40px;
+            border: 1px solid var(--g-input-border);
+            border-radius: 10px;
+            font-size: 16px;
+            font-family: inherit;
+            color: var(--g-text);
+            background: var(--g-white);
+        }
+
+            .st-buscar input::placeholder {
+                color: #64748B;
+            }
+
+    .st-sede select {
+        height: 48px;
+        padding: 0 12px;
+        border: 1px solid var(--g-input-border);
+        border-radius: 10px;
+        font-size: 15px;
+        font-family: inherit;
+        color: var(--g-text);
+        background: var(--g-white);
+    }
+
+    .st-buscar input:focus,
+    .st-sede select:focus {
+        outline: none;
+        border-color: var(--g-teal);
+        box-shadow: 0 0 0 3px rgba(4,120,87,0.25);
+    }
+
+    .st-filtros {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 12px;
+    }
+
+        .st-filtros button {
+            min-height: 40px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 999px;
+            border: 1px solid var(--g-input-border);
+            background: var(--g-white);
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--g-text);
+            cursor: pointer;
+        }
+
+            .st-filtros button span {
+                min-width: 22px;
+                padding: 0 6px;
+                border-radius: 999px;
+                background: var(--g-bg);
+                font-size: 12px;
+                text-align: center;
+            }
+
+            .st-filtros button:hover {
+                border-color: var(--g-teal);
+                color: var(--g-teal);
+            }
+
+            .st-filtros button[aria-pressed="true"] {
+                background: var(--g-teal);
+                border-color: var(--g-teal);
+                color: #FFFFFF;
+            }
+
+                .st-filtros button[aria-pressed="true"] span {
+                    background: rgba(255,255,255,0.22);
+                }
+
+            .st-filtros button:focus-visible {
+                outline: 2px solid var(--g-teal);
+                outline-offset: 2px;
+            }
+
+    /* Lista de productos */
+    .st-lista {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        background: var(--g-white);
+        border: 1px solid var(--g-border);
+        border-radius: 14px;
+        overflow: hidden;
+        container-type: inline-size;
+    }
+
+    .st-item {
+        display: grid;
+        grid-template-columns: minmax(180px, 1.3fr) 190px minmax(160px, 1.2fr) auto;
+        gap: 12px 20px;
+        align-items: center;
+        padding: 14px 1.25rem;
+        border-bottom: 1px solid var(--g-border);
+    }
+
+        .st-item:last-child {
+            border-bottom: none;
+        }
+
+        /* display:grid anularía el atributo hidden del filtro */
+        .st-item[hidden] {
+            display: none;
+        }
+
+    @@container (max-width: 760px) {
+        .st-item {
+            grid-template-columns: 1fr auto;
+        }
+
+        .st-cantidad {
+            grid-column: 2;
+            grid-row: 1;
+            text-align: right;
+        }
+
+        .st-zonas, .st-acciones {
+            grid-column: 1 / -1;
+        }
+
+        .st-acciones {
+            justify-content: flex-start !important;
+        }
+    }
+
+    .st-nombre {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--g-text);
+    }
+
+    .st-vence {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        margin-top: 4px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--g-muted);
+    }
+
+        .st-vence.pronto {
+            color: #92400E;
+        }
+
+        .st-vence.vencido {
+            color: var(--g-danger-text);
+        }
+
+    .st-numero {
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--g-navy);
+        line-height: 1.1;
+        font-variant-numeric: tabular-nums;
+    }
+
+        .st-numero small {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--g-muted);
+        }
+
+    /* Medidor: el relleno es el stock; la marquita, el mínimo */
+    .st-medidor {
+        position: relative;
+        height: 8px;
+        margin: 8px 0 6px;
+        border-radius: 4px;
+        background: #E2E8F0;
+    }
+
+        .st-medidor span {
+            display: block;
+            height: 100%;
+            border-radius: 4px;
+            background: var(--g-teal);
+        }
+
+        .st-medidor.bajo span {
+            background: #D97706;
+        }
+
+        .st-medidor i {
+            position: absolute;
+            top: -3px;
+            width: 2px;
+            height: 14px;
+            border-radius: 1px;
+            background: var(--g-navy);
+        }
+
+    .st-estado {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 2px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+        .st-estado.sin_stock {
+            background: rgba(220,38,38,0.1);
+            color: var(--g-danger-text);
+        }
+
+        .st-estado.bajo {
+            background: rgba(245,158,11,0.16);
+            color: #92400E;
+        }
+
+        .st-estado.normal {
+            background: rgba(4,120,87,0.1);
+            color: var(--g-teal);
+        }
+
+    .st-zonas {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .st-zona {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 8px;
+        border: 1px solid var(--g-border);
+        background: var(--g-bg);
+        font-size: 13px;
+        color: var(--g-text);
+        white-space: nowrap;
+    }
+
+        .st-zona strong {
+            font-variant-numeric: tabular-nums;
+        }
+
+        .st-zona small {
+            color: var(--g-muted);
+        }
+
+    .st-sin-zona {
+        font-size: 13px;
+        color: var(--g-muted);
+    }
+
+    .st-acciones {
+        display: flex;
+        gap: 4px;
+        justify-content: flex-end;
+    }
+
+        .st-acciones .cp-icono-btn {
+            width: 40px;
+            height: 40px;
+        }
+
+    .st-vacio[hidden] {
+        display: none;
+    }
+</style>
+
+<div class="cp-page st-page">
+    <div class="cp-header">
+        <div>
+            <h1><i class="bi bi-boxes" aria-hidden="true"></i> Stock</h1>
+            <p>@Model.SedeNombre · cuánto hay de cada producto y en qué zonas</p>
+        </div>
+    </div>
+
+    <div class="st-resumen">
+        <div class="st-dato">
+            <div class="st-dato-etiqueta">Con stock</div>
+            <div class="st-dato-valor">@Model.ConStock <small class="cp-sub">de @Model.Productos.Count</small></div>
+        </div>
+        <div class="st-dato">
+            <div class="st-dato-etiqueta">Unidades</div>
+            <div class="st-dato-valor">@Model.Unidades.ToString("N0", inv)</div>
+        </div>
+        <div class="st-dato">
+            <div class="st-dato-etiqueta">Por reponer</div>
+            <div class="st-dato-valor">@Model.PorReponer</div>
+        </div>
+        <div class="st-dato">
+            <div class="st-dato-etiqueta">Por vencer</div>
+            <div class="st-dato-valor">@Model.PorVencer</div>
+        </div>
+    </div>
+
+    <div class="st-herramientas">
+        <div class="st-buscar">
+            <i class="bi bi-search" aria-hidden="true"></i>
+            <input type="search" id="buscar" value="@Model.Busqueda" autocomplete="off"
+                   placeholder="Producto, código o zona (ej. A-01)" aria-label="Buscar por producto, código o zona" aria-controls="listaStock" />
+        </div>
+        @if (Model.PuedeElegirSede && Model.Sedes.Count > 1)
+        {
+            <form method="get" asp-action="Stock" class="st-sede">
+                <label for="sede" class="visually-hidden">Sede</label>
+                <select id="sede" name="sede" onchange="this.form.submit()">
+                    <option value="">Todas las sedes</option>
+                    @foreach (var s in Model.Sedes)
+                    {
+                        <option value="@s.Id" selected="@(Model.SedeId == s.Id)">@s.Nombre</option>
+                    }
+                </select>
+                <noscript><button type="submit" class="btn-g-outline">Ver</button></noscript>
+            </form>
+        }
+    </div>
+
+    <div class="st-filtros" role="group" aria-label="Mostrar">
+        @foreach (var f in filtros)
+        {
+            <button type="button" data-filtro="@f.Clave" aria-pressed="@(Model.Filtro == f.Clave ? "true" : "false")">
+                @f.Texto <span>@f.Cantidad</span>
+            </button>
+        }
+    </div>
+    <p class="visually-hidden" id="avisoResultados" aria-live="polite"></p>
+
+    @if (Model.Productos.Count == 0)
+    {
+        <div class="cp-panel">
+            <div class="cp-vacio">
+                <i class="bi bi-boxes" aria-hidden="true"></i>
+                Todavía no hay productos registrados.
             </div>
         </div>
-    </form>
-
-    <div class="table-responsive">
-        <table class="table table-striped table-hover align-middle">
-            <thead class="table-dark">
-                <tr>
-                    <th>Producto</th>
-                    <th>Ubicación (Estante)</th>
-                    <th>Sede</th>
-                    <th class="text-end">Stock</th>
-                    <th>Estado</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var item in Model)
-                {
-                    string claseFila = "";
-                    if (item.BajoStock)
-                        claseFila = "table-danger";
-                    else if (item.StockActual == 0)
-                        claseFila = "table-warning";
-
-                    <tr class="@claseFila">
-                        <td>@item.ProductoNombre</td>
-                        <td>@item.CodigoUbicacion</td>
-                        <td>@item.SedeNombre</td>
-                        <td class="text-end fw-bold">@item.StockActual</td>
-                        <td>
-                            @if (item.BajoStock)
-                            {
-                                <span class="badge bg-danger"><i class="bi bi-exclamation-triangle"></i> Bajo</span>
-                            }
-                            else if (item.StockActual == 0)
-                            {
-                                <span class="badge bg-warning text-dark">Sin stock</span>
-                            }
-                            else
-                            {
-                                <span class="badge bg-success">Normal</span>
-                            }
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
-    @if (!Model.Any())
+    }
+    else
     {
-        <div class="alert alert-info">No se encontraron productos en stock para su sede.</div>
+        <ul class="st-lista" id="listaStock">
+            @for (var i = 0; i < Model.Productos.Count; i++)
+            {
+                var p = Model.Productos[i];
+                var escala = Math.Max(1, Math.Max(p.Stock, p.Minimo * 2));
+                var busqueda = $"{p.Nombre} {p.Codigo} {string.Join(" ", p.Zonas.Select(z => z.Codigo))}".ToLowerInvariant();
+                // Para ordenar "por reponer": primero lo que está más lejos de su mínimo
+                var urgencia = p.Minimo == 0 ? 1m : (decimal)p.Stock / p.Minimo;
+                <li class="st-item" data-orden="@i" data-busqueda="@busqueda" data-estado="@p.Estado"
+                    data-vencer="@(p.PorVencer ? "1" : "0")" data-urgencia="@urgencia.ToString("0.###", inv)">
+                    <div class="st-info">
+                        <div class="st-nombre">@p.Nombre</div>
+                        <div class="cp-sub">@p.Codigo · @p.Tipo</div>
+                        @if (p.Vencimiento is DateOnly vence && p.DiasParaVencer is int dias)
+                        {
+                            var clase = dias < 0 ? "vencido" : p.PorVencer ? "pronto" : null;
+                            var texto = dias < 0 ? $"Vencido el {vence:dd/MM/yyyy}"
+                                : dias == 0 ? "Vence hoy"
+                                : dias <= StockConsultaViewModel.DiasAvisoVencimiento ? $"Vence en {dias} {(dias == 1 ? "día" : "días")} ({vence:dd/MM})"
+                                : $"Vence el {vence:dd/MM/yyyy}";
+                            <div class="st-vence @clase">
+                                <i class="bi @(clase == null ? "bi-calendar3" : "bi-hourglass-split")" aria-hidden="true"></i> @texto
+                            </div>
+                        }
+                    </div>
+
+                    <div class="st-cantidad">
+                        <div class="st-numero">@p.Stock.ToString("N0", inv) <small>@p.Unidad</small></div>
+                        @if (p.Minimo > 0)
+                        {
+                            <div class="st-medidor @(p.Estado == EstadoStock.Bajo ? "bajo" : null)" aria-hidden="true">
+                                <span style="width:@((p.Stock * 100m / escala).ToString("0.#", inv))%"></span>
+                                <i style="left:calc(@((p.Minimo * 100m / escala).ToString("0.#", inv))% - 1px)"></i>
+                            </div>
+                        }
+                        <span class="st-estado @p.Estado">
+                            <i class="bi @Icono(p.Estado)" aria-hidden="true"></i>
+                            @(EstadoStock.Texto(p.Estado) + (p.Minimo > 0 ? $" · mín. {p.Minimo}" : ""))
+                        </span>
+                    </div>
+
+                    <div class="st-zonas">
+                        @if (p.Zonas.Count == 0)
+                        {
+                            <span class="st-sin-zona">No está en ninguna zona</span>
+                        }
+                        @foreach (var z in p.Zonas)
+                        {
+                            <span class="st-zona">
+                                <i class="bi bi-geo-alt" aria-hidden="true"></i>
+                                @z.Codigo
+                                @if (todasLasSedes)
+                                {
+                                    <small>@z.Sede</small>
+                                }
+                                <strong>@z.Cantidad.ToString("N0", inv)</strong>
+                            </span>
+                        }
+                    </div>
+
+                    <div class="st-acciones">
+                        @if (p.Zonas.Count > 0)
+                        {
+                            <a class="cp-icono-btn" asp-controller="Mapa" asp-action="Index" asp-route-buscar="@p.Codigo"
+                               asp-route-sede="@(Model.PuedeElegirSede ? Model.SedeId : null)"
+                               title="Ver en el mapa" aria-label="Ver @p.Nombre en el mapa">
+                                <i class="bi bi-map" aria-hidden="true"></i>
+                            </a>
+                            <a class="cp-icono-btn" asp-controller="Mapa" asp-action="Mover" asp-route-producto="@p.Id"
+                               asp-route-origen="@(p.Zonas.Count == 1 ? p.Zonas[0].IdUbicacion : (int?)null)"
+                               asp-route-sede="@(Model.PuedeElegirSede ? Model.SedeId : null)"
+                               title="Mover a otra zona" aria-label="Mover @p.Nombre a otra zona">
+                                <i class="bi bi-arrows-move" aria-hidden="true"></i>
+                            </a>
+                        }
+                        @if (Model.PuedeVerKardex)
+                        {
+                            <a class="cp-icono-btn" asp-controller="Reporte" asp-action="Kardex" asp-route-producto="@p.Id"
+                               asp-route-sede="@(Model.PuedeElegirSede ? Model.SedeId : null)"
+                               title="Ver kardex" aria-label="Ver el kardex de @p.Nombre">
+                                <i class="bi bi-clock-history" aria-hidden="true"></i>
+                            </a>
+                        }
+                    </div>
+                </li>
+            }
+        </ul>
+        <div class="cp-panel st-vacio" id="sinResultados" hidden>
+            <div class="cp-vacio">
+                <i class="bi bi-search" aria-hidden="true"></i>
+                <span id="textoSinResultados">No hay productos que coincidan.</span>
+            </div>
+        </div>
     }
 </div>
 
 @section Scripts {
     <script>
-        // Aquí podrías agregar filtros adicionales
+        const lista = document.getElementById('listaStock');
+        if (lista) {
+            const items = [...lista.children];
+            const buscar = document.getElementById('buscar');
+            const botones = [...document.querySelectorAll('[data-filtro]')];
+            const sinResultados = document.getElementById('sinResultados');
+            const aviso = document.getElementById('avisoResultados');
+            const normalizar = t => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+            let filtro = botones.find(b => b.getAttribute('aria-pressed') === 'true')?.dataset.filtro ?? 'todos';
+
+            const cumple = {
+                todos: () => true,
+                reponer: li => li.dataset.estado !== 'normal',
+                sin_stock: li => li.dataset.estado === 'sin_stock',
+                vencer: li => li.dataset.vencer === '1'
+            };
+
+            function aplicar() {
+                const q = normalizar(buscar.value.trim());
+                // "Por reponer": lo más urgente primero; en lo demás, por nombre
+                const orden = filtro === 'reponer'
+                    ? [...items].sort((a, b) => a.dataset.urgencia - b.dataset.urgencia || a.dataset.orden - b.dataset.orden)
+                    : [...items].sort((a, b) => a.dataset.orden - b.dataset.orden);
+                lista.append(...orden);
+
+                let visibles = 0;
+                for (const li of items) {
+                    const ve = cumple[filtro](li) && (!q || normalizar(li.dataset.busqueda).includes(q));
+                    li.hidden = !ve;
+                    if (ve) visibles++;
+                }
+                lista.hidden = visibles === 0;
+                sinResultados.hidden = visibles > 0;
+                document.getElementById('textoSinResultados').textContent = q
+                    ? `No hay productos que coincidan con «${buscar.value.trim()}».`
+                    : 'No hay productos en este grupo.';
+                aviso.textContent = `${visibles} ${visibles === 1 ? 'producto' : 'productos'}`;
+
+                // La dirección guarda la búsqueda y el filtro (al volver o compartir el enlace se ve igual)
+                const url = new URL(location.href);
+                q ? url.searchParams.set('q', buscar.value.trim()) : url.searchParams.delete('q');
+                filtro !== 'todos' ? url.searchParams.set('filtro', filtro) : url.searchParams.delete('filtro');
+                history.replaceState(null, '', url);
+            }
+
+            botones.forEach(b => b.addEventListener('click', () => {
+                filtro = b.dataset.filtro;
+                botones.forEach(x => x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
+                aplicar();
+            }));
+            buscar.addEventListener('input', aplicar);
+            aplicar();
+        }
     </script>
 }
