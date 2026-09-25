@@ -104,7 +104,6 @@ namespace GestionAlmacen_Golocentro.ViewModels
         public DateTime? FechaAnulacion { get; set; }
         public string? AnuladaPor { get; set; }
         public string? MotivoAnulacion { get; set; }
-        public bool PuedeAnular { get; set; }
     }
 
     public record VentaFila(int IdMovimiento, string Numero, DateTime Fecha, string Cliente, decimal Total, string MetodoPago, string Vendedor, bool Anulada);

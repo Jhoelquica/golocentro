@@ -302,16 +302,14 @@ namespace GestionAlmacen_Golocentro.Controllers
                 Anulada = venta.Nota.Estado == EstadoNota.Anulada,
                 FechaAnulacion = venta.Nota.FechaAnulacion,
                 AnuladaPor = venta.AnuladaPor,
-                MotivoAnulacion = venta.Nota.MotivoAnulacion,
-                PuedeAnular = PuedeAnular()
+                MotivoAnulacion = venta.Nota.MotivoAnulacion
             });
         }
 
         // Nota hecha por error o venta cancelada: la nota queda anulada (no se borra) y el stock
-        // vuelve a las zonas de donde salió. Solo dueña y encargada.
+        // vuelve a las zonas de donde salió. Cualquier rol puede anular las ventas de su sede.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [Authorize(Roles = "duena,encargada")]
         public async Task<IActionResult> Anular(int id, string? motivo)
         {
             var usuarioIdClaim = User.FindFirst("UsuarioId")?.Value;
@@ -441,9 +439,6 @@ namespace GestionAlmacen_Golocentro.Controllers
             await _context.SaveChangesAsync();
             return Json(new { success = true, cliente = new ClienteVenta(cliente.IdCliente, cliente.Nombre, cliente.RucDni, cliente.Celular) });
         }
-
-        [NonAction]
-        private bool PuedeAnular() => User.IsInRole("duena") || User.IsInRole("encargada");
 
         [NonAction]
         private int? SedeDelUsuario()

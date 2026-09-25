@@ -694,7 +694,7 @@
                 <a class="btn-g-primary" asp-action="Nueva"><i class="bi bi-plus-lg" aria-hidden="true"></i> Nueva venta</a>
                 <a class="btn-g-outline" asp-action="Index"><i class="bi bi-list-ul" aria-hidden="true"></i> Ver ventas</a>
             </div>
-            @if (Model.PuedeAnular && !Model.Anulada)
+            @if (!Model.Anulada)
             {
                 <button type="button" class="nv-btn-anular" data-bs-toggle="modal" data-bs-target="#modalAnular">
                     <i class="bi bi-x-octagon" aria-hidden="true"></i> Anular venta
@@ -737,7 +737,7 @@
     </div>
 </div>
 
-@if (Model.PuedeAnular && !Model.Anulada)
+@if (!Model.Anulada)
 {
     <div class="modal fade cp-modal" id="modalAnular" tabindex="-1" aria-labelledby="tituloAnular" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
