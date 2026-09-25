@@ -19,7 +19,13 @@ namespace GestionAlmacen_Golocentro.Controllers
             _context = context;
         }
 
-        public async Task<IActionResult> Index(int? sede)
+        public async Task<IActionResult> Index(int? sede) => View(await CargarMapa(sede));
+
+        // Carteles para rotular cada zona en el piso (página de impresión, sin el layout de la app)
+        public async Task<IActionResult> Carteles(int? sede) => View(await CargarMapa(sede));
+
+        [NonAction]
+        private async Task<MapaViewModel> CargarMapa(int? sede)
         {
             var sedeUsuario = SedeDelUsuario();
             var sedesConPlano = await _context.Sedes
@@ -37,7 +43,7 @@ namespace GestionAlmacen_Golocentro.Controllers
 
             var elegida = sedesConPlano.FirstOrDefault(s => s.Id == sede) ?? sedesConPlano.FirstOrDefault();
             if (elegida == null)
-                return View(modelo);
+                return modelo;
 
             var plano = await _context.Sedes
                 .Where(s => s.IdSede == elegida.Id)
@@ -55,7 +61,7 @@ namespace GestionAlmacen_Golocentro.Controllers
                 .Select(l => new LineaMapa(l.Tipo, l.X1, l.Y1, l.X2, l.Y2))
                 .ToListAsync();
 
-            return View(modelo);
+            return modelo;
         }
 
         public async Task<IActionResult> Mover(int? producto, int? origen, int? sede)

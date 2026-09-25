@@ -396,6 +396,12 @@
                     </select>
                 </form>
             }
+            @if (Model.SedeId != null)
+            {
+                <a class="btn-g-outline" asp-action="Carteles" asp-route-sede="@Model.SedeId">
+                    <i class="bi bi-printer" aria-hidden="true"></i> Imprimir carteles
+                </a>
+            }
             <a class="btn-g-primary" asp-action="Mover" asp-route-sede="@Model.SedeId">
                 <i class="bi bi-arrow-left-right" aria-hidden="true"></i> Mover mercadería
             </a>
