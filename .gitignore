@@ -25,10 +25,9 @@ _ReSharper.*
 *.exe
 
 ## Ignorar dependencias de cliente
+## (wwwroot/lib SÍ se versiona: las vistas cargan Bootstrap y jQuery desde ahí)
 node_modules/
 bower_components/
-lib/
-wwwroot/lib/
 
 ## Ignorar configuraciones sensibles
 appsettings.json
