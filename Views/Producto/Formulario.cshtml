@@ -1,0 +1,326 @@
+@using System.Globalization
+@using GestionAlmacen_Golocentro.ViewModels
+@model ProductoFormViewModel
+@{
+    var esNuevo = Model.Id == null;
+    ViewData["Title"] = esNuevo ? "Nuevo producto" : "Editar producto";
+
+    string? Error(string campo) => ViewData.ModelState[campo]?.Errors.FirstOrDefault()?.ErrorMessage;
+    string? Describe(string campo, string? extra = null)
+    {
+        var ids = new[] { extra, Error(campo) != null ? campo + "-error" : null }.Where(x => x != null);
+        var valor = string.Join(" ", ids);
+        return valor.Length == 0 ? null : valor;
+    }
+
+    var orden = new[] { "Nombre", "Codigo", "Tipo", "UnidadMedida", "PrecioUnitario", "StockMinimo", "FechaVencimiento", "Lote" };
+    var errores = ViewData.ModelState
+        .Where(kv => kv.Value!.Errors.Count > 0)
+        .SelectMany(kv => kv.Value!.Errors.Select(e => (Campo: string.IsNullOrEmpty(kv.Key) ? "Nombre" : kv.Key, e.ErrorMessage)))
+        .OrderBy(e => Array.IndexOf(orden, e.Campo) is var i && i >= 0 ? i : orden.Length)
+        .ToList();
+}
+
+@await Html.PartialAsync("~/Views/Shared/_EstilosGestion.cshtml")
+
+<style>
+    .pf-bloque {
+        border: none;
+        padding: 0;
+        margin: 0 0 1.25rem;
+    }
+
+        .pf-bloque legend {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--g-navy);
+            padding-bottom: 8px;
+            margin-bottom: 12px;
+            border-bottom: 1px solid var(--g-border);
+            width: 100%;
+        }
+
+    .pf-fila {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0 16px;
+    }
+
+    @@media (max-width: 640px) {
+        .pf-fila {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .pf-moneda {
+        position: relative;
+    }
+
+        .pf-moneda span {
+            position: absolute;
+            left: 12px;
+            top: 22px;
+            transform: translateY(-50%);
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--g-muted);
+            pointer-events: none;
+        }
+
+        .pf-moneda input {
+            padding-left: 38px !important;
+        }
+
+    .pf-origen {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        background: rgba(4,120,87,0.06);
+        border: 1px solid rgba(4,120,87,0.2);
+        border-radius: 10px;
+        padding: 10px 14px;
+        font-size: 14px;
+        margin-bottom: 1rem;
+        max-width: 640px;
+    }
+
+        .pf-origen i {
+            color: var(--g-teal);
+            margin-top: 2px;
+        }
+
+    .btn-g-outline .cp-spinner {
+        border-color: rgba(51,65,85,0.3);
+        border-top-color: var(--g-navy);
+    }
+</style>
+
+<div class="cp-page">
+
+    <a class="cp-volver" asp-action="Index">
+        <i class="bi bi-arrow-left" aria-hidden="true"></i> Volver a productos
+    </a>
+
+    <div class="cp-header">
+        <div>
+            <h1><i class="bi bi-tags" aria-hidden="true"></i> @(esNuevo ? "Nuevo producto" : "Editar producto")</h1>
+            @if (!esNuevo)
+            {
+                <p>@Model.Nombre</p>
+            }
+        </div>
+    </div>
+
+    @if (TempData["Exito"] is string exito)
+    {
+        <div class="cp-aviso exito" role="status" style="max-width:640px">
+            <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+            <span>@exito</span>
+            <button type="button" aria-label="Cerrar mensaje" onclick="this.parentElement.remove()"><i class="bi bi-x" aria-hidden="true"></i></button>
+        </div>
+    }
+
+    @if (Model.Desde == "conteo" || Model.Desde == "entrada")
+    {
+        <p class="pf-origen">
+            <i class="bi bi-info-circle" aria-hidden="true"></i>
+            <span>Se abrió desde @(Model.Desde == "conteo" ? "el conteo" : "la entrada") en otra pestaña. Al guardar, vuelve a esa pestaña: el producto ya aparecerá ahí.</span>
+        </p>
+    }
+
+    @if (errores.Count > 0)
+    {
+        <div class="cp-resumen" role="alert" tabindex="-1" id="resumenErrores" aria-labelledby="resumenTitulo">
+            <h2 id="resumenTitulo">Revisa estos datos antes de guardar:</h2>
+            <ul>
+                @foreach (var e in errores)
+                {
+                    <li><a href="#@e.Campo">@e.ErrorMessage</a></li>
+                }
+            </ul>
+        </div>
+    }
+
+    <form class="cp-form-card" method="post" novalidate id="formProducto"
+          asp-action="@(esNuevo ? "Crear" : "Editar")" asp-route-id="@Model.Id">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="Desde" value="@Model.Desde" />
+
+        <p class="cp-nota">Los campos con <span class="cp-req" aria-hidden="true">*</span><span class="visually-hidden">asterisco</span> son obligatorios.</p>
+
+        <fieldset class="pf-bloque">
+            <legend>Datos del producto</legend>
+
+            <div class="cp-campo">
+                <label for="Nombre">Nombre <span class="cp-req" aria-hidden="true">*</span></label>
+                <input id="Nombre" name="Nombre" type="text" value="@Model.Nombre" maxlength="150"
+                       required aria-required="true" autocomplete="off"
+                       aria-invalid="@(Error("Nombre") != null ? "true" : null)"
+                       aria-describedby="@Describe("Nombre", "Nombre-ayuda")" />
+                <p class="cp-ayuda" id="Nombre-ayuda">Como lo reconocen en el almacén, por ejemplo: "Caramelo de fresa 100 u".</p>
+                @if (Error("Nombre") is string eNombre)
+                {
+                    <p class="cp-error" id="Nombre-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @eNombre</p>
+                }
+            </div>
+
+            <div class="pf-fila">
+                <div class="cp-campo">
+                    <label for="Codigo">Código <span class="cp-req" aria-hidden="true">*</span></label>
+                    <input id="Codigo" name="Codigo" type="text" value="@Model.Codigo" maxlength="50"
+                           required aria-required="true" autocomplete="off" spellcheck="false"
+                           aria-invalid="@(Error("Codigo") != null ? "true" : null)"
+                           aria-describedby="@Describe("Codigo", "Codigo-ayuda")" />
+                    <p class="cp-ayuda" id="Codigo-ayuda">@(esNuevo ? "Sugerido el siguiente libre. Puedes usar el código de barras." : "Debe ser único.")</p>
+                    @if (Error("Codigo") is string eCodigo)
+                    {
+                        <p class="cp-error" id="Codigo-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @eCodigo</p>
+                    }
+                </div>
+
+                <div class="cp-campo">
+                    <label for="Tipo">Tipo o categoría <span class="cp-req" aria-hidden="true">*</span></label>
+                    <input id="Tipo" name="Tipo" type="text" value="@Model.Tipo" maxlength="50" list="listaTipos"
+                           required aria-required="true" autocomplete="off"
+                           aria-invalid="@(Error("Tipo") != null ? "true" : null)"
+                           aria-describedby="@Describe("Tipo", "Tipo-ayuda")" />
+                    <datalist id="listaTipos">
+                        @foreach (var t in Model.TiposExistentes)
+                        {
+                            <option value="@t"></option>
+                        }
+                    </datalist>
+                    <p class="cp-ayuda" id="Tipo-ayuda">Elige uno existente o escribe uno nuevo.</p>
+                    @if (Error("Tipo") is string eTipo)
+                    {
+                        <p class="cp-error" id="Tipo-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @eTipo</p>
+                    }
+                </div>
+            </div>
+
+            <div class="cp-campo" style="max-width:calc(50% - 8px); min-width:220px">
+                <label for="UnidadMedida">Unidad de medida <span class="cp-req" aria-hidden="true">*</span></label>
+                <input id="UnidadMedida" name="UnidadMedida" type="text" value="@Model.UnidadMedida" maxlength="20" list="listaUnidades"
+                       required aria-required="true" autocomplete="off"
+                       aria-invalid="@(Error("UnidadMedida") != null ? "true" : null)"
+                       aria-describedby="@Describe("UnidadMedida", "UnidadMedida-ayuda")" />
+                <datalist id="listaUnidades">
+                    @foreach (var u in Model.UnidadesExistentes)
+                    {
+                        <option value="@u"></option>
+                    }
+                </datalist>
+                <p class="cp-ayuda" id="UnidadMedida-ayuda">Por ejemplo: unidad, caja, bolsa, paquete.</p>
+                @if (Error("UnidadMedida") is string eUnidad)
+                {
+                    <p class="cp-error" id="UnidadMedida-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @eUnidad</p>
+                }
+            </div>
+        </fieldset>
+
+        <fieldset class="pf-bloque">
+            <legend>Precio y stock</legend>
+            <div class="pf-fila">
+                <div class="cp-campo">
+                    <label for="PrecioUnitario">Precio de venta <span class="cp-req" aria-hidden="true">*</span></label>
+                    <div class="pf-moneda">
+                        <span aria-hidden="true">S/</span>
+                        <input id="PrecioUnitario" name="PrecioUnitario" type="number" min="0" step="0.01" inputmode="decimal"
+                               value="@Model.PrecioUnitario?.ToString("0.00", CultureInfo.InvariantCulture)"
+                               required aria-required="true"
+                               aria-invalid="@(Error("PrecioUnitario") != null ? "true" : null)"
+                               aria-describedby="@Describe("PrecioUnitario", "PrecioUnitario-ayuda")" />
+                    </div>
+                    <p class="cp-ayuda" id="PrecioUnitario-ayuda">En soles, por unidad de medida.</p>
+                    @if (Error("PrecioUnitario") is string ePrecio)
+                    {
+                        <p class="cp-error" id="PrecioUnitario-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @ePrecio</p>
+                    }
+                </div>
+
+                <div class="cp-campo">
+                    <label for="StockMinimo">Stock mínimo <span class="cp-req" aria-hidden="true">*</span></label>
+                    <input id="StockMinimo" name="StockMinimo" type="number" min="0" step="1" inputmode="numeric"
+                           value="@Model.StockMinimo" required aria-required="true"
+                           aria-invalid="@(Error("StockMinimo") != null ? "true" : null)"
+                           aria-describedby="@Describe("StockMinimo", "StockMinimo-ayuda")" />
+                    <p class="cp-ayuda" id="StockMinimo-ayuda">Cuando el stock llegue a este número, el sistema avisa.</p>
+                    @if (Error("StockMinimo") is string eMinimo)
+                    {
+                        <p class="cp-error" id="StockMinimo-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @eMinimo</p>
+                    }
+                </div>
+            </div>
+        </fieldset>
+
+        <fieldset class="pf-bloque">
+            <legend>Vencimiento <span class="cp-opcional">(opcional)</span></legend>
+            <div class="pf-fila">
+                <div class="cp-campo">
+                    <label for="FechaVencimiento">Fecha de vencimiento</label>
+                    <input id="FechaVencimiento" name="FechaVencimiento" type="date"
+                           value="@Model.FechaVencimiento?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)"
+                           aria-invalid="@(Error("FechaVencimiento") != null ? "true" : null)"
+                           aria-describedby="@Describe("FechaVencimiento", "FechaVencimiento-ayuda")" />
+                    <p class="cp-ayuda" id="FechaVencimiento-ayuda">El sistema avisa cuando se acerque.</p>
+                    @if (Error("FechaVencimiento") is string eFecha)
+                    {
+                        <p class="cp-error" id="FechaVencimiento-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @eFecha</p>
+                    }
+                </div>
+
+                <div class="cp-campo">
+                    <label for="Lote">Lote</label>
+                    <input id="Lote" name="Lote" type="text" value="@Model.Lote" maxlength="50" autocomplete="off"
+                           aria-invalid="@(Error("Lote") != null ? "true" : null)"
+                           aria-describedby="@Describe("Lote")" />
+                    @if (Error("Lote") is string eLote)
+                    {
+                        <p class="cp-error" id="Lote-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @eLote</p>
+                    }
+                </div>
+            </div>
+        </fieldset>
+
+        <div class="cp-botones">
+            <a class="btn-g-outline" asp-action="Index">Cancelar</a>
+            @if (esNuevo)
+            {
+                <button type="submit" class="btn-g-outline" name="accion" value="otro" id="btnOtro">
+                    <i class="bi bi-plus-lg" aria-hidden="true"></i> Guardar y crear otro
+                </button>
+            }
+            <button type="submit" class="btn-g-primary" id="btnGuardar">
+                <i class="bi bi-check-lg" aria-hidden="true"></i> @(esNuevo ? "Guardar producto" : "Guardar cambios")
+            </button>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <script>
+        document.getElementById('resumenErrores')?.focus();
+        // Con "crear otro" se empieza directo por el nombre
+        if (!document.getElementById('resumenErrores') && @(esNuevo ? "true" : "false")) {
+            document.getElementById('Nombre').focus();
+        }
+
+        const form = document.getElementById('formProducto');
+        const botones = [...form.querySelectorAll('button[type=submit]')];
+        const contenidos = new Map(botones.map(b => [b, b.innerHTML]));
+        form.addEventListener('submit', e => {
+            const pulsado = e.submitter;
+            // Se desactivan después de enviar para no perder el valor de "accion"
+            setTimeout(() => botones.forEach(b => b.disabled = true), 0);
+            if (pulsado) {
+                pulsado.setAttribute('aria-busy', 'true');
+                pulsado.innerHTML = '<span class="cp-spinner" aria-hidden="true"></span> Guardando…';
+            }
+        });
+        window.addEventListener('pageshow', () => botones.forEach(b => {
+            b.disabled = false;
+            b.removeAttribute('aria-busy');
+            b.innerHTML = contenidos.get(b);
+        }));
+    </script>
+}

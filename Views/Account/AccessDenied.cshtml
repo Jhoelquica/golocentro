@@ -1,16 +1,67 @@
-﻿@{
-    ViewData["Title"] = "Acceso Denegado";
+@{
+    ViewData["Title"] = "Acceso denegado";
+    var rol = RolHelper.Etiqueta(User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value);
 }
 
-<div class="text-center mt-5 pt-5">
-    <div class="display-1 text-danger mb-4">
-        <i class="bi bi-shield-lock"></i>
+@await Html.PartialAsync("~/Views/Shared/_EstilosGestion.cshtml")
+
+<style>
+    .ad-caja {
+        max-width: 480px;
+        margin: 3rem auto;
+        padding: 2rem 1.5rem;
+        text-align: center;
+        background: var(--g-white);
+        border: 1px solid var(--g-border);
+        border-radius: 14px;
+    }
+
+    .ad-icono {
+        width: 64px;
+        height: 64px;
+        margin: 0 auto 1rem;
+        border-radius: 50%;
+        background: rgba(220,38,38,0.1);
+        color: var(--g-danger-text);
+        font-size: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .ad-caja h1 {
+        font-size: 22px;
+        font-weight: 600;
+        color: var(--g-navy);
+        margin: 0 0 8px;
+    }
+
+    .ad-caja p {
+        font-size: 15px;
+        color: var(--g-muted);
+        margin: 0 0 1.25rem;
+    }
+
+    .ad-botones {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+</style>
+
+<div class="ad-caja">
+    <div class="ad-icono" aria-hidden="true"><i class="bi bi-shield-lock"></i></div>
+    <h1>Esta sección no está disponible para tu cuenta</h1>
+    <p>
+        @if (!string.IsNullOrEmpty(rol))
+        {
+            <span>Con el rol de <strong>@rol</strong> no puedes entrar aquí.</span>
+        }
+        Si crees que deberías tener acceso, pídeselo a la dueña.
+    </p>
+    <div class="ad-botones">
+        <a class="btn-g-outline" href="javascript:history.back()"><i class="bi bi-arrow-left" aria-hidden="true"></i> Volver</a>
+        <a class="btn-g-primary" asp-controller="Home" asp-action="Index"><i class="bi bi-house" aria-hidden="true"></i> Ir al inicio</a>
     </div>
-    <h1 class="display-4">Acceso Denegado</h1>
-    <p class="lead">No tienes permisos suficientes para acceder a esta sección.</p>
-    <hr class="my-4">
-    <p>Contacta con la administradora si crees que deberías tener acceso.</p>
-    <a asp-controller="Home" asp-action="Index" class="btn btn-primary btn-lg mt-3">
-        <i class="bi bi-house"></i> Volver al Inicio
-    </a>
 </div>

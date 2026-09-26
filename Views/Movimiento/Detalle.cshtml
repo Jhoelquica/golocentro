@@ -1,100 +1,287 @@
-﻿@model GestionAlmacen_Golocentro.Models.Movimiento
+@using System.Globalization
+@using GestionAlmacen_Golocentro.ViewModels
+@model MovimientoDetalleViewModel
 @{
-    ViewData["Title"] = $"Movimiento #{Model.IdMovimiento}";
+    var inv = CultureInfo.InvariantCulture;
+    var titulo = Model.EsEntrada ? "Entrada" : "Salida";
+    ViewData["Title"] = $"{titulo} del {Model.Fecha:dd/MM/yyyy}";
 }
 
-<div class="container">
-    <a asp-action="Index" class="btn btn-outline-secondary mb-3">
-        <i class="bi bi-arrow-left"></i> Volver a lista
-    </a>
+@await Html.PartialAsync("~/Views/Shared/_EstilosGestion.cshtml")
 
-    <div class="card shadow mb-4">
-        <div class="card-header bg-dark text-white">
-            <h4 class="mb-0"><i class="bi bi-box-arrow-@(Model.Tipo == "Entrada" ? "in" : "up")"></i> Movimiento de @Model.Tipo</h4>
+<style>
+    .md-page {
+        max-width: 1000px;
+    }
+
+    .md-datos {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px;
+        margin-bottom: 1rem;
+    }
+
+    .md-dato {
+        background: var(--g-white);
+        border: 1px solid var(--g-border);
+        border-radius: 14px;
+        padding: 12px 16px;
+    }
+
+    .md-etiqueta {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--g-muted);
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+    }
+
+    .md-valor {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--g-navy);
+        margin-top: 2px;
+        overflow-wrap: anywhere;
+    }
+
+    .md-seccion {
+        background: var(--g-white);
+        border: 1px solid var(--g-border);
+        border-radius: 14px;
+        margin-bottom: 1rem;
+    }
+
+    .md-cab {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 14px 1.25rem 10px;
+    }
+
+        .md-cab h2 {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--g-navy);
+            margin: 0;
+        }
+
+        .md-cab p {
+            font-size: 13px;
+            color: var(--g-muted);
+            margin: 0;
+        }
+
+    .md-num {
+        text-align: right !important;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+    }
+
+    .md-cambio {
+        color: var(--g-muted);
+    }
+
+        .md-cambio strong {
+            color: var(--g-navy);
+        }
+
+    .md-fotos {
+        padding: 0 1.25rem 16px;
+    }
+
+    .md-galeria {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 14px;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: 10px;
+    }
+
+        .md-galeria a {
+            display: block;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid var(--g-border);
+            text-decoration: none;
+            color: var(--g-muted);
+        }
+
+            .md-galeria a:focus-visible {
+                outline: 2px solid var(--g-teal);
+                outline-offset: 2px;
+            }
+
+        .md-galeria img {
+            display: block;
+            width: 100%;
+            aspect-ratio: 1;
+            object-fit: cover;
+            background: var(--g-bg);
+        }
+
+        .md-galeria span {
+            display: block;
+            font-size: 12px;
+            padding: 4px 8px;
+        }
+
+    .md-sin-fotos {
+        font-size: 14px;
+        color: var(--g-muted);
+        border: 1px dashed var(--g-input-border);
+        border-radius: 10px;
+        padding: 14px;
+        text-align: center;
+        margin-bottom: 14px;
+    }
+
+    .md-subir {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+
+        .md-subir input[type="file"] {
+            flex: 1;
+            min-width: 200px;
+            min-height: 44px;
+            padding: 9px 10px;
+            border: 1px solid var(--g-input-border);
+            border-radius: 8px;
+            font-size: 14px;
+            background: var(--g-white);
+        }
+
+            .md-subir input[type="file"]:focus {
+                outline: none;
+                border-color: var(--g-teal);
+                box-shadow: 0 0 0 3px rgba(4,120,87,0.25);
+            }
+</style>
+
+<div class="cp-page md-page">
+    <a class="cp-volver" asp-action="Index"><i class="bi bi-arrow-left" aria-hidden="true"></i> Movimientos</a>
+    <div class="cp-header">
+        <div>
+            <h1><i class="bi @(Model.EsEntrada ? "bi-box-arrow-in-down" : "bi-box-arrow-up")" aria-hidden="true"></i> @titulo del @Model.Fecha.ToString("dd/MM/yyyy", inv)</h1>
+            <p>@Model.Fecha.ToString("HH:mm", inv) · @Model.Lineas.Count @(Model.Lineas.Count == 1 ? "producto" : "productos") · @Model.Unidades @(Model.Unidades == 1 ? "unidad" : "unidades")</p>
         </div>
-        <div class="card-body">
-            <div class="row">
-                <div class="col-md-6">
-                    <p><strong>ID Movimiento:</strong> @Model.IdMovimiento</p>
-                    <p><strong>Fecha:</strong> @Model.Fecha.ToString("dd/MM/yyyy HH:mm")</p>
-                    <p><strong>Tipo:</strong> <span class="badge bg-@(Model.Tipo == "Entrada" ? "success" : "warning")">@Model.Tipo</span></p>
-                    <p><strong>Usuario:</strong> @Model.IdUsuarioNavigation?.Nombre</p>
-                    <p><strong>Sede:</strong> @Model.IdSedeNavigation?.Nombre</p>
-                </div>
-                <div class="col-md-6">
-                    @if (Model.Tipo == "Entrada")
-                    {
-                        <p><strong>Proveedor:</strong> @Model.IdProveedorNavigation?.Nombre</p>
-                        <p><strong>Factura:</strong> @(Model.ComprobanteEmitido ? "Emitida" : "No emitida")</p>
-                    }
-                    else
-                    {
-                        <p><strong>Cliente:</strong> @Model.IdClienteNavigation?.Nombre</p>
-                        <p><strong>Pedido:</strong> @(Model.ComprobanteEmitido ? "Emitido" : "No emitido")</p>
-                    }
-                    <p><strong>Observaciones:</strong> @(string.IsNullOrEmpty(Model.Observaciones) ? "Ninguna" : Model.Observaciones)</p>
-                </div>
+        @if (Model.EsEntrada)
+        {
+            <a class="btn-g-primary" asp-action="Entrada"><i class="bi bi-plus-lg" aria-hidden="true"></i> Nueva entrada</a>
+        }
+    </div>
+
+    @if (TempData["Exito"] is string exito)
+    {
+        <div class="cp-aviso exito" role="status">
+            <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+            <span>@exito</span>
+            <button type="button" aria-label="Cerrar mensaje" onclick="this.parentElement.remove()"><i class="bi bi-x" aria-hidden="true"></i></button>
+        </div>
+    }
+    @if (TempData["Error"] is string error)
+    {
+        <div class="cp-aviso error" role="alert">
+            <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+            <span>@error</span>
+            <button type="button" aria-label="Cerrar mensaje" onclick="this.parentElement.remove()"><i class="bi bi-x" aria-hidden="true"></i></button>
+        </div>
+    }
+
+    <div class="md-datos">
+        <div class="md-dato">
+            <div class="md-etiqueta">@(Model.EsEntrada ? "Proveedor" : "Cliente")</div>
+            <div class="md-valor">@(Model.Contraparte ?? (Model.EsEntrada ? "Sin proveedor" : "Sin cliente"))</div>
+        </div>
+        @if (Model.EsEntrada)
+        {
+            <div class="md-dato">
+                <div class="md-etiqueta">Factura / guía</div>
+                <div class="md-valor">@(Model.Documento ?? "No se anotó")</div>
             </div>
+        }
+        <div class="md-dato">
+            <div class="md-etiqueta">Registró</div>
+            <div class="md-valor">@Model.Usuario</div>
+        </div>
+        <div class="md-dato">
+            <div class="md-etiqueta">Sede</div>
+            <div class="md-valor">@Model.Sede</div>
         </div>
     </div>
 
-    <!-- Detalle de productos -->
-    <h5 class="mb-3"><i class="bi bi-list-ul"></i> Productos incluidos</h5>
-    @if (Model.DetalleMovimientos != null && Model.DetalleMovimientos.Any())
-    {
-        <table class="table table-striped table-bordered">
-            <thead class="table-secondary">
-                <tr>
-                    <th>Producto</th>
-                    <th>Cantidad</th>
-                    <th>Ubicación</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var detalle in Model.DetalleMovimientos)
-                {
+    <section class="md-seccion" aria-labelledby="tituloProductos">
+        <div class="md-cab">
+            <h2 id="tituloProductos">Productos</h2>
+            <p>Stock de la zona antes y después de @(Model.EsEntrada ? "recibir" : "sacar")</p>
+        </div>
+        <div class="cp-tabla-wrap">
+            <table class="cp-tabla">
+                <thead>
                     <tr>
-                        <td>@detalle.IdProductoNavigation?.Nombre</td>
-                        <td>@detalle.Cantidad</td>
-                        <td>@detalle.IdUbicacionNavigation?.CodigoEstante</td>
+                        <th scope="col">Producto</th>
+                        <th scope="col">Zona</th>
+                        <th scope="col" class="md-num">Cantidad</th>
+                        <th scope="col" class="md-num">Stock de la zona</th>
                     </tr>
-                }
-            </tbody>
-        </table>
-    }
-    else
-    {
-        <div class="alert alert-info">No hay productos registrados en este movimiento.</div>
-    }
+                </thead>
+                <tbody>
+                    @foreach (var l in Model.Lineas)
+                    {
+                        <tr>
+                            <td>
+                                <div class="cp-nombre">@l.Producto</div>
+                                <div class="cp-sub">@l.Codigo</div>
+                            </td>
+                            <td class="cp-doc">@l.Zona</td>
+                            <td class="md-num"><strong>@((Model.EsEntrada ? "+" : "−") + l.Cantidad)</strong> <span class="cp-sub">@l.Unidad</span></td>
+                            <td class="md-num md-cambio">@l.StockAnterior → <strong>@l.StockDespues</strong></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
 
-    <!-- Evidencias -->
-    <h5 class="mb-3 mt-4"><i class="bi bi-images"></i> Evidencias</h5>
-    @if (Model.Evidencia != null && Model.Evidencia.Any())
-    {
-        <div class="row">
-            @foreach (var ev in Model.Evidencia)
+    <section class="md-seccion" aria-labelledby="tituloFotos">
+        <div class="md-cab">
+            <h2 id="tituloFotos">Fotos</h2>
+            <p>@(Model.EsEntrada ? "De la mercadería recibida o de la guía" : "De la entrega")</p>
+        </div>
+        <div class="md-fotos">
+            @if (Model.Evidencias.Count == 0)
             {
-                <div class="col-md-3 mb-3">
-                    <div class="card">
-                        <a href="@ev.UrlArchivo" target="_blank">
-                            <img src="@ev.UrlArchivo" class="card-img-top" alt="Evidencia" style="max-height:200px; object-fit:cover;">
-                        </a>
-                        <div class="card-body p-2 text-center">
-                            <small class="text-muted">@ev.Fecha.ToString("dd/MM/yyyy HH:mm")</small>
-                        </div>
-                    </div>
-                </div>
+                <div class="md-sin-fotos">No hay fotos.</div>
+            }
+            else
+            {
+                <ul class="md-galeria">
+                    @foreach (var foto in Model.Evidencias)
+                    {
+                        var cuando = foto.Fecha.ToString("dd/MM HH:mm", inv);
+                        <li>
+                            <a href="@foto.Url" target="_blank" rel="noopener" aria-label="Ver foto del @cuando (abre en otra pestaña)">
+                                <img src="@foto.Url" alt="" loading="lazy" />
+                                <span>@cuando</span>
+                            </a>
+                        </li>
+                    }
+                </ul>
+            }
+            @if (Model.EsEntrada)
+            {
+                <form class="md-subir" method="post" asp-action="AgregarEvidencia" asp-route-id="@Model.Id" enctype="multipart/form-data">
+                    <label for="foto" class="visually-hidden">Foto de la entrada</label>
+                    <input type="file" id="foto" name="foto" accept="image/jpeg,image/png,image/webp" required aria-describedby="ayudaFoto" />
+                    <button type="submit" class="btn-g-outline"><i class="bi bi-upload" aria-hidden="true"></i> Subir foto</button>
+                </form>
+                <p class="cp-ayuda" id="ayudaFoto">JPG, PNG o WEBP de hasta 5 MB.</p>
             }
         </div>
-    }
-    else
-    {
-        <div class="alert alert-info">No hay evidencias adjuntas.</div>
-    }
+    </section>
 </div>
-
-@section Scripts {
-    <script>
-        // Opcional: ampliar imagen al hacer clic
-    </script>
-}

@@ -1,0 +1,51 @@
+@* Botón para ver/ocultar la contraseña en los campos envueltos en .cp-clave. Incluir después de los campos. *@
+<style>
+    .cp-clave {
+        position: relative;
+    }
+
+        .cp-clave input {
+            padding-right: 48px !important;
+        }
+
+    .cp-clave-ver {
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 44px;
+        height: 44px;
+        border: none;
+        background: none;
+        border-radius: 0 8px 8px 0;
+        color: var(--g-muted);
+        font-size: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+    }
+
+        .cp-clave-ver:hover {
+            color: var(--g-teal);
+        }
+
+        .cp-clave-ver:focus-visible {
+            outline: 2px solid var(--g-teal);
+            outline-offset: -2px;
+        }
+</style>
+<script>
+    document.querySelectorAll('.cp-clave-ver').forEach(boton => {
+        const input = document.getElementById(boton.getAttribute('aria-controls'));
+        boton.addEventListener('click', () => {
+            const ver = input.type === 'password';
+            input.type = ver ? 'text' : 'password';
+            boton.setAttribute('aria-pressed', ver ? 'true' : 'false');
+            boton.setAttribute('aria-label', ver ? 'Ocultar contraseña' : 'Mostrar contraseña');
+            boton.querySelector('i').className = ver ? 'bi bi-eye-slash' : 'bi bi-eye';
+        });
+    });
+    // Al enviar se vuelven a ocultar, para que el navegador no las guarde como texto visible
+    document.querySelectorAll('form').forEach(form => form.addEventListener('submit', () =>
+        form.querySelectorAll('.cp-clave input').forEach(input => input.type = 'password')));
+</script>

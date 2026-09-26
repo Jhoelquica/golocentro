@@ -1,0 +1,453 @@
+@using System.Globalization
+@using GestionAlmacen_Golocentro.ViewModels
+@model MapaViewModel
+@{
+    Layout = null;
+    // Escala del mini plano: 1 cuadrito = 10 unidades del SVG
+    const decimal S = 10m;
+    var anchoSvg = Model.Ancho * S;
+    var altoSvg = Model.Alto * S;
+    var zonas = Model.Zonas
+        .Where(z => z.X.HasValue && z.Y.HasValue && z.Ancho.HasValue && z.Alto.HasValue)
+        .ToList();
+}
+
+@functions {
+    // El SVG necesita punto decimal; con la cultura es-PE "1.5" saldría como "1,5"
+    static string F(decimal v) => v.ToString("0.##", CultureInfo.InvariantCulture);
+}
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Carteles de zonas - Golocentro</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        @@page {
+            size: A4 landscape;
+            margin: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #E2E8F0;
+            color: #0F172A;
+        }
+
+        .vh {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+            clip: rect(0 0 0 0);
+            white-space: nowrap;
+        }
+
+        /* ── Barra de pantalla (no se imprime) ── */
+        .barra {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: #FFFFFF;
+            border-bottom: 1px solid #CBD5E1;
+            padding: 14px 20px;
+        }
+
+        .barra-fila {
+            max-width: 1000px;
+            margin: 0 auto;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px 16px;
+        }
+
+        .barra h1 {
+            font-size: 20px;
+            font-weight: 600;
+            color: #334155;
+            margin-right: auto;
+        }
+
+        .barra p {
+            font-size: 14px;
+            color: #475569;
+        }
+
+        .volver {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #475569;
+            text-decoration: none;
+            padding: 6px 0;
+        }
+
+            .volver:hover {
+                color: #047857;
+            }
+
+        .boton {
+            min-height: 44px;
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: 1px solid #8492A6;
+            background: #FFFFFF;
+            color: #334155;
+            font-size: 14px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+            .boton:hover {
+                border-color: #047857;
+                color: #047857;
+            }
+
+            .boton.primario {
+                background: #047857;
+                border-color: #047857;
+                color: #FFFFFF;
+            }
+
+                .boton.primario:hover {
+                    background: #065F46;
+                    color: #FFFFFF;
+                }
+
+        .boton:focus-visible,
+        .volver:focus-visible,
+        .chip input:focus-visible + span {
+            outline: 2px solid #047857;
+            outline-offset: 2px;
+        }
+
+        .zonas-elegir {
+            border: none;
+            max-width: 1000px;
+            margin: 12px auto 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .chip {
+            position: relative;
+        }
+
+            .chip input {
+                position: absolute;
+                opacity: 0;
+                width: 100%;
+                height: 100%;
+                cursor: pointer;
+            }
+
+            .chip span {
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                min-height: 36px;
+                padding: 6px 12px;
+                border-radius: 20px;
+                border: 1px solid #8492A6;
+                font-size: 14px;
+                font-weight: 600;
+                color: #475569;
+                background: #FFFFFF;
+            }
+
+            .chip input:checked + span {
+                background: rgba(4,120,87,0.1);
+                border-color: #047857;
+                color: #047857;
+            }
+
+                .chip input:checked + span::before {
+                    content: "✓";
+                }
+
+        .aviso {
+            max-width: 1000px;
+            margin: 10px auto 0;
+            font-size: 14px;
+            color: #B91C1C;
+        }
+
+            .aviso:empty {
+                display: none;
+            }
+
+        /* ── Carteles ── */
+        .hojas {
+            max-width: 1000px;
+            margin: 24px auto 48px;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .cartel {
+            container-type: inline-size;
+            position: relative;
+            width: 100%;
+            aspect-ratio: 297 / 210;
+            background: #FFFFFF;
+            box-shadow: 0 4px 18px rgba(15,23,42,0.15);
+            overflow: hidden;
+        }
+
+            .cartel.omitido {
+                opacity: 0.35;
+            }
+
+        .c-marco {
+            position: absolute;
+            inset: 3.5cqw;
+            border: 0.5cqw solid #0F172A;
+            border-radius: 2cqw;
+            padding: 3cqw 4cqw;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .c-marca {
+            font-size: 1.9cqw;
+            font-weight: 600;
+            color: #475569;
+            letter-spacing: 0.02em;
+        }
+
+        .c-codigo {
+            font-size: 24cqw;
+            font-weight: 800;
+            line-height: 0.95;
+            letter-spacing: -0.02em;
+            color: #0F172A;
+            margin-top: 1.5cqw;
+        }
+
+        .c-desc {
+            font-size: 3.6cqw;
+            font-weight: 500;
+            color: #334155;
+            margin-top: 1.5cqw;
+            max-width: 48cqw;
+        }
+
+        .c-recepcion {
+            display: inline-block;
+            margin-top: 1.5cqw;
+            font-size: 2.6cqw;
+            font-weight: 800;
+            letter-spacing: 0.06em;
+            color: #FFFFFF;
+            background: #0F172A;
+            padding: 0.6cqw 1.8cqw;
+            border-radius: 1cqw;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        .c-pie {
+            margin-top: auto;
+            font-size: 1.7cqw;
+            color: #475569;
+            max-width: 44cqw;
+        }
+
+        /* Dentro del marco (inset 3.5cqw + borde) para que la leyenda no quede cortada */
+        .c-plano {
+            position: absolute;
+            right: 7cqw;
+            bottom: 6cqw;
+            width: 34cqw;
+            text-align: center;
+        }
+
+            .c-plano svg {
+                width: 100%;
+                height: auto;
+                display: block;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .c-plano p {
+                font-size: 1.6cqw;
+                font-weight: 600;
+                color: #334155;
+                margin-top: 0.8cqw;
+            }
+
+        .sin-plano {
+            max-width: 600px;
+            margin: 60px auto;
+            text-align: center;
+            color: #475569;
+        }
+
+        @@media print {
+            body {
+                background: none;
+            }
+
+            .barra,
+            .aviso {
+                display: none;
+            }
+
+            .hojas {
+                max-width: none;
+                margin: 0;
+                padding: 0;
+                display: block;
+            }
+
+            .cartel {
+                width: 297mm;
+                height: 210mm;
+                aspect-ratio: auto;
+                box-shadow: none;
+                break-after: page;
+            }
+
+                .cartel.omitido {
+                    display: none;
+                }
+        }
+    </style>
+</head>
+<body>
+    <header class="barra">
+        <div class="barra-fila">
+            <a class="volver" asp-action="Index" asp-route-sede="@Model.SedeId"><i class="bi bi-arrow-left" aria-hidden="true"></i> Volver al mapa</a>
+            <h1>Carteles de zonas</h1>
+            @if (zonas.Count > 0)
+            {
+                <button type="button" class="boton" id="btnTodas">Todas</button>
+                <button type="button" class="boton" id="btnNinguna">Ninguna</button>
+                <button type="button" class="boton primario" id="btnImprimir"><i class="bi bi-printer" aria-hidden="true"></i> <span id="textoImprimir">Imprimir</span></button>
+            }
+        </div>
+        @if (zonas.Count > 0)
+        {
+            <div class="barra-fila" style="margin-top:8px">
+                <p>Hoja A4 horizontal, un cartel por hoja. Marca las zonas que vas a imprimir.</p>
+            </div>
+            <fieldset class="zonas-elegir">
+                <legend class="vh">Zonas a imprimir</legend>
+                @foreach (var z in zonas)
+                {
+                    <label class="chip">
+                        <input type="checkbox" value="@z.Id" checked />
+                        <span>@z.Codigo</span>
+                    </label>
+                }
+            </fieldset>
+            <p class="aviso" id="aviso" role="alert"></p>
+        }
+    </header>
+
+    @if (zonas.Count == 0)
+    {
+        <p class="sin-plano">No hay zonas con posición en el plano para imprimir.</p>
+    }
+    else
+    {
+        <main class="hojas">
+            @foreach (var z in zonas)
+            {
+                <section class="cartel" data-id="@z.Id" aria-label="Cartel de la zona @z.Codigo">
+                    <div class="c-marco">
+                        <div class="c-marca">GOLOCENTRO · ALMACÉN @Model.SedeNombre.ToUpperInvariant()</div>
+                        <div class="c-codigo">@z.Codigo</div>
+                        @if (z.EsRecepcion)
+                        {
+                            <div><span class="c-recepcion">RECEPCIÓN</span></div>
+                            <div class="c-desc">Aquí se deja lo que llega. Luego se ordena en su zona.</div>
+                        }
+                        else if (!string.IsNullOrEmpty(z.Descripcion))
+                        {
+                            <div class="c-desc">@z.Descripcion</div>
+                        }
+                        <div class="c-pie">¿Buscas un producto? En el sistema: Mapa del almacén → ¿Dónde está?</div>
+                    </div>
+
+                    <div class="c-plano">
+                        <svg viewBox="-4 -4 @F(anchoSvg + 8) @F(altoSvg + 8)" role="img" aria-label="Ubicación de la zona @z.Codigo en el plano">
+                            <rect x="0" y="0" width="@F(anchoSvg)" height="@F(altoSvg)" fill="#FFFFFF" stroke="#0F172A" stroke-width="2.5" />
+                            @foreach (var otra in zonas)
+                            {
+                                var esta = otra.Id == z.Id;
+                                <rect x="@F(otra.X!.Value * S + 1)" y="@F(otra.Y!.Value * S + 1)"
+                                      width="@F(otra.Ancho!.Value * S - 2)" height="@F(otra.Alto!.Value * S - 2)" rx="1.5"
+                                      fill="@(esta ? "#0F172A" : "#F1F5F9")" stroke="@(esta ? "#0F172A" : "#94A3B8")" stroke-width="0.8" />
+                            }
+                            @foreach (var l in Model.Lineas.Where(l => l.Tipo == "division"))
+                            {
+                                <line x1="@F(l.X1 * S)" y1="@F(l.Y1 * S)" x2="@F(l.X2 * S)" y2="@F(l.Y2 * S)"
+                                      stroke="#475569" stroke-width="1.5" stroke-dasharray="5 3" />
+                            }
+                            @foreach (var l in Model.Lineas.Where(l => l.Tipo == "entrada"))
+                            {
+                                <g>
+                                    <line x1="@F(l.X1 * S)" y1="@F(l.Y1 * S)" x2="@F(l.X2 * S)" y2="@F(l.Y2 * S)" stroke="#FFFFFF" stroke-width="4" />
+                                    <text x="@F(l.X1 * S + 4)" y="@F(l.Y1 * S + 8)" font-size="8" font-weight="600" fill="#0F172A" font-family="Inter, sans-serif">Entrada</text>
+                                </g>
+                            }
+                        </svg>
+                        <p>Esta zona en el almacén</p>
+                    </div>
+                </section>
+            }
+        </main>
+
+        <script>
+            const casillas = [...document.querySelectorAll('.zonas-elegir input')];
+            const carteles = new Map([...document.querySelectorAll('.cartel')].map(c => [c.dataset.id, c]));
+            const textoImprimir = document.getElementById('textoImprimir');
+            const aviso = document.getElementById('aviso');
+
+            function actualizar() {
+                let marcadas = 0;
+                casillas.forEach(c => {
+                    carteles.get(c.value)?.classList.toggle('omitido', !c.checked);
+                    if (c.checked) marcadas++;
+                });
+                textoImprimir.textContent = marcadas ? `Imprimir (${marcadas})` : 'Imprimir';
+                if (marcadas) aviso.textContent = '';
+                return marcadas;
+            }
+
+            casillas.forEach(c => c.addEventListener('change', actualizar));
+            document.getElementById('btnTodas').addEventListener('click', () => { casillas.forEach(c => c.checked = true); actualizar(); });
+            document.getElementById('btnNinguna').addEventListener('click', () => { casillas.forEach(c => c.checked = false); actualizar(); });
+            document.getElementById('btnImprimir').addEventListener('click', () => {
+                if (!actualizar()) {
+                    aviso.textContent = 'Marca al menos una zona para imprimir.';
+                    return;
+                }
+                window.print();
+            });
+            actualizar();
+        </script>
+    }
+</body>
+</html>

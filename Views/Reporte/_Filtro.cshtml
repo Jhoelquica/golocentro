@@ -1,0 +1,90 @@
+@using System.Globalization
+@using GestionAlmacen_Golocentro.ViewModels
+@model FiltroReporte
+@{
+    var inv = CultureInfo.InvariantCulture;
+    string Iso(DateOnly d) => d.ToString("yyyy-MM-dd", inv);
+    var hoy = DateOnly.FromDateTime(DateTime.Today);
+    var inicioMes = new DateOnly(hoy.Year, hoy.Month, 1);
+    var rangos = new[]
+    {
+        (Texto: "Hoy", Desde: hoy, Hasta: hoy),
+        (Texto: "Ayer", Desde: hoy.AddDays(-1), Hasta: hoy.AddDays(-1)),
+        (Texto: "Últimos 7 días", Desde: hoy.AddDays(-6), Hasta: hoy),
+        (Texto: "Este mes", Desde: inicioMes, Hasta: hoy),
+        (Texto: "Mes pasado", Desde: inicioMes.AddMonths(-1), Hasta: inicioMes.AddDays(-1)),
+        (Texto: "Este año", Desde: new DateOnly(hoy.Year, 1, 1), Hasta: hoy)
+    };
+    // Filtros extra propios de un reporte (p. ej. soloAlertas en Stock)
+    var extra = ViewData["FiltroExtra"] as IDictionary<string, string> ?? new Dictionary<string, string>();
+
+    var rutaExcel = new Dictionary<string, string>(extra) { ["formato"] = "excel" };
+    if (Model.ConFechas)
+    {
+        rutaExcel["desde"] = Iso(Model.Desde);
+        rutaExcel["hasta"] = Iso(Model.Hasta);
+    }
+    if (Model.PuedeElegirSede && Model.SedeId != null)
+        rutaExcel["sede"] = Model.SedeId.Value.ToString(inv);
+}
+
+<div class="rp-barra">
+    @if (Model.ConFechas)
+    {
+        <nav class="rp-rangos" aria-label="Periodos rápidos">
+            @foreach (var r in rangos)
+            {
+                var activo = r.Desde == Model.Desde && r.Hasta == Model.Hasta;
+                <a asp-action="@Model.Accion" asp-route-desde="@Iso(r.Desde)" asp-route-hasta="@Iso(r.Hasta)"
+                   asp-route-sede="@(Model.PuedeElegirSede ? Model.SedeId : null)" asp-all-route-data="extra"
+                   aria-current="@(activo ? "true" : null)">@r.Texto</a>
+            }
+        </nav>
+    }
+
+    <div class="rp-fila-filtros">
+        <form class="rp-filtros" method="get" asp-action="@Model.Accion" aria-label="Filtros del reporte">
+            @foreach (var (clave, valor) in extra)
+            {
+                <input type="hidden" name="@clave" value="@valor" />
+            }
+            @if (Model.ConFechas)
+            {
+                <div class="rp-campo">
+                    <label for="desde">Desde</label>
+                    <input type="date" id="desde" name="desde" value="@Iso(Model.Desde)" max="@Iso(hoy)" />
+                </div>
+                <div class="rp-campo">
+                    <label for="hasta">Hasta</label>
+                    <input type="date" id="hasta" name="hasta" value="@Iso(Model.Hasta)" max="@Iso(hoy)" />
+                </div>
+            }
+            @if (Model.PuedeElegirSede)
+            {
+                <div class="rp-campo">
+                    <label for="sede">Sede</label>
+                    <select id="sede" name="sede">
+                        <option value="">Todas las sedes</option>
+                        @foreach (var s in Model.Sedes)
+                        {
+                            <option value="@s.Id" selected="@(Model.SedeId == s.Id)">@s.Nombre</option>
+                        }
+                    </select>
+                </div>
+            }
+            @if (Model.ConFechas || Model.PuedeElegirSede)
+            {
+                <button type="submit" class="btn-g-outline"><i class="bi bi-funnel" aria-hidden="true"></i> Ver reporte</button>
+            }
+        </form>
+
+        <div class="rp-acciones">
+            <a class="btn-g-primary" asp-action="@Model.Accion" asp-all-route-data="rutaExcel">
+                <i class="bi bi-file-earmark-spreadsheet" aria-hidden="true"></i> Descargar Excel
+            </a>
+            <button type="button" class="btn-g-outline" onclick="window.print()">
+                <i class="bi bi-printer" aria-hidden="true"></i> Imprimir
+            </button>
+        </div>
+    </div>
+</div>

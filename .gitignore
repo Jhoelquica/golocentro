@@ -35,6 +35,9 @@ appsettings.Development.json
 appsettings.Production.json
 !appsettings.Example.json
 
+## Ignorar configuración de MCP local (puede contener API keys, ej. 21st.dev)
+.mcp.json
+
 ## Ignorar uploads de usuario (fotos/evidencias reales, no versionar)
 wwwroot/uploads/*
 !wwwroot/uploads/.gitkeep

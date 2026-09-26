@@ -1,0 +1,363 @@
+@using System.Globalization
+@using GestionAlmacen_Golocentro.ViewModels
+@model VentasIndexViewModel
+@{
+    ViewData["Title"] = "Ventas";
+
+    var inv = CultureInfo.InvariantCulture;
+    string Monto(decimal n) => n.ToString("0.00", inv);
+    string Fecha(DateOnly d) => d.ToString("dd/MM/yyyy", inv);
+    string Iso(DateOnly d) => d.ToString("yyyy-MM-dd", inv);
+
+    var hoy = DateOnly.FromDateTime(DateTime.Today);
+    var rangos = new[]
+    {
+        (Texto: "Hoy", Desde: hoy, Hasta: hoy),
+        (Texto: "Ayer", Desde: hoy.AddDays(-1), Hasta: hoy.AddDays(-1)),
+        (Texto: "Últimos 7 días", Desde: hoy.AddDays(-6), Hasta: hoy),
+        (Texto: "Este mes", Desde: new DateOnly(hoy.Year, hoy.Month, 1), Hasta: hoy)
+    };
+    var periodo = Model.Desde == Model.Hasta ? $"el {Fecha(Model.Desde)}" : $"del {Fecha(Model.Desde)} al {Fecha(Model.Hasta)}";
+    var hayBusqueda = !string.IsNullOrWhiteSpace(Model.Busqueda);
+}
+
+@await Html.PartialAsync("~/Views/Shared/_EstilosGestion.cshtml")
+
+<style>
+    .vt-filtros {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        gap: 10px;
+        margin-bottom: 1rem;
+    }
+
+    .vt-rangos {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 12px;
+    }
+
+        .vt-rangos a {
+            min-height: 36px;
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 14px;
+            border-radius: 999px;
+            border: 1px solid var(--g-input-border);
+            background: var(--g-white);
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--g-text);
+            text-decoration: none;
+        }
+
+            .vt-rangos a:hover {
+                border-color: var(--g-teal);
+                color: var(--g-teal);
+            }
+
+            .vt-rangos a[aria-current="true"] {
+                background: var(--g-teal);
+                border-color: var(--g-teal);
+                color: #FFFFFF;
+            }
+
+            .vt-rangos a:focus-visible {
+                outline: 2px solid var(--g-teal);
+                outline-offset: 2px;
+            }
+
+    .vt-campo label {
+        display: block;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--g-muted);
+        margin-bottom: 4px;
+    }
+
+    .vt-campo input {
+        height: 44px;
+        padding: 0 10px;
+        border: 1px solid var(--g-input-border);
+        border-radius: 8px;
+        font-size: 15px;
+        font-family: inherit;
+        color: var(--g-text);
+        background: var(--g-white);
+    }
+
+        .vt-campo input:focus {
+            outline: none;
+            border-color: var(--g-teal);
+            box-shadow: 0 0 0 3px rgba(4,120,87,0.25);
+        }
+
+    .vt-campo-buscar {
+        flex: 1;
+        min-width: 200px;
+        max-width: 320px;
+    }
+
+        .vt-campo-buscar input {
+            width: 100%;
+        }
+
+    .vt-resumen {
+        display: grid;
+        grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
+        gap: 12px;
+        margin-bottom: 1rem;
+    }
+
+    @@media (max-width: 640px) {
+        .vt-resumen {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .vt-tarjeta {
+        background: var(--g-white);
+        border: 1px solid var(--g-border);
+        border-radius: 14px;
+        padding: 14px 18px;
+    }
+
+    .vt-etiqueta {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--g-muted);
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+    }
+
+    .vt-total {
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--g-navy);
+        font-variant-numeric: tabular-nums;
+        line-height: 1.2;
+        margin-top: 2px;
+    }
+
+    .vt-sub {
+        font-size: 13px;
+        color: var(--g-muted);
+    }
+
+    .vt-metodos {
+        list-style: none;
+        padding: 0;
+        margin: 8px 0 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+        .vt-metodos li {
+            padding: 6px 12px;
+            border-radius: 10px;
+            background: var(--g-bg);
+            border: 1px solid var(--g-border);
+            font-size: 13px;
+            color: var(--g-text);
+            font-variant-numeric: tabular-nums;
+        }
+
+            .vt-metodos li strong {
+                display: block;
+                font-size: 15px;
+                color: var(--g-navy);
+            }
+
+    .vt-num {
+        font-weight: 600;
+        color: var(--g-teal);
+        text-decoration: none;
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+    }
+
+        .vt-num:hover {
+            text-decoration: underline;
+        }
+
+        .vt-num:focus-visible {
+            outline: 2px solid var(--g-teal);
+            outline-offset: 2px;
+            border-radius: 4px;
+        }
+
+    .vt-monto {
+        text-align: right;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+    }
+
+    .cp-tabla th.vt-monto {
+        text-align: right;
+    }
+
+    .vt-chip-anulada {
+        display: inline-block;
+        margin-left: 6px;
+        padding: 1px 8px;
+        border-radius: 999px;
+        background: rgba(220,38,38,0.1);
+        color: var(--g-danger-text);
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .vt-anulada td {
+        color: var(--g-muted);
+    }
+
+    .vt-anulada .vt-monto {
+        font-weight: 400;
+    }
+
+    @@container (max-width: 720px) {
+        .vt-col-vendedor {
+            display: none;
+        }
+    }
+</style>
+
+<div class="cp-page">
+    <div class="cp-header">
+        <div>
+            <h1><i class="bi bi-receipt" aria-hidden="true"></i> Ventas</h1>
+            <p>
+                @Model.Ventas @(Model.Ventas == 1 ? "venta" : "ventas") @periodo
+                @if (hayBusqueda)
+                {
+                    <span> @(Model.Ventas == 1 ? "que coincide" : "que coinciden") con «@Model.Busqueda»</span>
+                }
+                @if (Model.Anuladas > 0)
+                {
+                    <span> · @Model.Anuladas @(Model.Anuladas == 1 ? "anulada" : "anuladas") (no suman)</span>
+                }
+            </p>
+        </div>
+        <a class="btn-g-primary" asp-action="Nueva"><i class="bi bi-plus-lg" aria-hidden="true"></i> Nueva venta</a>
+    </div>
+
+    <nav class="vt-rangos" aria-label="Periodos rápidos">
+        @foreach (var r in rangos)
+        {
+            var activo = r.Desde == Model.Desde && r.Hasta == Model.Hasta;
+            <a asp-action="Index" asp-route-desde="@Iso(r.Desde)" asp-route-hasta="@Iso(r.Hasta)" asp-route-q="@Model.Busqueda"
+               aria-current="@(activo ? "true" : null)">@r.Texto</a>
+        }
+    </nav>
+
+    <form class="vt-filtros" method="get" asp-action="Index" role="search" aria-label="Filtrar ventas">
+        <div class="vt-campo">
+            <label for="desde">Desde</label>
+            <input type="date" id="desde" name="desde" value="@Iso(Model.Desde)" max="@Iso(hoy)" />
+        </div>
+        <div class="vt-campo">
+            <label for="hasta">Hasta</label>
+            <input type="date" id="hasta" name="hasta" value="@Iso(Model.Hasta)" max="@Iso(hoy)" />
+        </div>
+        <div class="vt-campo vt-campo-buscar">
+            <label for="q">Nº de nota o cliente</label>
+            <input type="search" id="q" name="q" value="@Model.Busqueda" placeholder="Ej.: 15 o Juan" autocomplete="off" />
+        </div>
+        <button type="submit" class="btn-g-outline"><i class="bi bi-funnel" aria-hidden="true"></i> Filtrar</button>
+        @if (hayBusqueda)
+        {
+            <a class="cp-limpiar" asp-action="Index" asp-route-desde="@Iso(Model.Desde)" asp-route-hasta="@Iso(Model.Hasta)">Quitar búsqueda</a>
+        }
+    </form>
+
+    <div class="vt-resumen">
+        <div class="vt-tarjeta">
+            <div class="vt-etiqueta">Total vendido</div>
+            <div class="vt-total">S/ @Monto(Model.Total)</div>
+            <div class="vt-sub">@Model.Ventas @(Model.Ventas == 1 ? "venta" : "ventas")</div>
+        </div>
+        <div class="vt-tarjeta">
+            <div class="vt-etiqueta">Por método de pago</div>
+            @if (Model.PorMetodo.Count == 0)
+            {
+                <div class="vt-sub mt-2">Sin ventas en este periodo.</div>
+            }
+            else
+            {
+                <ul class="vt-metodos">
+                    @foreach (var m in Model.PorMetodo)
+                    {
+                        <li>@m.Metodo · @m.Ventas <strong>S/ @Monto(m.Total)</strong></li>
+                    }
+                </ul>
+            }
+        </div>
+    </div>
+
+    <section class="cp-panel" aria-label="Lista de ventas">
+        @if (Model.Filas.Count == 0)
+        {
+            <div class="cp-vacio">
+                <i class="bi bi-receipt" aria-hidden="true"></i>
+                @if (hayBusqueda)
+                {
+                    <span>No hay ventas que coincidan con «@Model.Busqueda» @periodo.</span>
+                }
+                else
+                {
+                    <span>No hay ventas @periodo.</span><br />
+                    <a asp-action="Nueva">Registrar una venta</a>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="cp-tabla-wrap">
+                <table class="cp-tabla">
+                    <thead>
+                        <tr>
+                            <th scope="col">Nº</th>
+                            <th scope="col">Fecha</th>
+                            <th scope="col">Cliente</th>
+                            <th scope="col">Pago</th>
+                            <th scope="col" class="vt-col-vendedor">Atendió</th>
+                            <th scope="col" class="vt-monto">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var f in Model.Filas)
+                        {
+                            <tr class="@(f.Anulada ? "vt-anulada" : null)">
+                                <td>
+                                    <a class="vt-num" asp-action="Nota" asp-route-id="@f.IdMovimiento" aria-label="Ver nota @f.Numero@(f.Anulada ? ", anulada" : "")">@f.Numero</a>
+                                    @if (f.Anulada)
+                                    {
+                                        <span class="vt-chip-anulada">Anulada</span>
+                                    }
+                                </td>
+                                <td class="cp-doc">@f.Fecha.ToString("dd/MM HH:mm", inv)</td>
+                                <td class="cp-nombre">@f.Cliente</td>
+                                <td>@f.MetodoPago</td>
+                                <td class="vt-col-vendedor">@f.Vendedor</td>
+                                <td class="vt-monto">
+                                    @if (f.Anulada)
+                                    {
+                                        <s>S/ @Monto(f.Total)</s>
+                                    }
+                                    else
+                                    {
+                                        <span>S/ @Monto(f.Total)</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+</div>

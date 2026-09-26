@@ -1,13 +1,92 @@
-﻿@{
+@using GestionAlmacen_Golocentro.ViewModels
+@model DashboardViewModel
+@{
     ViewData["Title"] = "Dashboard";
-    var nombre = ViewBag.NombreCompleto as string ?? "";
-    var rol = ViewBag.Rol as string ?? "";
+    var rol = RolHelper.Etiqueta(Model.Rol);
     var hora = DateTime.Now.Hour;
     var saludo = hora < 12 ? "Buenos días" : hora < 18 ? "Buenas tardes" : "Buenas noches";
+    var fecha = DateTime.Now.ToString("dddd, d 'de' MMMM 'de' yyyy", Cultura);
+    fecha = char.ToUpper(fecha[0]) + fecha[1..];
+
+    var entradasSemana = Model.UltimosSieteDias.Sum(d => d.Entradas);
+    var salidasSemana = Model.UltimosSieteDias.Sum(d => d.Salidas);
+}
+
+@functions {
+    static readonly System.Globalization.CultureInfo Cultura = new("es-PE");
+
+    static string Cuando(DateTime f)
+    {
+        if (f.Date == DateTime.Today) return "Hoy, " + f.ToString("HH:mm");
+        if (f.Date == DateTime.Today.AddDays(-1)) return "Ayer, " + f.ToString("HH:mm");
+        return f.ToString("dd/MM, HH:mm");
+    }
+
+    static string NombreDia(DateTime f) =>
+        f.Date == DateTime.Today ? "hoy" : f.ToString("ddd d", Cultura).Replace(".", "");
+
+    string EtiquetaSerie(string serie, Func<ActividadDia, int> valor) =>
+        $"{serie} por día, últimos 7 días: " +
+        string.Join(", ", Model.UltimosSieteDias.Select(d => $"{NombreDia(d.Fecha)}: {valor(d)}"));
+
+    // Los mensajes se generan como "Stock bajo: X" / "Próximo a vencer: X"; la insignia ya dice el tipo
+    static string SinPrefijo(string mensaje)
+    {
+        foreach (var prefijo in new[] { "Stock bajo: ", "Próximo a vencer: " })
+            if (mensaje.StartsWith(prefijo)) return mensaje[prefijo.Length..];
+        return mensaje;
+    }
 }
 
 <style>
-    /* ── Métricas ── */
+    .dash-greeting {
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+        .dash-greeting h1 {
+            font-size: 22px;
+            font-weight: 600;
+            color: var(--g-navy);
+            margin: 0 0 6px;
+        }
+
+        .dash-greeting p {
+            font-size: 14px;
+            color: var(--g-muted);
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+    .badge-rol {
+        background: rgba(4,120,87,0.12);
+        color: var(--g-teal);
+        font-size: 12px;
+        font-weight: 600;
+        padding: 3px 10px;
+        border-radius: 20px;
+    }
+
+    .dash-date {
+        background: var(--g-white);
+        border: 1px solid var(--g-border);
+        border-radius: var(--radius);
+        padding: 8px 14px;
+        font-size: 13px;
+        color: var(--g-muted);
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    /* ── Métricas (informativas, sin efecto hover para no parecer clicables) ── */
     .metric-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
@@ -16,68 +95,79 @@
     }
 
     .metric-card {
-        background: #fff;
-        border: 1px solid rgba(121,174,146,0.2);
+        background: var(--g-white);
+        border: 1px solid var(--g-border);
         border-radius: 14px;
-        padding: 1.25rem 1.5rem;
+        padding: 1.25rem;
         display: flex;
         align-items: center;
         gap: 1rem;
-        transition: transform 0.15s, box-shadow 0.15s;
+        min-width: 0;
     }
 
-        .metric-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0,31,54,0.08);
-        }
-
     .metric-icon {
-        width: 52px;
-        height: 52px;
-        border-radius: 14px;
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
         display: flex;
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
-        font-size: 24px;
+        font-size: 22px;
     }
 
-        .metric-icon.entrada {
-            background: rgba(28,85,96,0.1);
-            color: #1C5560;
-        }
+        .metric-icon.entrada { background: rgba(4,120,87,0.1); color: var(--g-teal); }
+        .metric-icon.salida  { background: rgba(51,65,85,0.08); color: var(--g-navy); }
+        .metric-icon.alerta  { background: rgba(220,38,38,0.1); color: var(--g-danger-text); }
+        .metric-icon.ok      { background: rgba(4,120,87,0.1); color: var(--g-teal); }
 
-        .metric-icon.salida {
-            background: rgba(121,174,146,0.2);
-            color: #4a8c6f;
-        }
-
-        .metric-icon.alerta {
-            background: rgba(231,76,60,0.1);
-            color: #e74c3c;
-        }
+    .metric-body {
+        flex: 1;
+        min-width: 0;
+    }
 
     .metric-label {
         font-size: 12px;
         font-weight: 600;
-        color: #79AE92;
+        color: var(--g-muted);
         letter-spacing: 0.05em;
         text-transform: uppercase;
         margin-bottom: 4px;
     }
 
     .metric-value {
-        font-size: 32px;
+        font-size: 30px;
         font-weight: 600;
-        color: #001F36;
-        line-height: 1;
+        color: var(--g-navy);
+        line-height: 1.1;
+        font-variant-numeric: tabular-nums;
     }
 
     .metric-sub {
-        font-size: 11px;
-        color: #a0b8b0;
-        margin-top: 3px;
+        font-size: 12px;
+        color: var(--g-muted);
+        margin-top: 4px;
     }
+
+    /* Mini gráfico de 7 días: cada tarjeta muestra una sola serie, así que no depende del color */
+    .spark {
+        display: flex;
+        align-items: flex-end;
+        gap: 3px;
+        width: 76px;
+        height: 40px;
+        flex-shrink: 0;
+        border-bottom: 1px solid var(--g-input-border);
+    }
+
+    .spark-bar {
+        flex: 1;
+        border-radius: 2px 2px 0 0;
+        min-height: 0;
+    }
+
+    .spark.entrada .spark-bar { background: var(--g-teal); }
+    .spark.salida .spark-bar  { background: #64748B; }
 
     /* ── Acciones rápidas ── */
     .actions-grid {
@@ -88,8 +178,8 @@
     }
 
     .action-card {
-        background: #fff;
-        border: 1px solid rgba(121,174,146,0.2);
+        background: var(--g-white);
+        border: 1px solid var(--g-border);
         border-radius: 14px;
         padding: 1.25rem 1rem;
         display: flex;
@@ -98,430 +188,482 @@
         justify-content: center;
         gap: 10px;
         text-decoration: none;
-        transition: all 0.18s;
-        cursor: pointer;
+        transition: background var(--transition), border-color var(--transition), transform var(--transition), box-shadow var(--transition);
     }
 
-        .action-card:hover {
-            background: #001F36;
-            border-color: #001F36;
+        .action-card:hover,
+        .action-card:focus-visible {
+            background: var(--g-navy);
+            border-color: var(--g-navy);
             transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(0,31,54,0.2);
+            box-shadow: 0 8px 24px rgba(15,23,42,0.2);
         }
 
-            .action-card:hover .action-icon {
-                background: rgba(251,255,205,0.15);
-                color: #FBFFCD;
+        .action-card:focus-visible {
+            outline: 2px solid var(--g-teal);
+            outline-offset: 3px;
+        }
+
+            .action-card:hover .action-icon,
+            .action-card:focus-visible .action-icon {
+                background: rgba(255,255,255,0.15);
+                color: #FFFFFF;
             }
 
-            .action-card:hover .action-label {
-                color: #FBFFCD;
+            .action-card:hover .action-label,
+            .action-card:focus-visible .action-label {
+                color: #FFFFFF;
             }
 
-            .action-card:hover .action-sub {
-                color: rgba(251,255,205,0.6);
+            .action-card:hover .action-sub,
+            .action-card:focus-visible .action-sub {
+                color: rgba(255,255,255,0.75);
             }
 
     .action-icon {
         width: 48px;
         height: 48px;
         border-radius: 12px;
-        background: rgba(28,85,96,0.08);
+        background: rgba(4,120,87,0.08);
         display: flex;
         align-items: center;
         justify-content: center;
         font-size: 22px;
-        color: #1C5560;
-        transition: all 0.18s;
+        color: var(--g-teal);
+        transition: background var(--transition), color var(--transition);
     }
 
     .action-label {
-        font-size: 13px;
+        font-size: 14px;
         font-weight: 600;
-        color: #001F36;
+        color: var(--g-navy);
         text-align: center;
-        transition: color 0.18s;
+        transition: color var(--transition);
     }
 
     .action-sub {
-        font-size: 11px;
-        color: #79AE92;
+        font-size: 12px;
+        color: var(--g-muted);
         text-align: center;
-        transition: color 0.18s;
+        transition: color var(--transition);
     }
 
-    /* ── Tablas inferiores ── */
+    /* ── Paneles inferiores ── */
     .bottom-grid {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1.15fr 1fr;
         gap: 1rem;
+        align-items: start;
     }
 
-    .table-card {
-        background: #fff;
-        border: 1px solid rgba(121,174,146,0.2);
+    .panel {
+        background: var(--g-white);
+        border: 1px solid var(--g-border);
         border-radius: 14px;
         overflow: hidden;
     }
 
-    .table-card-header {
-        padding: 1rem 1.25rem;
-        border-bottom: 1px solid rgba(121,174,146,0.15);
+    .panel-header {
+        padding: 0.75rem 0.75rem 0.75rem 1.25rem;
+        border-bottom: 1px solid var(--g-border);
         display: flex;
         align-items: center;
         gap: 8px;
     }
 
-        .table-card-header i {
+        .panel-header > i {
             font-size: 17px;
-            color: #1C5560;
+            color: var(--g-teal);
         }
 
-        .table-card-header span {
-            font-size: 14px;
+        .panel-header h2 {
+            font-size: 15px;
             font-weight: 600;
-            color: #001F36;
+            color: var(--g-navy);
+            margin: 0;
             flex: 1;
         }
 
-        .table-card-header a {
-            font-size: 12px;
-            color: #79AE92;
-            text-decoration: none;
-            font-weight: 500;
-        }
-
-            .table-card-header a:hover {
-                color: #1C5560;
-            }
-
-    .mov-table {
-        width: 100%;
-        border-collapse: collapse;
-    }
-
-        .mov-table th {
-            font-size: 11px;
-            font-weight: 600;
-            color: #79AE92;
-            letter-spacing: 0.06em;
-            text-transform: uppercase;
-            padding: 8px 1.25rem;
-            background: #f8fbfa;
-            border-bottom: 1px solid rgba(121,174,146,0.15);
-        }
-
-        .mov-table td {
-            padding: 10px 1.25rem;
-            font-size: 13px;
-            color: #334;
-            border-bottom: 1px solid rgba(121,174,146,0.1);
-            vertical-align: middle;
-        }
-
-        .mov-table tr:last-child td {
-            border-bottom: none;
-        }
-
-        .mov-table tr:hover td {
-            background: #f8fbfa;
-        }
-
-    .empty-row td {
-        text-align: center;
-        color: #b0c4bb;
-        padding: 2rem;
+    .panel-link {
         font-size: 13px;
-    }
-
-    /* Badges */
-    .badge-entrada {
-        background: rgba(28,85,96,0.12);
-        color: #1C5560;
-        font-size: 11px;
-        font-weight: 600;
-        padding: 3px 10px;
-        border-radius: 20px;
-        white-space: nowrap;
-    }
-
-    .badge-salida {
-        background: rgba(192,57,43,0.1);
-        color: #c0392b;
-        font-size: 11px;
-        font-weight: 600;
-        padding: 3px 10px;
-        border-radius: 20px;
-        white-space: nowrap;
-    }
-
-    .badge-stock {
-        background: rgba(230,150,0,0.12);
-        color: #b37a00;
-        font-size: 11px;
-        font-weight: 600;
-        padding: 3px 10px;
-        border-radius: 20px;
-        white-space: nowrap;
-    }
-
-    .badge-venc {
-        background: rgba(121,174,146,0.2);
-        color: #3a7a5a;
-        font-size: 11px;
-        font-weight: 600;
-        padding: 3px 10px;
-        border-radius: 20px;
-        white-space: nowrap;
-    }
-
-    /* Saludo */
-    .dash-greeting {
-        margin-bottom: 1.5rem;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-
-        .dash-greeting h2 {
-            font-size: 20px;
-            font-weight: 600;
-            color: #001F36;
-            margin: 0;
-        }
-
-        .dash-greeting p {
-            font-size: 13px;
-            color: #79AE92;
-            margin: 2px 0 0;
-        }
-
-    .dash-date {
-        background: #fff;
-        border: 1px solid rgba(121,174,146,0.2);
-        border-radius: 10px;
-        padding: 8px 14px;
-        font-size: 12px;
-        color: #5a7d6e;
+        color: var(--g-muted);
+        text-decoration: none;
         font-weight: 500;
-        display: flex;
+        padding: 6px 10px;
+        border-radius: 8px;
+        display: inline-flex;
         align-items: center;
-        gap: 6px;
+        gap: 4px;
+        transition: color var(--transition), background var(--transition);
     }
 
-    @@media (max-width: 900px) {
+        .panel-link:hover {
+            color: var(--g-teal);
+            background: rgba(4,120,87,0.06);
+        }
+
+        .panel-link:focus-visible {
+            outline: 2px solid var(--g-teal);
+            outline-offset: 1px;
+        }
+
+    .lista {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+
+        .lista > li + li {
+            border-top: 1px solid var(--g-border);
+        }
+
+    .actividad-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 1.25rem;
+        text-decoration: none;
+        color: inherit;
+        transition: background var(--transition);
+    }
+
+        .actividad-item:hover {
+            background: var(--g-bg);
+        }
+
+        .actividad-item:focus-visible {
+            outline: 2px solid var(--g-teal);
+            outline-offset: -2px;
+        }
+
+    .actividad-icono {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        font-size: 16px;
+    }
+
+        .actividad-icono.entrada { background: rgba(4,120,87,0.1); color: var(--g-teal); }
+        .actividad-icono.salida  { background: rgba(51,65,85,0.08); color: var(--g-navy); }
+
+    .actividad-texto {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .actividad-titulo {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--g-text);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .actividad-meta {
+        font-size: 12px;
+        color: var(--g-muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .actividad-hora {
+        font-size: 12px;
+        color: var(--g-muted);
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 3px 9px;
+        border-radius: 20px;
+        white-space: nowrap;
+    }
+
+        .chip.entrada     { background: rgba(4,120,87,0.12);  color: var(--g-teal); }
+        .chip.salida      { background: rgba(51,65,85,0.1);   color: var(--g-navy); }
+        .chip.anulada     { background: rgba(220,38,38,0.1);  color: var(--g-danger-text); }
+        .chip.stock       { background: rgba(245,158,11,0.15); color: #92400E; }
+        .chip.vencimiento { background: rgba(220,38,38,0.1);  color: var(--g-danger-text); }
+
+    .alerta-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 12px 1.25rem;
+    }
+
+    .alerta-texto {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .alerta-msg {
+        font-size: 14px;
+        color: var(--g-text);
+    }
+
+    .alerta-fecha {
+        font-size: 12px;
+        color: var(--g-muted);
+    }
+
+    .vacio {
+        text-align: center;
+        padding: 2rem 1.25rem;
+        color: var(--g-muted);
+        font-size: 14px;
+    }
+
+        .vacio > i {
+            font-size: 26px;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .vacio a {
+            color: var(--g-teal);
+            font-weight: 600;
+        }
+
+    /* Con sidebar (230px) las 3 métricas necesitan ~1200px de ventana; debajo, una por fila */
+    @@media (max-width: 1199.98px) {
         .metric-grid {
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1fr;
+            gap: 0.75rem;
         }
+    }
 
-        .actions-grid {
-            grid-template-columns: 1fr 1fr;
-        }
-
+    @@media (max-width: 1100px) {
         .bottom-grid {
             grid-template-columns: 1fr;
         }
     }
 
-    @@media (max-width: 576px) {
-        .metric-grid {
-            grid-template-columns: 1fr;
-        }
-
+    @@media (max-width: 1000px) {
         .actions-grid {
             grid-template-columns: 1fr 1fr;
         }
     }
+
+    @@media (max-width: 576px) {
+        .actividad-hora {
+            display: none;
+        }
+    }
+
+    @@media (prefers-reduced-motion: reduce) {
+        .action-card,
+        .action-card:hover,
+        .action-card:focus-visible {
+            transition: none;
+            transform: none;
+        }
+    }
 </style>
 
-<!-- Saludo -->
 <div class="dash-greeting">
     <div>
-        <h2>@saludo, @nombre 👋</h2>
+        <h1>@saludo, @Model.NombreCompleto</h1>
         <p>
-            <span class="badge-entrada" style="font-size:12px">@rol</span>
-            &nbsp;· Resumen del día
+            <span class="badge-rol">@rol</span>
+            <span>Resumen del día</span>
         </p>
     </div>
     <div class="dash-date">
-        <i class="bi bi-calendar3"></i>
-        @DateTime.Now.ToString("dddd, dd 'de' MMMM 'de' yyyy", new System.Globalization.CultureInfo("es-PE"))
+        <i class="bi bi-calendar3" aria-hidden="true"></i>
+        @fecha
     </div>
 </div>
 
-<!-- Métricas -->
-<div class="metric-grid">
+<section class="metric-grid" aria-label="Indicadores del día">
     <div class="metric-card">
-        <div class="metric-icon entrada">
-            <i class="bi bi-box-arrow-in-down"></i>
-        </div>
-        <div>
+        <div class="metric-icon entrada" aria-hidden="true"><i class="bi bi-box-arrow-in-down"></i></div>
+        <div class="metric-body">
             <div class="metric-label">Entradas hoy</div>
-            <div class="metric-value">@(ViewBag.EntradasHoy ?? 0)</div>
-            <div class="metric-sub">Ingresos registrados</div>
+            <div class="metric-value">@Model.EntradasHoy</div>
+            <div class="metric-sub">Últimos 7 días: @entradasSemana</div>
+        </div>
+        @{ var maxEntradas = Math.Max(1, Model.UltimosSieteDias.Max(d => d.Entradas)); }
+        <div class="spark entrada" role="img" aria-label="@(EtiquetaSerie("Entradas", d => d.Entradas))">
+            @foreach (var d in Model.UltimosSieteDias)
+            {
+                <span class="spark-bar" style="height:@(d.Entradas * 100 / maxEntradas)%"
+                      title="@NombreDia(d.Fecha): @d.Entradas"></span>
+            }
         </div>
     </div>
-    <div class="metric-card">
-        <div class="metric-icon salida">
-            <i class="bi bi-box-arrow-up"></i>
-        </div>
-        <div>
-            <div class="metric-label">Salidas hoy</div>
-            <div class="metric-value">@(ViewBag.SalidasHoy ?? 0)</div>
-            <div class="metric-sub">Despachos realizados</div>
-        </div>
-    </div>
-    <div class="metric-card">
-        <div class="metric-icon alerta">
-            <i class="bi bi-exclamation-triangle"></i>
-        </div>
-        <div>
-            <div class="metric-label">Alertas activas</div>
-            <div class="metric-value">@(ViewBag.AlertasActivas ?? 0)</div>
-            <div class="metric-sub">Stock bajo o por vencer</div>
-        </div>
-    </div>
-</div>
 
-<!-- Acciones rápidas -->
-<div class="actions-grid">
-    <a class="action-card"
-       asp-controller="Movimiento" asp-action="Entrada">
-        <div class="action-icon"><i class="bi bi-package-import" style="font-size:22px"></i></div>
-        <div class="action-label">Nueva Entrada</div>
+    <div class="metric-card">
+        <div class="metric-icon salida" aria-hidden="true"><i class="bi bi-box-arrow-up"></i></div>
+        <div class="metric-body">
+            <div class="metric-label">Ventas hoy</div>
+            <div class="metric-value">@Model.SalidasHoy</div>
+            <div class="metric-sub">Últimos 7 días: @salidasSemana</div>
+        </div>
+        @{ var maxSalidas = Math.Max(1, Model.UltimosSieteDias.Max(d => d.Salidas)); }
+        <div class="spark salida" role="img" aria-label="@(EtiquetaSerie("Ventas", d => d.Salidas))">
+            @foreach (var d in Model.UltimosSieteDias)
+            {
+                <span class="spark-bar" style="height:@(d.Salidas * 100 / maxSalidas)%"
+                      title="@NombreDia(d.Fecha): @d.Salidas"></span>
+            }
+        </div>
+    </div>
+
+    <div class="metric-card">
+        @if (Model.AlertasActivas > 0)
+        {
+            <div class="metric-icon alerta" aria-hidden="true"><i class="bi bi-exclamation-triangle"></i></div>
+        }
+        else
+        {
+            <div class="metric-icon ok" aria-hidden="true"><i class="bi bi-check-circle"></i></div>
+        }
+        <div class="metric-body">
+            <div class="metric-label">Alertas activas</div>
+            <div class="metric-value">@Model.AlertasActivas</div>
+            <div class="metric-sub">
+                @if (Model.AlertasActivas == 0)
+                {
+                    <span>Todo en orden</span>
+                }
+                else
+                {
+                    <span>@Model.AlertasStockBajo stock bajo · @Model.AlertasVencimiento por vencer</span>
+                }
+            </div>
+        </div>
+    </div>
+</section>
+
+<nav class="actions-grid" aria-label="Acciones rápidas">
+    <a class="action-card" asp-controller="Movimiento" asp-action="Entrada">
+        <div class="action-icon" aria-hidden="true"><i class="bi bi-box-arrow-in-down"></i></div>
+        <div class="action-label">Nueva entrada</div>
         <div class="action-sub">Registrar ingreso</div>
     </a>
-    <a class="action-card"
-       asp-controller="Movimiento" asp-action="Salida">
-        <div class="action-icon"><i class="bi bi-package-export" style="font-size:22px"></i></div>
-        <div class="action-label">Nueva Salida</div>
-        <div class="action-sub">Registrar despacho</div>
+    <a class="action-card" asp-controller="Venta" asp-action="Nueva">
+        <div class="action-icon" aria-hidden="true"><i class="bi bi-cart3"></i></div>
+        <div class="action-label">Nueva venta</div>
+        <div class="action-sub">Con nota de venta</div>
     </a>
-    <a class="action-card"
-       asp-controller="Producto" asp-action="Stock">
-        <div class="action-icon"><i class="bi bi-bar-chart-line"></i></div>
-        <div class="action-label">Ver Stock</div>
+    <a class="action-card" asp-controller="Producto" asp-action="Stock">
+        <div class="action-icon" aria-hidden="true"><i class="bi bi-bar-chart-line"></i></div>
+        <div class="action-label">Ver stock</div>
         <div class="action-sub">Consultar inventario</div>
     </a>
-    <a class="action-card"
-       asp-controller="Alerta" asp-action="Index">
-        <div class="action-icon"><i class="bi bi-bell"></i></div>
-        <div class="action-label">Ver Alertas</div>
-        <div class="action-sub">@(ViewBag.AlertasActivas ?? 0) pendientes</div>
+    <a class="action-card" asp-controller="Alerta" asp-action="Index">
+        <div class="action-icon" aria-hidden="true"><i class="bi bi-bell"></i></div>
+        <div class="action-label">Ver alertas</div>
+        <div class="action-sub">@Model.AlertasActivas pendientes</div>
     </a>
-</div>
+</nav>
 
-<!-- Últimos movimientos + Últimas alertas -->
 <div class="bottom-grid">
 
-    <!-- Movimientos -->
-    <div class="table-card">
-        <div class="table-card-header">
-            <i class="bi bi-clock-history"></i>
-            <span>Últimos Movimientos</span>
-            <a asp-controller="Movimiento" asp-action="Index">Ver todos →</a>
+    <section class="panel" aria-labelledby="tituloMovimientos">
+        <div class="panel-header">
+            <i class="bi bi-clock-history" aria-hidden="true"></i>
+            <h2 id="tituloMovimientos">Últimos movimientos</h2>
+            <a class="panel-link" asp-controller="Movimiento" asp-action="Index" aria-label="Ver todos los movimientos">
+                Ver todos <i class="bi bi-arrow-right" aria-hidden="true"></i>
+            </a>
         </div>
-        <table class="mov-table">
-            <thead>
-                <tr>
-                    <th>Fecha</th>
-                    <th>Tipo</th>
-                    <th>Usuario</th>
-                </tr>
-            </thead>
-            <tbody>
-                @if (ViewBag.UltimosMovimientos != null)
-                {
-                    foreach (var mov in ViewBag.UltimosMovimientos)
-                    {
-                        <tr>
-                            <td style="color:#79AE92; font-size:12px">
-                                @mov.Fecha.ToString("dd/MM HH:mm")
-                            </td>
-                            <td>
-                                @if (mov.Tipo == "Entrada")
-                                {
-                                    <span class="badge-entrada">Entrada</span>
-                                }
-                                else
-                                {
-                                    <span class="badge-salida">Salida</span>
-                                }
-                            </td>
-                            <td style="font-weight:500">
-                                @mov.IdUsuarioNavigation?.Nombre
-                            </td>
-                        </tr>
-                    }
-                }
-                else
-                {
-                    <tr class="empty-row">
-                        <td colspan="3">
-                            <i class="bi bi-inbox" style="font-size:20px;display:block;margin-bottom:6px"></i>
-                            No hay movimientos recientes
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
 
-    <!-- Alertas -->
-    <div class="table-card">
-        <div class="table-card-header">
-            <i class="bi bi-exclamation-triangle" style="color:#e74c3c"></i>
-            <span>Últimas Alertas</span>
-            <a asp-controller="Alerta" asp-action="Index">Ver todas →</a>
-        </div>
-        <table class="mov-table">
-            <thead>
-                <tr>
-                    <th>Tipo</th>
-                    <th>Mensaje</th>
-                </tr>
-            </thead>
-            <tbody>
-                @if (ViewBag.UltimasAlertas != null)
+        @if (Model.UltimosMovimientos.Count == 0)
+        {
+            <div class="vacio">
+                <i class="bi bi-inbox" aria-hidden="true"></i>
+                Aún no hay movimientos registrados.<br />
+                <a asp-controller="Movimiento" asp-action="Entrada">Registrar la primera entrada</a>
+            </div>
+        }
+        else
+        {
+            <ol class="lista">
+                @foreach (var mov in Model.UltimosMovimientos)
                 {
-                    foreach (var alerta in ViewBag.UltimasAlertas)
-                    {
-                        string tipoMostrar = alerta.Tipo switch
+                    var esEntrada = mov.Tipo == "Entrada";
+                    var contraparte = mov.Contraparte ?? (esEntrada ? "Sin proveedor" : "Sin cliente");
+                    <li>
+                        <a class="actividad-item" asp-controller="@(esEntrada ? "Movimiento" : "Venta")" asp-action="@(esEntrada ? "Detalle" : "Nota")" asp-route-id="@mov.IdMovimiento">
+                            <span class="actividad-icono @(esEntrada ? "entrada" : "salida")" aria-hidden="true">
+                                <i class="bi @(esEntrada ? "bi-box-arrow-in-down" : "bi-box-arrow-up")"></i>
+                            </span>
+                            <span class="actividad-texto">
+                                <span class="actividad-titulo">@contraparte</span>
+                                <span class="actividad-meta">
+                                    <span class="chip @(esEntrada ? "entrada" : mov.Anulada ? "anulada" : "salida")">@(esEntrada ? "Entrada" : mov.Anulada ? "Venta anulada" : "Venta")</span>
+                                    @mov.CantidadProductos @(mov.CantidadProductos == 1 ? "producto" : "productos") · @mov.Usuario
+                                </span>
+                            </span>
+                            <time class="actividad-hora" datetime="@mov.Fecha.ToString("yyyy-MM-ddTHH:mm")">@Cuando(mov.Fecha)</time>
+                        </a>
+                    </li>
+                }
+            </ol>
+        }
+    </section>
+
+    <section class="panel" aria-labelledby="tituloAlertas">
+        <div class="panel-header">
+            <i class="bi bi-exclamation-triangle" aria-hidden="true" style="color:var(--g-danger-text)"></i>
+            <h2 id="tituloAlertas">Últimas alertas</h2>
+            <a class="panel-link" asp-controller="Alerta" asp-action="Index" aria-label="Ver todas las alertas">
+                Ver todas <i class="bi bi-arrow-right" aria-hidden="true"></i>
+            </a>
+        </div>
+
+        @if (Model.UltimasAlertas.Count == 0)
+        {
+            <div class="vacio">
+                <i class="bi bi-check-circle" aria-hidden="true" style="color:var(--g-teal)"></i>
+                Sin alertas pendientes. El stock está en orden.
+            </div>
+        }
+        else
+        {
+            <ul class="lista">
+                @foreach (var alerta in Model.UltimasAlertas)
+                {
+                    var esStock = alerta.Tipo == "stock_minimo";
+                    <li class="alerta-item">
+                        @if (esStock)
                         {
-                            "stock_minimo" => "Stock Bajo",
-                            "vencimiento" => "Vencimiento",
-                            _ => alerta.Tipo
-                        };
-                        bool esStock = alerta.Tipo == "stock_minimo";
-
-                        <tr>
-                            <td>
-                                @if (esStock)
-                                {
-                                    <span class="badge-stock">@tipoMostrar</span>
-                                }
-                                else
-                                {
-                                    <span class="badge-venc">@tipoMostrar</span>
-                                }
-                            </td>
-                            <td style="font-size:12px; color:#445">@alerta.Mensaje</td>
-                        </tr>
-                    }
+                            <span class="chip stock"><i class="bi bi-graph-down-arrow" aria-hidden="true"></i> Stock bajo</span>
+                        }
+                        else if (alerta.Tipo == "vencimiento")
+                        {
+                            <span class="chip vencimiento"><i class="bi bi-hourglass-split" aria-hidden="true"></i> Por vencer</span>
+                        }
+                        else
+                        {
+                            <span class="chip stock">@alerta.Tipo</span>
+                        }
+                        <span class="alerta-texto">
+                            <span class="alerta-msg">@SinPrefijo(alerta.Mensaje)</span>
+                            <time class="alerta-fecha" datetime="@alerta.FechaGenerada.ToString("yyyy-MM-ddTHH:mm")">@Cuando(alerta.FechaGenerada)</time>
+                        </span>
+                    </li>
                 }
-                else
-                {
-                    <tr class="empty-row">
-                        <td colspan="2">
-                            <i class="bi bi-check-circle" style="font-size:20px;display:block;margin-bottom:6px;color:#79AE92"></i>
-                            Sin alertas pendientes
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
+            </ul>
+        }
+    </section>
 
 </div>

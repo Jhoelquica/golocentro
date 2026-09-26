@@ -1,91 +1,347 @@
-﻿@model IEnumerable<GestionAlmacen_Golocentro.Models.Movimiento>
+@using System.Globalization
+@using GestionAlmacen_Golocentro.ViewModels
+@model MovimientosIndexViewModel
 @{
     ViewData["Title"] = "Movimientos";
-}
-
-<div class="container">
-    <h2 class="mb-4"><i class="bi bi-list-ul"></i> Lista de Movimientos</h2>
-
-    <p>
-        <a asp-action="Entrada" class="btn btn-success">
-            <i class="bi bi-plus-circle"></i> Nueva Entrada
-        </a>
-        <a asp-action="Salida" class="btn btn-warning">
-            <i class="bi bi-dash-circle"></i> Nueva Salida
-        </a>
-    </p>
-
-    <table class="table table-striped table-hover">
-        <thead class="table-dark">
-            <tr>
-                <th>ID</th>
-                <th>Tipo</th>
-                <th>Fecha</th>
-                <th>Usuario</th>
-                <th>Sede</th>
-                <th>Proveedor</th>
-                <th>Comprobante</th>
-                <th>Evidencia</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var item in Model)
-            {
-                <tr>
-                    <td>@item.IdMovimiento</td>
-                    <td>@item.Tipo</td>
-                    <td>@item.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
-                    <td>@item.IdUsuarioNavigation?.Nombre</td>
-                    <td>@item.IdSedeNavigation?.Nombre</td>
-                    <td>@item.IdProveedorNavigation?.Nombre</td>
-                    <td>
-                        @if (item.ComprobanteEmitido)
-                        {
-                            <span class="badge bg-success">Sí</span>
-                        }
-                        else
-                        {
-                            <span class="badge bg-secondary">No</span>
-                        }
-                    </td>
-                    <td>
-                        @if (item.Evidencia != null && item.Evidencia.Any())
-                        {
-                            foreach (var ev in item.Evidencia)
-                            {
-                                <a href="@ev.UrlArchivo" target="_blank" class="btn btn-sm btn-outline-info" title="Ver evidencia">
-                                    <i class="bi bi-image"></i> Ver
-                                </a>
-                            }
-                        }
-                        else
-                        {
-                            <span class="text-muted">—</span>
-                        }
-                    </td>
-                    <td>
-                        <a asp-action="Detalle" asp-route-id="@item.IdMovimiento" class="btn btn-sm btn-outline-primary">
-                            <i class="bi bi-info-circle"></i> Detalle
-                        </a>
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
-
-    @if (ViewBag.TotalPaginas > 1)
+    var inv = CultureInfo.InvariantCulture;
+    string Iso(DateOnly d) => d.ToString("yyyy-MM-dd", inv);
+    var hoy = DateOnly.FromDateTime(DateTime.Today);
+    var rangos = new[]
     {
-        <nav>
-            <ul class="pagination justify-content-center">
-                @for (int i = 1; i <= ViewBag.TotalPaginas; i++)
-                {
-                    <li class="page-item @(i == ViewBag.PaginaActual ? "active" : "")">
-                        <a class="page-link" asp-action="Index" asp-route-pagina="@i">@i</a>
-                    </li>
-                }
-            </ul>
-        </nav>
+        (Texto: "Hoy", Desde: hoy, Hasta: hoy),
+        (Texto: "Ayer", Desde: hoy.AddDays(-1), Hasta: hoy.AddDays(-1)),
+        (Texto: "Últimos 7 días", Desde: hoy.AddDays(-6), Hasta: hoy),
+        (Texto: "Este mes", Desde: new DateOnly(hoy.Year, hoy.Month, 1), Hasta: hoy)
+    };
+    var tipos = new[]
+    {
+        (Clave: "todos", Texto: "Todo"),
+        (Clave: TipoActividad.Entrada, Texto: "Entradas"),
+        (Clave: TipoActividad.Venta, Texto: "Ventas"),
+        (Clave: TipoActividad.Traslado, Texto: "Traslados"),
+        (Clave: TipoActividad.Conteo, Texto: "Conteos")
+    };
+    string Icono(string tipo) => tipo switch
+    {
+        TipoActividad.Entrada => "bi-box-arrow-in-down",
+        TipoActividad.Venta => "bi-cart3",
+        TipoActividad.Traslado => "bi-arrow-left-right",
+        TipoActividad.Conteo => "bi-clipboard-check",
+        _ => "bi-box-arrow-up"
+    };
+    var periodo = Model.Desde == Model.Hasta ? $"el {Model.Desde:dd/MM/yyyy}" : $"del {Model.Desde:dd/MM/yyyy} al {Model.Hasta:dd/MM/yyyy}";
+    string Cuando(DateTime f)
+    {
+        var dia = DateOnly.FromDateTime(f);
+        return dia == hoy ? $"Hoy, {f:HH:mm}" : dia == hoy.AddDays(-1) ? $"Ayer, {f:HH:mm}" : f.ToString("dd/MM HH:mm", inv);
     }
 
+    void Contenido(ActividadFila f)
+    {
+        <span class="mv-icono @f.Tipo" aria-hidden="true"><i class="bi @Icono(f.Tipo)"></i></span>
+        <span class="mv-titulo">
+            <span class="mv-tipo @(f.Anulada ? "anulada" : null)">@f.TipoTexto</span>@f.Titulo
+        </span>
+        <span class="mv-lado">
+            @if (f.Total is decimal total)
+            {
+                if (f.Anulada)
+                {
+                    <strong><s>S/ @total.ToString("N2", inv)</s></strong>
+                }
+                else
+                {
+                    <strong>S/ @total.ToString("N2", inv)</strong>
+                }
+            }
+            <time datetime="@f.Fecha.ToString("yyyy-MM-ddTHH:mm", inv)">@Cuando(f.Fecha)</time>
+        </span>
+        <span class="mv-sub">
+            @(string.Join(" · ", new[] { f.Documento, f.Resumen, f.Usuario, Model.VariasSedes ? f.Sede : null, f.Fotos > 0 ? $"{f.Fotos} foto{(f.Fotos == 1 ? "" : "s")}" : null }.Where(x => !string.IsNullOrEmpty(x))))
+        </span>
+    }
+}
+
+@await Html.PartialAsync("~/Views/Shared/_EstilosGestion.cshtml")
+
+<style>
+    .mv-page {
+        max-width: 1100px;
+    }
+
+    .mv-acciones {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .mv-filtros {
+        background: var(--g-white);
+        border: 1px solid var(--g-border);
+        border-radius: 14px;
+        padding: 12px 14px;
+        margin-bottom: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .mv-fila {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+    }
+
+        .mv-fila a {
+            min-height: 36px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 999px;
+            border: 1px solid var(--g-input-border);
+            background: var(--g-white);
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--g-text);
+            text-decoration: none;
+        }
+
+            .mv-fila a span {
+                min-width: 22px;
+                padding: 0 6px;
+                border-radius: 999px;
+                background: var(--g-bg);
+                font-size: 12px;
+                text-align: center;
+            }
+
+            .mv-fila a:hover {
+                border-color: var(--g-teal);
+                color: var(--g-teal);
+            }
+
+            .mv-fila a[aria-current="true"] {
+                background: var(--g-teal);
+                border-color: var(--g-teal);
+                color: #FFFFFF;
+            }
+
+                .mv-fila a[aria-current="true"] span {
+                    background: rgba(255,255,255,0.22);
+                }
+
+            .mv-fila a:focus-visible {
+                outline: 2px solid var(--g-teal);
+                outline-offset: 2px;
+            }
+
+    .mv-etiqueta {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--g-muted);
+        min-width: 56px;
+    }
+
+    .mv-lista {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+
+    .mv-item {
+        border-bottom: 1px solid var(--g-border);
+    }
+
+        .mv-item:last-child {
+            border-bottom: none;
+        }
+
+    .mv-enlace {
+        display: grid;
+        grid-template-columns: 40px minmax(0, 1fr) auto;
+        gap: 4px 14px;
+        align-items: center;
+        padding: 12px 1.25rem;
+        color: var(--g-text);
+        text-decoration: none;
+    }
+
+    a.mv-enlace:hover {
+        background: var(--g-bg);
+    }
+
+    a.mv-enlace:focus-visible {
+        outline: 2px solid var(--g-teal);
+        outline-offset: -2px;
+    }
+
+    .mv-icono {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        grid-row: span 2;
+    }
+
+        .mv-icono.entrada {
+            background: rgba(4,120,87,0.1);
+            color: var(--g-teal);
+        }
+
+        .mv-icono.venta, .mv-icono.salida {
+            background: rgba(51,65,85,0.1);
+            color: var(--g-navy);
+        }
+
+        .mv-icono.traslado {
+            background: rgba(37,99,235,0.1);
+            color: #1D4ED8;
+        }
+
+        .mv-icono.conteo {
+            background: rgba(245,158,11,0.16);
+            color: #92400E;
+        }
+
+    .mv-titulo {
+        font-size: 15px;
+        font-weight: 600;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .mv-tipo {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--g-muted);
+        margin-right: 6px;
+    }
+
+        .mv-tipo.anulada {
+            color: var(--g-danger-text);
+        }
+
+    .mv-sub {
+        font-size: 13px;
+        color: var(--g-muted);
+        grid-column: 2;
+    }
+
+    .mv-lado {
+        grid-row: span 2;
+        text-align: right;
+        font-size: 13px;
+        color: var(--g-muted);
+        white-space: nowrap;
+    }
+
+        .mv-lado strong {
+            display: block;
+            font-size: 15px;
+            color: var(--g-navy);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .mv-lado s {
+            color: var(--g-muted);
+        }
+</style>
+
+<div class="cp-page mv-page">
+    <div class="cp-header">
+        <div>
+            <h1><i class="bi bi-arrow-down-up" aria-hidden="true"></i> Movimientos</h1>
+            <p>@Model.Total @(Model.Total == 1 ? "movimiento" : "movimientos") @periodo · entradas, ventas, traslados y conteos</p>
+        </div>
+        <div class="mv-acciones">
+            <a class="btn-g-outline" asp-controller="Venta" asp-action="Nueva"><i class="bi bi-cart3" aria-hidden="true"></i> Nueva venta</a>
+            <a class="btn-g-primary" asp-action="Entrada"><i class="bi bi-box-arrow-in-down" aria-hidden="true"></i> Nueva entrada</a>
+        </div>
+    </div>
+
+    <div class="mv-filtros">
+        <nav class="mv-fila" aria-label="Tipo de movimiento">
+            <span class="mv-etiqueta">Ver</span>
+            @foreach (var t in tipos)
+            {
+                <a asp-action="Index" asp-route-tipo="@(t.Clave == "todos" ? null : t.Clave)" asp-route-desde="@Iso(Model.Desde)" asp-route-hasta="@Iso(Model.Hasta)"
+                   aria-current="@(Model.Tipo == t.Clave ? "true" : null)">@t.Texto <span>@Model.PorTipo.GetValueOrDefault(t.Clave)</span></a>
+            }
+        </nav>
+        <nav class="mv-fila" aria-label="Periodo">
+            <span class="mv-etiqueta">Periodo</span>
+            @foreach (var r in rangos)
+            {
+                <a asp-action="Index" asp-route-tipo="@(Model.Tipo == "todos" ? null : Model.Tipo)" asp-route-desde="@Iso(r.Desde)" asp-route-hasta="@Iso(r.Hasta)"
+                   aria-current="@(r.Desde == Model.Desde && r.Hasta == Model.Hasta ? "true" : null)">@r.Texto</a>
+            }
+        </nav>
+    </div>
+
+    <section class="cp-panel" aria-label="Lista de movimientos">
+        @if (Model.Filas.Count == 0)
+        {
+            <div class="cp-vacio">
+                <i class="bi bi-inbox" aria-hidden="true"></i>
+                No hay movimientos de este tipo @periodo.
+            </div>
+        }
+        else
+        {
+            <ol class="mv-lista">
+                @foreach (var f in Model.Filas)
+                {
+                    <li class="mv-item">
+                        @if (f.Enlace != null)
+                        {
+                            <a class="mv-enlace" href="@f.Enlace">
+                                @{ Contenido(f); }
+                            </a>
+                        }
+                        else
+                        {
+                            <div class="mv-enlace">
+                                @{ Contenido(f); }
+                            </div>
+                        }
+                    </li>
+                }
+            </ol>
+
+            @if (Model.TotalPaginas > 1)
+            {
+                <nav class="cp-paginacion" aria-label="Paginación">
+                    @if (Model.Pagina > 1)
+                    {
+                        <a class="btn-g-outline" asp-action="Index" asp-route-tipo="@(Model.Tipo == "todos" ? null : Model.Tipo)"
+                           asp-route-desde="@Iso(Model.Desde)" asp-route-hasta="@Iso(Model.Hasta)" asp-route-pagina="@(Model.Pagina - 1)">
+                            <i class="bi bi-chevron-left" aria-hidden="true"></i> Anterior
+                        </a>
+                    }
+                    else
+                    {
+                        <span class="cp-pag-espacio"></span>
+                    }
+                    <span>Página @Model.Pagina de @Model.TotalPaginas</span>
+                    @if (Model.Pagina < Model.TotalPaginas)
+                    {
+                        <a class="btn-g-outline" asp-action="Index" asp-route-tipo="@(Model.Tipo == "todos" ? null : Model.Tipo)"
+                           asp-route-desde="@Iso(Model.Desde)" asp-route-hasta="@Iso(Model.Hasta)" asp-route-pagina="@(Model.Pagina + 1)">
+                            Siguiente <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                        </a>
+                    }
+                    else
+                    {
+                        <span class="cp-pag-espacio"></span>
+                    }
+                </nav>
+            }
+        }
+    </section>
 </div>

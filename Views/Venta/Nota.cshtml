@@ -1,0 +1,980 @@
+@using System.Globalization
+@using GestionAlmacen_Golocentro.ViewModels
+@model NotaVentaViewModel
+@{
+    ViewData["Title"] = $"Nota de venta {Model.Numero}";
+
+    var inv = CultureInfo.InvariantCulture;
+    string Monto(decimal n) => n.ToString("0.00", inv);
+    string TipoDocumento(string? doc) => doc?.Length == 11 ? "RUC" : doc?.Length == 8 ? "DNI" : "Doc.";
+    var fecha = Model.Fecha.ToString("dd/MM/yyyy", inv);
+    var hora = Model.Fecha.ToString("HH:mm", inv);
+
+    // Texto del mensaje de WhatsApp (el PDF va aparte)
+    var lineasMensaje = new List<string>
+    {
+        "*DISTRIBUIDORA GOLOCENTRO*",
+        $"Nota de venta *{Model.Numero}*",
+        $"Fecha: {fecha} {hora}"
+    };
+    if (!Model.EsPublicoGeneral)
+        lineasMensaje.Add($"Cliente: {Model.ClienteNombre}");
+    lineasMensaje.Add("");
+    lineasMensaje.AddRange(Model.Lineas.Select(l => $"{l.Cantidad} x {l.Descripcion}: S/ {Monto(l.Importe)}"));
+    lineasMensaje.Add("");
+    if (Model.Descuento > 0)
+    {
+        lineasMensaje.Add($"Subtotal: S/ {Monto(Model.Subtotal)}");
+        lineasMensaje.Add($"Descuento: -S/ {Monto(Model.Descuento)}");
+    }
+    lineasMensaje.Add($"*Total: S/ {Monto(Model.Total)}*");
+    lineasMensaje.Add($"Pago: {Model.MetodoPago}");
+    lineasMensaje.Add("");
+    lineasMensaje.Add("¡Gracias por su compra!");
+    var mensaje = string.Join("\n", lineasMensaje);
+
+    var celular = !Model.EsPublicoGeneral && Model.ClienteCelular is { Length: 9 } cel ? cel : null;
+    var archivoPdf = $"Nota-{Model.Numero}.pdf";
+}
+
+@await Html.PartialAsync("~/Views/Shared/_EstilosGestion.cshtml")
+
+<style>
+    .nv-page {
+        max-width: 1000px;
+    }
+
+    .nv-grid {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        grid-template-areas:
+            "vista acciones"
+            "vista fotos";
+        grid-template-rows: auto 1fr;
+        gap: 20px;
+        align-items: start;
+    }
+
+    .nv-vista {
+        grid-area: vista;
+        background: #E9EEF3;
+        border-radius: 14px;
+        padding: 28px 24px 32px;
+    }
+
+    .nv-acciones {
+        grid-area: acciones;
+    }
+
+    .nv-fotos {
+        grid-area: fotos;
+    }
+
+    @@media (max-width: 860px) {
+        .nv-grid {
+            grid-template-columns: 1fr;
+            grid-template-areas:
+                "acciones"
+                "vista"
+                "fotos";
+        }
+
+        .nv-vista {
+            padding: 20px 12px 24px;
+        }
+    }
+
+    .nv-card {
+        background: var(--g-white);
+        border: 1px solid var(--g-border);
+        border-radius: 14px;
+        padding: 1.25rem;
+    }
+
+    .nv-titulo {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--g-navy);
+        margin: 0 0 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+        .nv-titulo > i {
+            color: var(--g-teal);
+        }
+
+    .nv-botones {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+        .nv-botones .btn-g-primary,
+        .nv-botones .btn-g-outline {
+            width: 100%;
+            justify-content: flex-start;
+        }
+
+        .nv-botones .btn-g-primary {
+            min-height: 52px;
+            font-size: 15px;
+        }
+
+    .nv-destino {
+        font-size: 13px;
+        color: var(--g-muted);
+        margin: -2px 0 6px;
+    }
+
+    .nv-estado {
+        font-size: 13px;
+        color: var(--g-teal);
+        font-weight: 500;
+        margin: 10px 0 0;
+    }
+
+        .nv-estado.error {
+            color: var(--g-danger-text);
+        }
+
+        .nv-estado:empty {
+            display: none;
+        }
+
+    .nv-enlaces {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 14px;
+        padding-top: 14px;
+        border-top: 1px solid var(--g-border);
+    }
+
+        .nv-enlaces > * {
+            flex: 1;
+        }
+
+    /* Papel en pantalla: sombra y borde dentado de ticket recién cortado */
+    .nv-papel {
+        width: 80mm;
+        margin: 0 auto;
+        filter: drop-shadow(0 6px 14px rgba(15,23,42,0.16));
+    }
+
+        .nv-papel::after {
+            content: "";
+            display: block;
+            height: 6px;
+            background: conic-gradient(from -45deg at 50% 100%, #FFFFFF 90deg, transparent 0) 0 0 / 12px 6px repeat-x;
+        }
+
+    /* Ticket: blanco y negro, pensado para impresora térmica de 80 mm */
+    .nv-ticket {
+        width: 80mm;
+        box-sizing: border-box;
+        padding: 5mm 4mm 4mm;
+        background: #FFFFFF;
+        color: #000000;
+        font-family: 'Inter', Arial, sans-serif;
+        font-size: 11.5px;
+        line-height: 1.4;
+        /* Sin cifras tabulares: html2canvas las mide distinto y deja huecos en el PDF */
+    }
+
+        .nv-ticket dl,
+        .nv-ticket dd,
+        .nv-ticket ul {
+            margin: 0;
+        }
+
+        .nv-ticket dt {
+            font-weight: 600;
+        }
+
+    .nv-cab {
+        text-align: center;
+    }
+
+    .nv-marca {
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        margin-bottom: 2px;
+    }
+
+    .nv-sep {
+        border-top: 1px dashed #000000;
+        margin: 8px 0;
+    }
+
+    .nv-doc {
+        text-align: center;
+        margin-bottom: 6px;
+    }
+
+    .nv-doc-tipo {
+        font-size: 12.5px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+    }
+
+    .nv-doc-num {
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    .nv-datos > div {
+        display: flex;
+        gap: 6px;
+    }
+
+    .nv-datos dt {
+        flex: none;
+        width: 17mm;
+    }
+
+    .nv-datos dd {
+        flex: 1;
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    .nv-items-cab {
+        display: flex;
+        justify-content: space-between;
+        font-size: 10.5px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
+
+    .nv-items {
+        list-style: none;
+        padding: 0;
+    }
+
+        .nv-items li {
+            padding: 4px 0 0;
+        }
+
+    .nv-item-desc {
+        font-weight: 600;
+        overflow-wrap: anywhere;
+    }
+
+    .nv-item-det {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+    }
+
+    .nv-totales > div {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+    }
+
+    .nv-totales dt {
+        font-weight: 400;
+    }
+
+    .nv-totales .nv-total {
+        font-size: 15px;
+        font-weight: 700;
+        margin-top: 2px;
+    }
+
+        .nv-totales .nv-total dt {
+            font-weight: 700;
+        }
+
+    .nv-pago {
+        margin-top: 6px;
+    }
+
+    .nv-obs {
+        margin-top: 2px;
+        overflow-wrap: anywhere;
+    }
+
+    .nv-pie {
+        text-align: center;
+        font-weight: 600;
+    }
+
+    /* Fotos de entrega: solo en el sistema */
+    .nv-nota {
+        font-size: 13px;
+        color: var(--g-muted);
+        margin: -4px 0 12px;
+    }
+
+    .nv-galeria {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 14px;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+        gap: 10px;
+    }
+
+        .nv-galeria a {
+            display: block;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid var(--g-border);
+            text-decoration: none;
+            color: var(--g-muted);
+        }
+
+            .nv-galeria a:focus-visible {
+                outline: 2px solid var(--g-teal);
+                outline-offset: 2px;
+            }
+
+        .nv-galeria img {
+            display: block;
+            width: 100%;
+            aspect-ratio: 1;
+            object-fit: cover;
+            background: var(--g-bg);
+        }
+
+        .nv-galeria span {
+            display: block;
+            font-size: 12px;
+            padding: 4px 8px;
+        }
+
+    .nv-sin-fotos {
+        font-size: 14px;
+        color: var(--g-muted);
+        border: 1px dashed var(--g-input-border);
+        border-radius: 10px;
+        padding: 14px;
+        text-align: center;
+        margin-bottom: 14px;
+    }
+
+    .nv-subir {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+
+        .nv-subir input[type="file"] {
+            flex: 1;
+            min-width: 200px;
+            min-height: 44px;
+            padding: 9px 10px;
+            border: 1px solid var(--g-input-border);
+            border-radius: 8px;
+            font-size: 14px;
+            background: var(--g-white);
+        }
+
+            .nv-subir input[type="file"]:focus {
+                outline: none;
+                border-color: var(--g-teal);
+                box-shadow: 0 0 0 3px rgba(4,120,87,0.25);
+            }
+
+    /* Venta anulada */
+    .nv-chip-anulada {
+        font-size: 13px;
+        font-weight: 600;
+        padding: 3px 10px;
+        border-radius: 999px;
+        background: rgba(220,38,38,0.1);
+        color: var(--g-danger-text);
+    }
+
+    .nv-sello {
+        display: inline-block;
+        margin-top: 6px;
+        padding: 2px 12px;
+        border: 2px solid #000000;
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: 0.2em;
+    }
+
+    .nv-titulo-anulada,
+    .nv-titulo-anulada > i {
+        color: var(--g-danger-text);
+    }
+
+    .nv-anulacion {
+        margin: 0 0 10px;
+        font-size: 14px;
+    }
+
+        .nv-anulacion > div {
+            display: flex;
+            gap: 10px;
+            padding: 3px 0;
+        }
+
+        .nv-anulacion dt {
+            flex: none;
+            width: 64px;
+            font-weight: 600;
+            color: var(--g-muted);
+        }
+
+        .nv-anulacion dd {
+            margin: 0;
+            overflow-wrap: anywhere;
+        }
+
+    .nv-btn-anular {
+        width: 100%;
+        min-height: 44px;
+        margin-top: 10px;
+        border: none;
+        border-radius: 8px;
+        background: none;
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--g-danger-text);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        cursor: pointer;
+    }
+
+        .nv-btn-anular:hover {
+            background: rgba(220,38,38,0.08);
+        }
+
+        .nv-btn-anular:focus-visible {
+            outline: 2px solid var(--g-danger-text);
+            outline-offset: 2px;
+        }
+
+    .nv-devolucion {
+        list-style: none;
+        margin: 10px 0 14px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        background: var(--g-bg);
+        border: 1px solid var(--g-border);
+        text-align: left;
+        font-size: 14px;
+        color: var(--g-text);
+    }
+
+        .nv-devolucion li + li {
+            margin-top: 4px;
+        }
+
+        .nv-devolucion span {
+            color: var(--g-muted);
+        }
+
+    .cp-modal .nv-campo-motivo {
+        text-align: left;
+        margin-bottom: 0;
+    }
+
+    .nv-motivos {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 8px;
+    }
+
+        .nv-motivos button {
+            min-height: 36px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            border: 1px solid var(--g-input-border);
+            background: var(--g-white);
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--g-text);
+            cursor: pointer;
+        }
+
+            .nv-motivos button:hover {
+                border-color: var(--g-danger-text);
+                color: var(--g-danger-text);
+            }
+
+            .nv-motivos button:focus-visible {
+                outline: 2px solid var(--g-teal);
+                outline-offset: 2px;
+            }
+
+    #nv-impresion {
+        display: none;
+    }
+
+    /* Al imprimir solo sale una copia del ticket (se arma antes de imprimir) */
+    @@media print {
+        body.nv-imprimiendo > *:not(#nv-impresion) {
+            display: none !important;
+        }
+
+        body.nv-imprimiendo {
+            background: #FFFFFF !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        #nv-impresion {
+            display: block !important;
+        }
+    }
+</style>
+
+<div class="cp-page nv-page">
+    <a class="cp-volver" asp-action="Index"><i class="bi bi-arrow-left" aria-hidden="true"></i> Ventas</a>
+    <header class="cp-header">
+        <div>
+            <h1>
+                <i class="bi bi-receipt" aria-hidden="true"></i> Nota de venta @Model.Numero
+                @if (Model.Anulada)
+                {
+                    <span class="nv-chip-anulada">Anulada</span>
+                }
+            </h1>
+            <p>@fecha a las @hora · @Model.ClienteNombre · Total S/ @Monto(Model.Total)@(Model.Anulada ? " (no suma)" : "")</p>
+        </div>
+    </header>
+
+    @if (TempData["Exito"] is string exito)
+    {
+        <div class="cp-aviso exito" role="status">
+            <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+            <span>@exito</span>
+            <button type="button" aria-label="Cerrar mensaje" onclick="this.parentElement.remove()"><i class="bi bi-x" aria-hidden="true"></i></button>
+        </div>
+    }
+    @if (TempData["Error"] is string error)
+    {
+        <div class="cp-aviso error" role="alert">
+            <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+            <span>@error</span>
+            <button type="button" aria-label="Cerrar mensaje" onclick="this.parentElement.remove()"><i class="bi bi-x" aria-hidden="true"></i></button>
+        </div>
+    }
+
+    <div class="nv-grid">
+        <div class="nv-vista">
+            <div class="nv-papel">
+                <article class="nv-ticket" id="ticket" aria-label="Nota de venta @Model.Numero">
+                    <header class="nv-cab">
+                        <div class="nv-marca">DISTRIBUIDORA GOLOCENTRO</div>
+                        <div>@Model.SedeNombre</div>
+                        @if (!string.IsNullOrWhiteSpace(Model.SedeDireccion))
+                        {
+                            <div>@Model.SedeDireccion</div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Model.SedeCiudad))
+                        {
+                            <div>@Model.SedeCiudad</div>
+                        }
+                    </header>
+
+                    <div class="nv-sep"></div>
+                    <div class="nv-doc">
+                        <div class="nv-doc-tipo">NOTA DE VENTA</div>
+                        <div class="nv-doc-num">@Model.Numero</div>
+                        @if (Model.Anulada)
+                        {
+                            <div class="nv-sello">ANULADA</div>
+                        }
+                    </div>
+                    <dl class="nv-datos">
+                        <div><dt>Fecha</dt><dd>@fecha @hora</dd></div>
+                        <div><dt>Atendió</dt><dd>@Model.Vendedor</dd></div>
+                        <div><dt>Cliente</dt><dd>@Model.ClienteNombre</dd></div>
+                        @if (!Model.EsPublicoGeneral && !string.IsNullOrEmpty(Model.ClienteDocumento))
+                        {
+                            <div><dt>@TipoDocumento(Model.ClienteDocumento)</dt><dd>@Model.ClienteDocumento</dd></div>
+                        }
+                        @if (!Model.EsPublicoGeneral && !string.IsNullOrEmpty(Model.ClienteCelular))
+                        {
+                            <div><dt>Celular</dt><dd>@Model.ClienteCelular</dd></div>
+                        }
+                    </dl>
+
+                    <div class="nv-sep"></div>
+                    <div class="nv-items-cab"><span>Descripción</span><span>Importe</span></div>
+                    <ul class="nv-items">
+                        @foreach (var l in Model.Lineas)
+                        {
+                            <li>
+                                <div class="nv-item-desc">@l.Descripcion</div>
+                                <div class="nv-item-det">
+                                    <span>@l.Cantidad @l.Unidad × @Monto(l.PrecioUnitario)</span>
+                                    <span>@Monto(l.Importe)</span>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+
+                    <div class="nv-sep"></div>
+                    <dl class="nv-totales">
+                        @if (Model.Descuento > 0)
+                        {
+                            <div><dt>Subtotal</dt><dd>S/ @Monto(Model.Subtotal)</dd></div>
+                            <div><dt>Descuento</dt><dd>-S/ @Monto(Model.Descuento)</dd></div>
+                        }
+                        <div class="nv-total"><dt>TOTAL</dt><dd>S/ @Monto(Model.Total)</dd></div>
+                    </dl>
+                    <div class="nv-pago"><strong>Pago:</strong> @Model.MetodoPago</div>
+                    @if (!string.IsNullOrWhiteSpace(Model.Observaciones))
+                    {
+                        <div class="nv-obs"><strong>Obs.:</strong> @Model.Observaciones</div>
+                    }
+
+                    <div class="nv-sep"></div>
+                    <footer class="nv-pie">¡Gracias por su compra!</footer>
+                </article>
+            </div>
+        </div>
+
+        <section class="nv-card nv-acciones" aria-labelledby="tituloAcciones">
+            @if (Model.Anulada)
+            {
+                <h2 class="nv-titulo nv-titulo-anulada" id="tituloAcciones"><i class="bi bi-x-octagon" aria-hidden="true"></i> Venta anulada</h2>
+                <dl class="nv-anulacion">
+                    <div><dt>Cuándo</dt><dd>@Model.FechaAnulacion?.ToString("dd/MM/yyyy HH:mm", inv)</dd></div>
+                    <div><dt>Quién</dt><dd>@Model.AnuladaPor</dd></div>
+                    <div><dt>Motivo</dt><dd>@Model.MotivoAnulacion</dd></div>
+                </dl>
+                <p class="nv-nota">
+                    No suma en las ventas. Volvió al stock:
+                    @(string.Join("; ", Model.Lineas.Select(l => $"{l.Cantidad} {l.Descripcion} a {l.Zona}"))).
+                </p>
+                <div class="nv-botones">
+                    <button type="button" class="btn-g-outline" id="btnImprimir">
+                        <i class="bi bi-printer" aria-hidden="true"></i> Imprimir ticket (sale como ANULADA)
+                    </button>
+                    <button type="button" class="btn-g-outline" id="btnPdf">
+                        <i class="bi bi-file-earmark-pdf" aria-hidden="true"></i> Descargar PDF
+                    </button>
+                </div>
+            }
+            else
+            {
+                <h2 class="nv-titulo" id="tituloAcciones"><i class="bi bi-send" aria-hidden="true"></i> Entregar la nota</h2>
+                <div class="nv-botones">
+                    <button type="button" class="btn-g-primary" id="btnWhatsApp">
+                        <i class="bi bi-whatsapp" aria-hidden="true"></i> Enviar por WhatsApp
+                    </button>
+                    <p class="nv-destino" id="destinoWhatsApp">
+                        @if (celular != null)
+                        {
+                            <span>Se abrirá el chat de @Model.ClienteNombre (@celular) con el mensaje y el PDF.</span>
+                        }
+                        else
+                        {
+                            <span>Mensaje y PDF; eliges el contacto en WhatsApp.</span>
+                        }
+                    </p>
+                    <button type="button" class="btn-g-outline" id="btnImprimir">
+                        <i class="bi bi-printer" aria-hidden="true"></i> Imprimir ticket (80 mm)
+                    </button>
+                    <button type="button" class="btn-g-outline" id="btnPdf">
+                        <i class="bi bi-file-earmark-pdf" aria-hidden="true"></i> Descargar PDF
+                    </button>
+                </div>
+            }
+            <p class="nv-estado" id="estado" role="status"></p>
+            <div class="nv-enlaces">
+                <a class="btn-g-primary" asp-action="Nueva"><i class="bi bi-plus-lg" aria-hidden="true"></i> Nueva venta</a>
+                <a class="btn-g-outline" asp-action="Index"><i class="bi bi-list-ul" aria-hidden="true"></i> Ver ventas</a>
+            </div>
+            @if (!Model.Anulada)
+            {
+                <button type="button" class="nv-btn-anular" data-bs-toggle="modal" data-bs-target="#modalAnular">
+                    <i class="bi bi-x-octagon" aria-hidden="true"></i> Anular venta
+                </button>
+            }
+        </section>
+
+        <section class="nv-card nv-fotos" aria-labelledby="tituloFotos">
+            <h2 class="nv-titulo" id="tituloFotos"><i class="bi bi-camera" aria-hidden="true"></i> Fotos de la entrega</h2>
+            <p class="nv-nota">Para validar que se entregó todo bien. Quedan en el sistema; no salen en la nota.</p>
+            @if (Model.Evidencias.Count == 0)
+            {
+                <div class="nv-sin-fotos">@(Model.Anulada ? "Esta venta no tiene fotos de entrega." : "Aún no hay fotos de esta entrega.")</div>
+            }
+            else
+            {
+                <ul class="nv-galeria">
+                    @foreach (var foto in Model.Evidencias)
+                    {
+                        var cuando = foto.Fecha.ToString("dd/MM HH:mm", inv);
+                        <li>
+                            <a href="@foto.Url" target="_blank" rel="noopener" aria-label="Ver foto de entrega del @cuando (abre en otra pestaña)">
+                                <img src="@foto.Url" alt="" loading="lazy" />
+                                <span>@cuando</span>
+                            </a>
+                        </li>
+                    }
+                </ul>
+            }
+            @if (!Model.Anulada)
+            {
+                <form class="nv-subir" method="post" asp-action="AgregarEvidencia" asp-route-id="@Model.IdMovimiento" enctype="multipart/form-data">
+                    <label for="foto" class="visually-hidden">Foto de la entrega</label>
+                    <input type="file" id="foto" name="foto" accept="image/jpeg,image/png,image/webp" required aria-describedby="ayudaFoto" />
+                    <button type="submit" class="btn-g-outline"><i class="bi bi-upload" aria-hidden="true"></i> Subir foto</button>
+                </form>
+                <p class="cp-ayuda" id="ayudaFoto">JPG, PNG o WEBP de hasta 5 MB.</p>
+            }
+        </section>
+    </div>
+</div>
+
+@if (!Model.Anulada)
+{
+    <div class="modal fade cp-modal" id="modalAnular" tabindex="-1" aria-labelledby="tituloAnular" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="post" asp-action="Anular" asp-route-id="@Model.IdMovimiento" id="formAnular" novalidate>
+                    <div class="modal-body">
+                        <div class="cp-modal-icono" aria-hidden="true"><i class="bi bi-x-octagon"></i></div>
+                        <h2 id="tituloAnular">¿Anular la venta @Model.Numero?</h2>
+                        <p>La nota no se borra: queda como anulada y deja de sumar en las ventas. Estos productos vuelven al stock:</p>
+                        <ul class="nv-devolucion">
+                            @foreach (var l in Model.Lineas)
+                            {
+                                <li><strong>@l.Cantidad @l.Unidad</strong> @l.Descripcion <span>a @l.Zona</span></li>
+                            }
+                        </ul>
+                        <div class="cp-campo nv-campo-motivo">
+                            <label for="motivo">Motivo <span class="cp-req" aria-hidden="true">*</span></label>
+                            <div class="nv-motivos" role="group" aria-label="Motivos frecuentes">
+                                <button type="button" data-motivo="Nota hecha con error">Nota con error</button>
+                                <button type="button" data-motivo="El cliente canceló la compra">El cliente canceló</button>
+                                <button type="button" data-motivo="El cliente devolvió los productos">Devolución</button>
+                            </div>
+                            <textarea id="motivo" name="motivo" rows="2" maxlength="200" required aria-required="true"
+                                      placeholder="Escribe o elige un motivo"></textarea>
+                            <p class="cp-error" id="motivo-error" hidden><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> Escribe el motivo de la anulación.</p>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn-g-outline" data-bs-dismiss="modal" id="btnCancelarAnular">Cancelar</button>
+                        <button type="submit" class="btn-g-danger" id="btnConfirmarAnular">Sí, anular venta</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}
+
+<style id="nv-pagina"></style>
+
+@section Scripts {
+    <script>
+        const ticket = document.getElementById('ticket');
+        const estado = document.getElementById('estado');
+        const mensaje = @Json.Serialize(mensaje);
+        const celular = @Json.Serialize(celular);
+        const nombreArchivo = @Json.Serialize(archivoPdf);
+        const urlWhatsApp = 'https://wa.me/' + (celular ? '51' + celular : '') + '?text=' + encodeURIComponent(mensaje);
+        const PX_A_MM = 25.4 / 96;
+
+        function avisar(texto, esError) {
+            estado.textContent = texto;
+            estado.classList.toggle('error', !!esError);
+        }
+
+        const altoTicketMm = () => Math.ceil(ticket.getBoundingClientRect().height * PX_A_MM) + 2;
+
+        // ===== Impresión: una copia del ticket sola en la página, del alto justo =====
+        function prepararImpresion() {
+            document.getElementById('nv-impresion')?.remove();
+            const copia = ticket.cloneNode(true);
+            copia.removeAttribute('id');
+            const contenedor = document.createElement('div');
+            contenedor.id = 'nv-impresion';
+            contenedor.append(copia);
+            document.body.append(contenedor);
+            document.body.classList.add('nv-imprimiendo');
+            document.getElementById('nv-pagina').textContent = `@@page { size: 80mm ${altoTicketMm()}mm; margin: 0; }`;
+        }
+
+        function terminarImpresion() {
+            document.getElementById('nv-impresion')?.remove();
+            document.body.classList.remove('nv-imprimiendo');
+            document.getElementById('nv-pagina').textContent = '';
+        }
+
+        window.addEventListener('beforeprint', prepararImpresion);
+        window.addEventListener('afterprint', terminarImpresion);
+        document.getElementById('btnImprimir').addEventListener('click', () => window.print());
+
+        // ===== PDF (html2pdf se carga solo cuando hace falta) =====
+        let promesaLibreria = null;
+        function cargarHtml2pdf() {
+            promesaLibreria ??= new Promise((resolver, rechazar) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.14.0/html2pdf.bundle.min.js';
+                script.integrity = 'sha512-+9GoO5OUX2MmPRHUH5dnOY+KGReMLcxywEvQxvAI0y5JxXh/lkz99dKj4xdYfODP3dMFsoZRz4CF/vHcaqa2Ag==';
+                script.crossOrigin = 'anonymous';
+                script.referrerPolicy = 'no-referrer';
+                script.onload = () => resolver(window.html2pdf);
+                script.onerror = () => {
+                    promesaLibreria = null;
+                    script.remove();
+                    rechazar(new Error('No se pudo cargar el generador de PDF.'));
+                };
+                document.head.append(script);
+            });
+            return promesaLibreria;
+        }
+
+        let promesaPdf = null;
+        function generarPdf() {
+            promesaPdf ??= Promise.all([cargarHtml2pdf(), document.fonts.ready])
+                .then(([html2pdf]) => html2pdf()
+                    .set({
+                        margin: 0,
+                        filename: nombreArchivo,
+                        image: { type: 'jpeg', quality: 0.98 },
+                        html2canvas: { scale: 3, backgroundColor: '#ffffff' },
+                        jsPDF: { unit: 'mm', format: [80, altoTicketMm()], orientation: 'portrait' },
+                        pagebreak: { mode: 'avoid-all' }
+                    })
+                    .from(ticket)
+                    .outputPdf('blob'))
+                .catch(error => {
+                    promesaPdf = null;
+                    throw error;
+                });
+            return promesaPdf;
+        }
+
+        function descargar(blob) {
+            const url = URL.createObjectURL(blob);
+            const enlace = document.createElement('a');
+            enlace.href = url;
+            enlace.download = nombreArchivo;
+            document.body.append(enlace);
+            enlace.click();
+            enlace.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 10000);
+        }
+
+        async function conBoton(boton, texto, accion) {
+            const contenido = boton.innerHTML;
+            boton.disabled = true;
+            boton.innerHTML = `<span class="cp-spinner" aria-hidden="true"></span> ${texto}`;
+            try {
+                await accion();
+            } finally {
+                boton.disabled = false;
+                boton.innerHTML = contenido;
+            }
+        }
+
+        const btnPdf = document.getElementById('btnPdf');
+        btnPdf.addEventListener('click', () => conBoton(btnPdf, 'Generando PDF…', async () => {
+            try {
+                descargar(await generarPdf());
+                avisar(`PDF descargado: ${nombreArchivo}`);
+            } catch {
+                avisar('No se pudo generar el PDF. Revisa tu conexión a internet e inténtalo de nuevo.', true);
+            }
+        }));
+
+        // ===== WhatsApp: en el celular se comparte el PDF con el mensaje; en la PC se abre el chat y se descarga el PDF =====
+        function puedeCompartirArchivos() {
+            try {
+                return !!navigator.canShare?.({ files: [new File([''], nombreArchivo, { type: 'application/pdf' })] });
+            } catch {
+                return false;
+            }
+        }
+
+        const btnWhatsApp = document.getElementById('btnWhatsApp');
+        btnWhatsApp?.addEventListener('click', () => {
+            if (puedeCompartirArchivos()) {
+                conBoton(btnWhatsApp, 'Preparando la nota…', async () => {
+                    try {
+                        const archivo = new File([await generarPdf()], nombreArchivo, { type: 'application/pdf' });
+                        await navigator.share({ files: [archivo], text: mensaje });
+                        avisar('');
+                    } catch (error) {
+                        if (error?.name === 'AbortError') return;
+                        window.open(urlWhatsApp, '_blank', 'noopener');
+                        avisar('No se pudo adjuntar el PDF; se abrió WhatsApp solo con el mensaje.', true);
+                    }
+                });
+                return;
+            }
+
+            // El chat se abre dentro del clic para que el navegador no lo bloquee como ventana emergente
+            window.open(urlWhatsApp, '_blank', 'noopener');
+            conBoton(btnWhatsApp, 'Preparando el PDF…', async () => {
+                try {
+                    descargar(await generarPdf());
+                    avisar(`Se abrió WhatsApp con el mensaje y se descargó ${nombreArchivo}: adjúntalo en el chat (clip › Documento).`);
+                } catch {
+                    avisar('Se abrió WhatsApp con el mensaje, pero no se pudo generar el PDF. Usa «Descargar PDF» para reintentar.', true);
+                }
+            });
+        });
+
+        // ===== Anular venta =====
+        const formAnular = document.getElementById('formAnular');
+        if (formAnular) {
+            const modalAnular = document.getElementById('modalAnular');
+            const motivo = document.getElementById('motivo');
+            const errorMotivo = document.getElementById('motivo-error');
+            const btnConfirmar = document.getElementById('btnConfirmarAnular');
+
+            function marcarMotivo(invalido) {
+                errorMotivo.hidden = !invalido;
+                motivo.setAttribute('aria-invalid', invalido ? 'true' : 'false');
+                if (invalido) motivo.setAttribute('aria-describedby', 'motivo-error');
+                else motivo.removeAttribute('aria-describedby');
+            }
+
+            formAnular.querySelectorAll('[data-motivo]').forEach(boton => boton.addEventListener('click', () => {
+                motivo.value = boton.dataset.motivo;
+                marcarMotivo(false);
+                motivo.focus();
+            }));
+            motivo.addEventListener('input', () => { if (motivo.value.trim()) marcarMotivo(false); });
+
+            formAnular.addEventListener('submit', e => {
+                if (!motivo.value.trim()) {
+                    e.preventDefault();
+                    marcarMotivo(true);
+                    motivo.focus();
+                    return;
+                }
+                btnConfirmar.disabled = true;
+                btnConfirmar.innerHTML = '<span class="cp-spinner" aria-hidden="true"></span> Anulando…';
+            });
+
+            // En una acción que no se deshace el foco inicial va a "Cancelar"
+            modalAnular.addEventListener('shown.bs.modal', () => document.getElementById('btnCancelarAnular').focus());
+            modalAnular.addEventListener('hidden.bs.modal', () => {
+                motivo.value = '';
+                marcarMotivo(false);
+            });
+        }
+
+        // En el celular el PDF se prepara de antemano: compartir necesita el archivo listo al tocar el botón
+        if (btnWhatsApp && puedeCompartirArchivos()) {
+            const precargar = () => generarPdf().catch(() => { });
+            if ('requestIdleCallback' in window) requestIdleCallback(precargar, { timeout: 3000 });
+            else setTimeout(precargar, 1500);
+        }
+    </script>
+}

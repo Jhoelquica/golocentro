@@ -15,13 +15,23 @@ public partial class Sede
 
     public string Estado { get; set; } = null!;
 
+    public decimal? PlanoAncho { get; set; }
+
+    public decimal? PlanoAlto { get; set; }
+
+    public virtual ICollection<AjusteInventario> AjusteInventarios { get; set; } = new List<AjusteInventario>();
+
     public virtual ICollection<Alertum> Alerta { get; set; } = new List<Alertum>();
 
     public virtual ICollection<Camara> Camaras { get; set; } = new List<Camara>();
 
     public virtual ICollection<Movimiento> Movimientos { get; set; } = new List<Movimiento>();
 
+    public virtual ICollection<PlanoLinea> PlanoLineas { get; set; } = new List<PlanoLinea>();
+
     public virtual ICollection<Reporte> Reportes { get; set; } = new List<Reporte>();
+
+    public virtual ICollection<Traslado> Traslados { get; set; } = new List<Traslado>();
 
     public virtual ICollection<Ubicacion> Ubicacions { get; set; } = new List<Ubicacion>();
 
