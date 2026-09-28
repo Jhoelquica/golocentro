@@ -30,6 +30,8 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<Movimiento> Movimientos { get; set; }
 
+    public virtual DbSet<Negocio> Negocios { get; set; }
+
     public virtual DbSet<NotaVentum> NotaVenta { get; set; }
 
     public virtual DbSet<PlanoLinea> PlanoLineas { get; set; }
@@ -371,6 +373,35 @@ public partial class AppDbContext : DbContext
                 .HasConstraintName("movimiento_id_usuario_fkey");
         });
 
+        modelBuilder.Entity<Negocio>(entity =>
+        {
+            entity.HasKey(e => e.IdNegocio).HasName("negocio_pkey");
+
+            entity.ToTable("negocio");
+
+            entity.Property(e => e.IdNegocio)
+                .HasDefaultValue(1)
+                .HasColumnName("id_negocio");
+            entity.Property(e => e.Correo)
+                .HasMaxLength(100)
+                .HasColumnName("correo");
+            entity.Property(e => e.MensajeNota)
+                .HasMaxLength(120)
+                .HasColumnName("mensaje_nota");
+            entity.Property(e => e.NombreComercial)
+                .HasMaxLength(100)
+                .HasColumnName("nombre_comercial");
+            entity.Property(e => e.RazonSocial)
+                .HasMaxLength(150)
+                .HasColumnName("razon_social");
+            entity.Property(e => e.Ruc)
+                .HasMaxLength(11)
+                .HasColumnName("ruc");
+            entity.Property(e => e.Telefono)
+                .HasMaxLength(15)
+                .HasColumnName("telefono");
+        });
+
         modelBuilder.Entity<NotaVentum>(entity =>
         {
             entity.HasKey(e => e.IdNota).HasName("nota_venta_pkey");
@@ -613,6 +644,9 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.PlanoAncho)
                 .HasPrecision(5, 1)
                 .HasColumnName("plano_ancho");
+            entity.Property(e => e.Telefono)
+                .HasMaxLength(15)
+                .HasColumnName("telefono");
         });
 
         modelBuilder.Entity<Traslado>(entity =>
