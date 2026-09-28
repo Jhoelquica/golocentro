@@ -71,6 +71,24 @@
         background: var(--g-teal);
         color: #FFFFFF;
         border: 1px solid var(--g-teal);
+        box-shadow: 0 1px 2px rgba(4,120,87,0.25), inset 0 1px 0 rgba(255,255,255,0.12);
+    }
+
+    .btn-g-primary:hover {
+        box-shadow: 0 6px 16px rgba(4,120,87,0.3), inset 0 1px 0 rgba(255,255,255,0.12);
+    }
+
+    /* Al presionar, el botón se hunde un poco */
+    .btn-g-primary:active,
+    .btn-g-outline:active,
+    .btn-g-danger:active {
+        transform: translateY(1px);
+    }
+
+    .btn-g-primary,
+    .btn-g-outline,
+    .btn-g-danger {
+        transition: background var(--transition), color var(--transition), border-color var(--transition), box-shadow var(--transition), transform 0.08s ease;
     }
 
         .btn-g-primary:hover {
@@ -364,6 +382,12 @@
         .cp-limpiar:hover {
             color: var(--g-teal);
         }
+
+    /* Profundidad suave en capas: se ve más fino que un borde solo */
+    .cp-panel,
+    .cp-form-card {
+        box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 6px 20px rgba(15,23,42,0.04);
+    }
 
     .cp-panel {
         background: var(--g-white);

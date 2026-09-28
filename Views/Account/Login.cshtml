@@ -21,93 +21,246 @@
         body {
             font-family: 'Inter', sans-serif;
             min-height: 100vh;
-            background: #334155;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 1.5rem 1rem;
+            background: #F8FAFC;
+            color: #0F172A;
         }
-
-            /* Decoración: fixed para que no genere scroll ni recorte la tarjeta en pantallas bajas */
-            body::before, body::after {
-                content: '';
-                position: fixed;
-                border-radius: 50%;
-                pointer-events: none;
-                z-index: 0;
-            }
-
-            body::before {
-                width: 500px;
-                height: 500px;
-                background: radial-gradient(circle, rgba(4,120,87,0.4) 0%, transparent 70%);
-                top: -150px;
-                right: -100px;
-            }
-
-            body::after {
-                width: 400px;
-                height: 400px;
-                background: radial-gradient(circle, rgba(203,213,225,0.15) 0%, transparent 70%);
-                bottom: -100px;
-                left: -80px;
-            }
 
         :focus-visible {
             outline: 2px solid #047857;
             outline-offset: 2px;
         }
 
-        .login-card {
-            background: #ffffff;
-            border-radius: 20px;
-            width: 100%;
-            max-width: 400px;
-            overflow: hidden;
+        /* Pantalla partida: foto del almacén a la izquierda, acceso a la derecha.
+           El formulario va primero en el HTML para lectores de pantalla y teclado. */
+        .lg-pantalla {
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: minmax(0, 1.15fr) minmax(420px, 1fr);
+            grid-template-areas: "foto panel";
+        }
+
+        .lg-foto {
+            grid-area: foto;
             position: relative;
-            z-index: 1;
-            box-shadow: 0 24px 60px rgba(0,0,0,0.35);
+            overflow: hidden;
+            isolation: isolate;
+            color: #FFFFFF;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 40px 48px;
+            background: #1E293B;
         }
 
-        .login-header {
-            background: #334155;
-            padding: 2rem 2rem 1.75rem;
-            text-align: center;
-            border-bottom: 3px solid #047857;
+            /* La foto grande solo se descarga en pantallas grandes (en el celular va una más liviana) */
+            .lg-foto::before {
+                content: '';
+                position: absolute;
+                inset: 0;
+                z-index: -2;
+                background-position: center;
+                background-size: cover;
+                animation: lg-acercar 1.6s cubic-bezier(.2, .7, .2, 1) both;
+            }
+
+            .lg-foto::after {
+                content: '';
+                position: absolute;
+                inset: 0;
+                z-index: -1;
+                background:
+                    linear-gradient(180deg, rgba(15,23,42,0.55) 0%, rgba(15,23,42,0.2) 38%, rgba(15,23,42,0.9) 100%),
+                    linear-gradient(90deg, rgba(4,120,87,0.22) 0%, transparent 55%);
+            }
+
+        @@media (min-width: 901px) {
+            .lg-foto::before {
+                background-image: url('/img/login-almacen-960.webp');
+            }
         }
 
-        .login-logo-wrap {
-            width: 72px;
-            height: 72px;
+        .lg-marca {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+        }
+
+        .lg-logo {
+            width: 40px;
+            height: 40px;
+            border-radius: 11px;
             background: #047857;
-            border-radius: 18px;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: 0 auto 1rem;
-            box-shadow: 0 8px 20px rgba(4,120,87,0.5);
+            box-shadow: 0 6px 18px rgba(4,120,87,0.45);
         }
 
-            .login-logo-wrap i {
-                font-size: 34px;
+            .lg-logo i {
+                font-size: 20px;
                 color: #FFFFFF;
             }
 
-        .login-header h1 {
-            font-size: 22px;
-            font-weight: 600;
-            color: #FFFFFF;
-            letter-spacing: 0.02em;
-            margin-bottom: 4px;
+        .lg-texto {
+            max-width: 460px;
         }
 
-        .login-header p {
+        .lg-kicker {
             font-size: 13px;
-            color: #CBD5E1;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #A7F3D0;
+            margin-bottom: 10px;
+        }
+
+        .lg-texto h2 {
+            font-size: clamp(28px, 3.2vw, 40px);
+            font-weight: 700;
+            line-height: 1.15;
+            letter-spacing: -0.01em;
+            margin-bottom: 12px;
+        }
+
+        .lg-texto > p:not(.lg-kicker) {
+            font-size: 16px;
+            line-height: 1.55;
+            color: #E2E8F0;
+            margin-bottom: 20px;
+        }
+
+        .lg-puntos {
+            list-style: none;
             display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+            .lg-puntos li {
+                display: inline-flex;
+                align-items: center;
+                gap: 7px;
+                padding: 7px 12px;
+                border-radius: 999px;
+                background: rgba(15,23,42,0.55);
+                border: 1px solid rgba(255,255,255,0.18);
+                font-size: 13px;
+                font-weight: 500;
+                color: #F8FAFC;
+            }
+
+                .lg-puntos li i {
+                    color: #6EE7B7;
+                }
+
+        .lg-panel {
+            grid-area: panel;
+            display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 4px;
+            gap: 20px;
+            padding: 32px 24px;
+            background:
+                radial-gradient(circle at 100% 0%, rgba(4,120,87,0.08), transparent 45%),
+                #F8FAFC;
+        }
+
+        .login-card {
+            width: 100%;
+            max-width: 400px;
+            background: #FFFFFF;
+            border: 1px solid #E2E8F0;
+            border-radius: 18px;
+            box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 16px 40px rgba(15,23,42,0.08);
+            animation: lg-subir 0.45s ease-out 0.1s both;
+        }
+
+        .login-header {
+            padding: 1.75rem 2rem 0;
+        }
+
+            .login-header .lg-marca {
+                color: #334155;
+                font-size: 16px;
+                margin-bottom: 1.25rem;
+            }
+
+                .login-header .lg-marca .lg-logo {
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 10px;
+                    box-shadow: 0 4px 12px rgba(4,120,87,0.35);
+                }
+
+            .login-header h1 {
+                font-size: 22px;
+                font-weight: 700;
+                color: #0F172A;
+                margin-bottom: 4px;
+            }
+
+            .login-header p {
+                font-size: 14px;
+                color: #475569;
+            }
+
+        @@keyframes lg-acercar {
+            from { transform: scale(1.06); }
+            to { transform: none; }
+        }
+
+        @@keyframes lg-subir {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: none; }
+        }
+
+        /* Celular y tablet: la foto pasa a ser una franja arriba y el acceso sube sobre ella */
+        @@media (max-width: 900px) {
+            .lg-pantalla {
+                grid-template-columns: 1fr;
+                grid-template-areas: "foto" "panel";
+            }
+
+            .lg-foto {
+                min-height: 200px;
+                padding: 20px 20px 36px;
+            }
+
+                .lg-foto::before {
+                    background-image: url('/img/login-almacen-640.webp');
+                    background-position: center 35%;
+                }
+
+            .lg-texto h2 {
+                font-size: 24px;
+                margin-bottom: 0;
+            }
+
+            .lg-texto > p:not(.lg-kicker),
+            .lg-puntos {
+                display: none;
+            }
+
+            .lg-panel {
+                position: relative;
+                margin-top: -18px;
+                border-radius: 18px 18px 0 0;
+                justify-content: flex-start;
+                padding: 20px 16px 24px;
+            }
+
+            .login-card {
+                box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 8px 24px rgba(15,23,42,0.06);
+            }
+
+            /* La marca ya está en la franja de la foto */
+            .login-header .lg-marca {
+                display: none;
+            }
         }
 
         .login-body {
@@ -313,9 +466,6 @@
         }
 
         .login-footer {
-            background: #F8FAFC;
-            border-top: 1px solid #E2E8F0;
-            padding: 12px;
             text-align: center;
             font-size: 12px;
             color: #475569;
@@ -328,7 +478,11 @@
         @@media (prefers-reduced-motion: reduce) {
             *, *::before, *::after {
                 transition: none !important;
-                animation-duration: 1.5s !important;
+            }
+
+            .lg-foto::before,
+            .login-card {
+                animation: none !important;
             }
 
             .btn-login:active {
@@ -338,89 +492,105 @@
     </style>
 </head>
 <body>
+    <div class="lg-pantalla">
+        <main class="lg-panel">
+            <div class="login-card">
+                <div class="login-header">
+                    <div class="lg-marca">
+                        <span class="lg-logo" aria-hidden="true"><i class="bi bi-boxes"></i></span>
+                        Golocentro
+                    </div>
+                    <h1>Acceso al sistema</h1>
+                    <p>Ingresa con el usuario que te dio la dueña.</p>
+                </div>
 
-    <main class="login-card">
+                <div class="login-body">
+                        @if (ViewBag.Error != null)
+                        {
+                            <div class="alert-error" id="alertError" role="alert">
+                                <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+                                <span>@ViewBag.Error</span>
+                                <button class="btn-close-error" type="button" aria-label="Cerrar mensaje"
+                                        onclick="document.getElementById('alertError').remove()">
+                                    <i class="bi bi-x" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                        }
 
-        <div class="login-header">
-            <div class="login-logo-wrap">
-                <i class="bi bi-boxes" aria-hidden="true"></i>
+                        <form method="post" asp-controller="Account" asp-action="Login" id="formLogin">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="returnUrl" value="@ViewData["ReturnUrl"]" />
+
+                            <div class="field-group">
+                                <label for="nombreUsuario">Usuario</label>
+                                <div class="field-input-wrap">
+                                    <i class="bi bi-person field-icon" aria-hidden="true"></i>
+                                    <input type="text"
+                                           id="nombreUsuario"
+                                           name="nombreUsuario"
+                                           value="@usuarioPrevio"
+                                           placeholder="Ingresa tu usuario"
+                                           required
+                                           autocapitalize="none"
+                                           spellcheck="false"
+                                           autocomplete="username"
+                                           autofocus="@string.IsNullOrEmpty(usuarioPrevio)" />
+                                </div>
+                            </div>
+
+                            <div class="field-group">
+                                <label for="contraseña">Contraseña</label>
+                                <div class="field-input-wrap">
+                                    <i class="bi bi-lock field-icon" aria-hidden="true"></i>
+                                    <input type="password"
+                                           id="contraseña"
+                                           name="contraseña"
+                                           class="con-toggle"
+                                           placeholder="••••••••"
+                                           required
+                                           autocomplete="current-password"
+                                           autofocus="@(!string.IsNullOrEmpty(usuarioPrevio))" />
+                                    <button type="button" class="toggle-pass" id="togglePass"
+                                            aria-label="Mostrar contraseña" aria-pressed="false" aria-controls="contraseña">
+                                        <i class="bi bi-eye" id="toggleIcon" aria-hidden="true"></i>
+                                    </button>
+                                </div>
+                                <p class="caps-aviso" id="capsAviso" aria-live="polite" hidden>
+                                    <i class="bi bi-capslock-fill" aria-hidden="true"></i>
+                                    Bloq Mayús está activado
+                                </p>
+                            </div>
+
+                            <button type="submit" class="btn-login" id="btnLogin">
+                                <i class="bi bi-box-arrow-in-right" aria-hidden="true"></i>
+                                <span>Ingresar al Sistema</span>
+                            </button>
+                            <p class="login-ayuda">¿No tienes cuenta u olvidaste tu contraseña? Pídesela a la dueña.</p>
+                        </form>
+                </div>
             </div>
-            <h1>Golocentro</h1>
-            <p><i class="bi bi-geo-alt-fill" aria-hidden="true"></i> Ayacucho, Perú</p>
-        </div>
+            <div class="login-footer">
+                © @DateTime.Now.Year <strong>Distribuidora Golocentro</strong> · Ayacucho, Perú
+            </div>
+        </main>
 
-        <div class="login-body">
-            <h2>Acceso al Sistema</h2>
-
-            @if (ViewBag.Error != null)
-            {
-                <div class="alert-error" id="alertError" role="alert">
-                    <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
-                    <span>@ViewBag.Error</span>
-                    <button class="btn-close-error" type="button" aria-label="Cerrar mensaje"
-                            onclick="document.getElementById('alertError').remove()">
-                        <i class="bi bi-x" aria-hidden="true"></i>
-                    </button>
-                </div>
-            }
-
-            <form method="post" asp-controller="Account" asp-action="Login" id="formLogin">
-                @Html.AntiForgeryToken()
-                <input type="hidden" name="returnUrl" value="@ViewData["ReturnUrl"]" />
-
-                <div class="field-group">
-                    <label for="nombreUsuario">Usuario</label>
-                    <div class="field-input-wrap">
-                        <i class="bi bi-person field-icon" aria-hidden="true"></i>
-                        <input type="text"
-                               id="nombreUsuario"
-                               name="nombreUsuario"
-                               value="@usuarioPrevio"
-                               placeholder="Ingresa tu usuario"
-                               required
-                               autocapitalize="none"
-                               spellcheck="false"
-                               autocomplete="username"
-                               autofocus="@string.IsNullOrEmpty(usuarioPrevio)" />
-                    </div>
-                </div>
-
-                <div class="field-group">
-                    <label for="contraseña">Contraseña</label>
-                    <div class="field-input-wrap">
-                        <i class="bi bi-lock field-icon" aria-hidden="true"></i>
-                        <input type="password"
-                               id="contraseña"
-                               name="contraseña"
-                               class="con-toggle"
-                               placeholder="••••••••"
-                               required
-                               autocomplete="current-password"
-                               autofocus="@(!string.IsNullOrEmpty(usuarioPrevio))" />
-                        <button type="button" class="toggle-pass" id="togglePass"
-                                aria-label="Mostrar contraseña" aria-pressed="false" aria-controls="contraseña">
-                            <i class="bi bi-eye" id="toggleIcon" aria-hidden="true"></i>
-                        </button>
-                    </div>
-                    <p class="caps-aviso" id="capsAviso" aria-live="polite" hidden>
-                        <i class="bi bi-capslock-fill" aria-hidden="true"></i>
-                        Bloq Mayús está activado
-                    </p>
-                </div>
-
-                <button type="submit" class="btn-login" id="btnLogin">
-                    <i class="bi bi-box-arrow-in-right" aria-hidden="true"></i>
-                    <span>Ingresar al Sistema</span>
-                </button>
-                <p class="login-ayuda">¿No tienes cuenta u olvidaste tu contraseña? Pídesela a la dueña.</p>
-            </form>
-        </div>
-
-        <div class="login-footer">
-            © @DateTime.Now.Year <strong>Distribuidora Golocentro</strong> · Todos los derechos reservados
-        </div>
-
-    </main>
+        <aside class="lg-foto" aria-label="Golocentro">
+            <div class="lg-marca">
+                <span class="lg-logo" aria-hidden="true"><i class="bi bi-boxes"></i></span>
+                Golocentro
+            </div>
+            <div class="lg-texto">
+                <p class="lg-kicker">Distribuidora Golocentro · Almacén</p>
+                <h2>Tu almacén, en orden.</h2>
+                <p>Stock, ventas y zonas del almacén en un solo lugar, desde la computadora o el celular.</p>
+                <ul class="lg-puntos">
+                    <li><i class="bi bi-boxes" aria-hidden="true"></i> Stock por zona</li>
+                    <li><i class="bi bi-receipt" aria-hidden="true"></i> Notas de venta</li>
+                    <li><i class="bi bi-map" aria-hidden="true"></i> Mapa del almacén</li>
+                </ul>
+            </div>
+        </aside>
+    </div>
 
     <script>
         const inputPass = document.getElementById('contraseña');

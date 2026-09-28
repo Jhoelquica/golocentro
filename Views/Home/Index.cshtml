@@ -39,34 +39,80 @@
 }
 
 <style>
-    .dash-greeting {
-        margin-bottom: 1.5rem;
+    /* Banner de bienvenida: foto del almacén con degradado para que el texto se lea (contraste > 7:1) */
+    .dash-hero {
+        position: relative;
+        overflow: hidden;
+        isolation: isolate;
         display: flex;
-        align-items: center;
+        align-items: flex-end;
         justify-content: space-between;
         flex-wrap: wrap;
-        gap: 10px;
+        gap: 12px 20px;
+        min-height: 156px;
+        padding: 26px 28px;
+        margin-bottom: 1.5rem;
+        border-radius: 16px;
+        background: #1E293B;
+        color: #FFFFFF;
+        box-shadow: 0 10px 30px rgba(15,23,42,0.18);
     }
 
-        .dash-greeting h1 {
-            font-size: 22px;
-            font-weight: 600;
-            color: var(--g-navy);
-            margin: 0 0 6px;
+        .dash-hero::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            z-index: -2;
+            background: url('/img/banner-pasillo-1600.webp') center 55% / cover no-repeat;
+            animation: dash-aparecer 1.2s ease-out both;
         }
 
-        .dash-greeting p {
-            font-size: 14px;
-            color: var(--g-muted);
-            margin: 0;
-            display: flex;
-            align-items: center;
-            gap: 8px;
+        .dash-hero::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            z-index: -1;
+            background: linear-gradient(90deg, rgba(15,23,42,0.94) 0%, rgba(15,23,42,0.74) 48%, rgba(15,23,42,0.3) 100%);
         }
+
+    @@media (max-width: 768px) {
+        .dash-hero {
+            padding: 20px;
+            min-height: 140px;
+        }
+
+            .dash-hero::before {
+                background-image: url('/img/banner-pasillo-800.webp');
+            }
+    }
+
+    @@keyframes dash-aparecer {
+        from { opacity: 0; transform: scale(1.04); }
+        to { opacity: 1; transform: none; }
+    }
+
+    .dash-hero h1 {
+        font-size: 26px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        color: #FFFFFF;
+        margin: 0 0 8px;
+    }
+
+    .dash-hero p {
+        font-size: 14px;
+        color: #E2E8F0;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
 
     .badge-rol {
-        background: rgba(4,120,87,0.12);
-        color: var(--g-teal);
+        background: rgba(110,231,183,0.18);
+        border: 1px solid rgba(110,231,183,0.35);
+        color: #A7F3D0;
         font-size: 12px;
         font-weight: 600;
         padding: 3px 10px;
@@ -74,16 +120,22 @@
     }
 
     .dash-date {
-        background: var(--g-white);
-        border: 1px solid var(--g-border);
-        border-radius: var(--radius);
+        background: rgba(255,255,255,0.1);
+        border: 1px solid rgba(255,255,255,0.2);
+        border-radius: 999px;
         padding: 8px 14px;
         font-size: 13px;
-        color: var(--g-muted);
+        color: #F1F5F9;
         font-weight: 500;
         display: flex;
         align-items: center;
         gap: 6px;
+    }
+
+    @@media (prefers-reduced-motion: reduce) {
+        .dash-hero::before {
+            animation: none;
+        }
     }
 
     /* ── Métricas (informativas, sin efecto hover para no parecer clicables) ── */
@@ -477,19 +529,19 @@
     }
 </style>
 
-<div class="dash-greeting">
+<section class="dash-hero" aria-labelledby="saludo">
     <div>
-        <h1>@saludo, @Model.NombreCompleto</h1>
+        <h1 id="saludo">@saludo, @Model.NombreCompleto</h1>
         <p>
             <span class="badge-rol">@rol</span>
-            <span>Resumen del día</span>
+            <span>Resumen del día · @(User.FindFirst("SedeNombre")?.Value ?? "")</span>
         </p>
     </div>
     <div class="dash-date">
         <i class="bi bi-calendar3" aria-hidden="true"></i>
         @fecha
     </div>
-</div>
+</section>
 
 <section class="metric-grid" aria-label="Indicadores del día">
     <div class="metric-card">

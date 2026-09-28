@@ -68,7 +68,19 @@ if (!app.Environment.IsDevelopment())
 app.UseStatusCodePagesWithReExecute("/Error/{0}");
 
 app.UseHttpsRedirection();
-app.UseStaticFiles();
+// Imágenes y librerías casi no cambian: el navegador las guarda 30 días y no vuelve a pedirlas.
+// Las fotos subidas (evidencias, perfiles) tienen nombre único; se guardan solo en ese navegador.
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = contexto =>
+    {
+        var ruta = contexto.Context.Request.Path.Value ?? "";
+        if (ruta.StartsWith("/img/") || ruta.StartsWith("/lib/"))
+            contexto.Context.Response.Headers.CacheControl = "public,max-age=2592000";
+        else if (ruta.StartsWith("/evidencias/") || ruta.StartsWith("/uploads/"))
+            contexto.Context.Response.Headers.CacheControl = "private,max-age=604800";
+    }
+});
 app.UseRouting();
 
 app.UseAuthentication();

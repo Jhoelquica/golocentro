@@ -102,6 +102,16 @@
             justify-content: center;
         }
 
+        .foto {
+            display: block;
+            width: 160px;
+            height: 160px;
+            margin: 0 auto 1.25rem;
+            border-radius: 20px;
+            object-fit: cover;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
+        }
+
         .numero {
             font-size: 13px;
             font-weight: 600;
@@ -200,7 +210,14 @@
 <body>
     <main>
         <a class="marca" href="~/"><span aria-hidden="true"><i class="bi bi-boxes"></i></span> Golocentro</a>
-        <div class="icono" aria-hidden="true"><i class="bi @icono"></i></div>
+        @if (Model.Codigo == 404)
+        {
+            <img class="foto" src="~/img/cajas-480.webp" alt="" width="160" height="160" decoding="async" />
+        }
+        else
+        {
+            <div class="icono" aria-hidden="true"><i class="bi @icono"></i></div>
+        }
         <p class="numero">ERROR @Model.Codigo</p>
         <h1>@titulo</h1>
         <p>@texto</p>
