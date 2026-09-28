@@ -1,4 +1,5 @@
 using System.Net.Mail;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using GestionAlmacen_Golocentro.Data;
 using GestionAlmacen_Golocentro.Models;
@@ -220,6 +221,66 @@ namespace GestionAlmacen_Golocentro.Controllers
             return RedirectToAction(nameof(Index));
         }
 
+        // ===== Editor del plano de una sede =====
+        public async Task<IActionResult> Plano(int id)
+        {
+            var modelo = await ModeloPlano(id);
+            return modelo == null ? NotFound() : View(modelo);
+        }
+
+        // El editor manda todo el plano como JSON: tamaño, posición de cada zona y líneas de referencia
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Plano(int id, string? datos)
+        {
+            var sede = await _context.Sedes.FindAsync(id);
+            if (sede == null)
+                return NotFound();
+
+            PlanoGuardado? plano = null;
+            try
+            {
+                plano = JsonSerializer.Deserialize<PlanoGuardado>(datos ?? "", new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            }
+            catch (JsonException)
+            {
+            }
+
+            var zonas = await _context.Ubicaciones.Where(u => u.IdSede == id).ToListAsync();
+            var errores = plano == null ? new List<string> { "No llegaron los datos del plano. Vuelve a intentarlo." } : ValidarPlano(plano, zonas);
+            if (errores.Count > 0)
+            {
+                TempData["Error"] = string.Join(" ", errores.Take(3)) + (errores.Count > 3 ? $" (y {errores.Count - 3} más)" : "");
+                return RedirectToAction(nameof(Plano), new { id });
+            }
+
+            sede.PlanoAncho = plano!.Ancho;
+            sede.PlanoAlto = plano.Alto;
+            foreach (var z in plano.Zonas)
+            {
+                var zona = zonas.First(u => u.IdUbicacion == z.Id);
+                var dibujada = z.X != null;
+                zona.PosX = dibujada ? z.X : null;
+                zona.PosY = dibujada ? z.Y : null;
+                zona.Ancho = dibujada ? z.Ancho : null;
+                zona.Alto = dibujada ? z.Alto : null;
+            }
+            _context.PlanoLineas.RemoveRange(await _context.PlanoLineas.Where(l => l.IdSede == id).ToListAsync());
+            _context.PlanoLineas.AddRange(plano.Lineas.Select(l => new PlanoLinea
+            {
+                IdSede = id,
+                Tipo = l.Tipo,
+                X1 = l.X1,
+                Y1 = l.Y1,
+                X2 = l.X2,
+                Y2 = l.Y2
+            }));
+            await _context.SaveChangesAsync();
+
+            TempData["Exito"] = "Plano guardado. Así se ve ahora en el Mapa del almacén.";
+            return RedirectToAction(nameof(Plano), new { id });
+        }
+
         // ===== Zonas de una sede =====
         public async Task<IActionResult> Zonas(int id)
         {
@@ -324,6 +385,93 @@ namespace GestionAlmacen_Golocentro.Controllers
         }
 
         // ===== Auxiliares =====
+        [NonAction]
+        private async Task<PlanoEditorViewModel?> ModeloPlano(int id)
+        {
+            var sede = await _context.Sedes
+                .Where(s => s.IdSede == id)
+                .Select(s => new { s.Nombre, s.PlanoAncho, s.PlanoAlto })
+                .FirstOrDefaultAsync();
+            if (sede == null)
+                return null;
+
+            return new PlanoEditorViewModel
+            {
+                SedeId = id,
+                SedeNombre = sede.Nombre,
+                Ancho = sede.PlanoAncho ?? PlanoAncho,
+                Alto = sede.PlanoAlto ?? PlanoAlto,
+                Zonas = await _context.Ubicaciones
+                    .Where(u => u.IdSede == id)
+                    .OrderBy(u => u.CodigoEstante)
+                    .Select(u => new ZonaEditor(u.IdUbicacion, u.CodigoEstante, u.Descripcion, u.Tipo == TipoZona.Recepcion,
+                        u.ProductoUbicacions.Count(pu => pu.CantidadActual > 0), u.PosX, u.PosY, u.Ancho, u.Alto))
+                    .ToListAsync(),
+                Lineas = await _context.PlanoLineas
+                    .Where(l => l.IdSede == id)
+                    .Select(l => new LineaEditor(l.Tipo, l.X1, l.Y1, l.X2, l.Y2))
+                    .ToListAsync()
+            };
+        }
+
+        // Mismas reglas que el editor en el navegador: dentro del plano, en pasos de medio cuadrito y sin zonas encimadas
+        [NonAction]
+        private static List<string> ValidarPlano(PlanoGuardado plano, List<Ubicacion> zonasSede)
+        {
+            var errores = new List<string>();
+            static bool MedioPaso(decimal v) => v * 2 == decimal.Truncate(v * 2);
+
+            if (plano.Ancho < PlanoEditorViewModel.TamanoMinimo || plano.Ancho > PlanoEditorViewModel.TamanoMaximo
+                || plano.Alto < PlanoEditorViewModel.TamanoMinimo || plano.Alto > PlanoEditorViewModel.TamanoMaximo
+                || !MedioPaso(plano.Ancho) || !MedioPaso(plano.Alto))
+                errores.Add($"El plano debe medir entre {PlanoEditorViewModel.TamanoMinimo} y {PlanoEditorViewModel.TamanoMaximo} cuadritos por lado.");
+
+            var dibujadas = new List<(string Codigo, decimal X, decimal Y, decimal Ancho, decimal Alto)>();
+            foreach (var z in plano.Zonas)
+            {
+                var zona = zonasSede.FirstOrDefault(u => u.IdUbicacion == z.Id);
+                if (zona == null)
+                {
+                    errores.Add("Una de las zonas ya no existe. Recarga la página.");
+                    continue;
+                }
+                if (z.X == null)
+                    continue;
+                if (z.Y == null || z.Ancho == null || z.Alto == null
+                    || z.X < 0 || z.Y < 0 || z.Ancho < 0.5m || z.Alto < 0.5m
+                    || !MedioPaso(z.X.Value) || !MedioPaso(z.Y.Value) || !MedioPaso(z.Ancho.Value) || !MedioPaso(z.Alto.Value)
+                    || z.X + z.Ancho > plano.Ancho || z.Y + z.Alto > plano.Alto)
+                {
+                    errores.Add($"La zona {zona.CodigoEstante} se sale del plano.");
+                    continue;
+                }
+                dibujadas.Add((zona.CodigoEstante, z.X.Value, z.Y.Value, z.Ancho.Value, z.Alto.Value));
+            }
+
+            for (var i = 0; i < dibujadas.Count; i++)
+                for (var j = i + 1; j < dibujadas.Count; j++)
+                {
+                    var a = dibujadas[i];
+                    var b = dibujadas[j];
+                    if (a.X < b.X + b.Ancho && b.X < a.X + a.Ancho && a.Y < b.Y + b.Alto && b.Y < a.Y + a.Alto)
+                        errores.Add($"Las zonas {a.Codigo} y {b.Codigo} están encimadas.");
+                }
+
+            if (plano.Lineas.Count > 100)
+                errores.Add("Hay demasiadas líneas en el plano (máximo 100).");
+            foreach (var l in plano.Lineas)
+            {
+                if (l.Tipo is not ("entrada" or "division" or "pasillo"))
+                    errores.Add("Una línea tiene un tipo que no existe.");
+                else if (new[] { l.X1, l.X2 }.Any(x => x < 0 || x > plano.Ancho) || new[] { l.Y1, l.Y2 }.Any(y => y < 0 || y > plano.Alto)
+                         || new[] { l.X1, l.Y1, l.X2, l.Y2 }.Any(v => !MedioPaso(v)))
+                    errores.Add("Una línea se sale del plano.");
+                else if (l.X1 == l.X2 && l.Y1 == l.Y2)
+                    errores.Add("Una línea no tiene largo.");
+            }
+            return errores.Distinct().ToList();
+        }
+
         [NonAction]
         private async Task<string?> MotivoNoEliminarSede(int id)
         {

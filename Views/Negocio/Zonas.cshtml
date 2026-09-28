@@ -108,7 +108,10 @@
             <h1><i class="bi bi-grid-3x3-gap" aria-hidden="true"></i> Zonas de @Model.SedeNombre</h1>
             <p>@Model.Zonas.Count @(Model.Zonas.Count == 1 ? "zona" : "zonas") · donde se deja la mercadería en el piso</p>
         </div>
-        <a class="btn-g-outline" asp-controller="Mapa" asp-action="Index" asp-route-sede="@Model.SedeId"><i class="bi bi-map" aria-hidden="true"></i> Ver el mapa</a>
+        <div style="display:flex; gap:8px; flex-wrap:wrap">
+            <a class="btn-g-outline" asp-controller="Mapa" asp-action="Index" asp-route-sede="@Model.SedeId"><i class="bi bi-map" aria-hidden="true"></i> Ver el mapa</a>
+            <a class="btn-g-primary" asp-action="Plano" asp-route-id="@Model.SedeId"><i class="bi bi-bounding-box" aria-hidden="true"></i> Dibujar en el plano</a>
+        </div>
     </div>
 
     @if (TempData["Exito"] is string exito)
@@ -141,7 +144,7 @@
             <i class="bi bi-pencil-square" aria-hidden="true"></i>
             <span>
                 @sinDibujar @(sinDibujar == 1 ? "zona no está dibujada" : "zonas no están dibujadas") en el plano. Igual se pueden usar para entradas,
-                ventas y conteos, y el buscador del mapa las encuentra; solo no se ven en el dibujo.
+                ventas y conteos; para que se vean en el mapa, <a asp-action="Plano" asp-route-id="@Model.SedeId">dibújalas en el plano</a>.
             </span>
         </p>
     }

@@ -398,6 +398,12 @@
             }
             @if (Model.SedeId != null)
             {
+                @if (User.IsInRole("duena"))
+                {
+                    <a class="btn-g-outline" asp-controller="Negocio" asp-action="Plano" asp-route-id="@Model.SedeId">
+                        <i class="bi bi-bounding-box" aria-hidden="true"></i> Editar plano
+                    </a>
+                }
                 <a class="btn-g-outline" asp-action="Carteles" asp-route-sede="@Model.SedeId">
                     <i class="bi bi-printer" aria-hidden="true"></i> Imprimir carteles
                 </a>
