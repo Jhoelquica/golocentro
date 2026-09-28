@@ -528,6 +528,11 @@
 
                     @if (User.IsInRole("duena"))
                     {
+                        <a class="g-nav-link @(currentController == "Negocio" ? "active" : "")"
+                           asp-controller="Negocio" asp-action="Index">
+                            <i class="bi bi-shop"></i> Negocio
+                        </a>
+
                         <a class="g-nav-link @(currentController == "Usuario" ? "active" : "")"
                            asp-controller="Usuario" asp-action="Index">
                             <i class="bi bi-person-badge"></i> Usuarios

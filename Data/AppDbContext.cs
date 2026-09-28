@@ -685,7 +685,7 @@ public partial class AppDbContext : DbContext
 
             entity.ToTable("ubicacion");
 
-            entity.HasIndex(e => e.CodigoEstante, "ubicacion_codigo_estante_key").IsUnique();
+            entity.HasIndex(e => new { e.IdSede, e.CodigoEstante }, "uq_ubicacion_sede_codigo").IsUnique();
 
             entity.Property(e => e.IdUbicacion)
                 .UseIdentityAlwaysColumn()

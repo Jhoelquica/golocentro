@@ -89,6 +89,10 @@ namespace GestionAlmacen_Golocentro.ViewModels
         public string SedeNombre { get; set; } = "";
         public string? SedeDireccion { get; set; }
         public string? SedeCiudad { get; set; }
+
+        // Teléfono que sale en la nota: el de la sede o, si no tiene, el del negocio
+        public string? Telefono { get; set; }
+        public DatosNegocio Negocio { get; set; } = DatosNegocio.PorDefecto;
         public bool EsPublicoGeneral { get; set; }
         public string ClienteNombre { get; set; } = "";
         public string? ClienteDocumento { get; set; }

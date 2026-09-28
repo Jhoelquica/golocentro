@@ -1,0 +1,252 @@
+@using GestionAlmacen_Golocentro.ViewModels
+@model NegocioFormViewModel
+@{
+    ViewData["Title"] = "Datos del negocio";
+
+    string? Error(string campo) => ViewData.ModelState[campo]?.Errors.FirstOrDefault()?.ErrorMessage;
+    string? Describe(string campo, string? extra = null)
+    {
+        var ids = new[] { extra, Error(campo) != null ? campo + "-error" : null }.Where(x => x != null);
+        var valor = string.Join(" ", ids);
+        return valor.Length == 0 ? null : valor;
+    }
+    var errores = ViewData.ModelState
+        .Where(kv => kv.Value!.Errors.Count > 0)
+        .SelectMany(kv => kv.Value!.Errors.Select(e => (Campo: kv.Key, e.ErrorMessage)))
+        .ToList();
+
+    // La vista previa usa lo que está en el formulario y la primera sede
+    var datos = new DatosNegocio(Model.NombreComercial ?? "", Model.RazonSocial, Model.Ruc, Model.Telefono, Model.Correo,
+        string.IsNullOrWhiteSpace(Model.MensajeNota) ? DatosNegocio.MensajePorDefecto : Model.MensajeNota);
+    var sede = Model.Sedes.FirstOrDefault();
+    var campos = new[]
+    {
+        (Nombre: "NombreComercial", Etiqueta: "Nombre del negocio", Req: true, Max: 100, Tipo: "text", Modo: "text", Ayuda: "Sale arriba de la nota, en mayúsculas.", Ejemplo: "Distribuidora Golocentro"),
+        (Nombre: "RazonSocial", Etiqueta: "Razón social", Req: false, Max: 150, Tipo: "text", Modo: "text", Ayuda: "Solo si es distinta del nombre del negocio.", Ejemplo: "Golocentro E.I.R.L."),
+        (Nombre: "Ruc", Etiqueta: "RUC", Req: false, Max: 11, Tipo: "text", Modo: "numeric", Ayuda: "11 dígitos.", Ejemplo: "20123456789"),
+        (Nombre: "Telefono", Etiqueta: "Teléfono o celular", Req: false, Max: 15, Tipo: "tel", Modo: "tel", Ayuda: "Para pedidos. Si una sede tiene su propio teléfono, en sus notas sale el de la sede.", Ejemplo: "966 333 444"),
+        (Nombre: "Correo", Etiqueta: "Correo", Req: false, Max: 100, Tipo: "email", Modo: "email", Ayuda: "", Ejemplo: "ventas@golocentro.pe"),
+        (Nombre: "MensajeNota", Etiqueta: "Mensaje al pie de la nota", Req: false, Max: 120, Tipo: "text", Modo: "text", Ayuda: "Si lo dejas vacío sale «¡Gracias por su compra!».", Ejemplo: "¡Gracias por su compra! Vuelva pronto")
+    };
+    string? Valor(string nombre) => nombre switch
+    {
+        "NombreComercial" => Model.NombreComercial,
+        "RazonSocial" => Model.RazonSocial,
+        "Ruc" => Model.Ruc,
+        "Telefono" => Model.Telefono,
+        "Correo" => Model.Correo,
+        _ => Model.MensajeNota
+    };
+}
+
+@await Html.PartialAsync("~/Views/Shared/_EstilosGestion.cshtml")
+
+<style>
+    .ng-page {
+        max-width: 1100px;
+    }
+
+    .ng-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 340px;
+        gap: 20px;
+        align-items: start;
+        margin-bottom: 1.5rem;
+    }
+
+    @@media (max-width: 900px) {
+        .ng-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .ng-grid .cp-form-card {
+        max-width: none;
+    }
+
+    .ng-vista {
+        position: sticky;
+        top: calc(var(--topbar-h) + 16px);
+        background: #E9EEF3;
+        border-radius: 14px;
+        padding: 16px 12px 20px;
+    }
+
+        .ng-vista h2 {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--g-muted);
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            text-align: center;
+            margin: 0 0 12px;
+        }
+
+    @@media (max-width: 900px) {
+        .ng-vista {
+            position: static;
+        }
+    }
+
+    .ng-sedes-cab {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+    }
+
+        .ng-sedes-cab p {
+            margin-bottom: 0 !important;
+        }
+
+    .ng-sedes h2 {
+        font-size: 17px;
+        font-weight: 600;
+        color: var(--g-navy);
+        margin: 0 0 4px;
+    }
+
+    .ng-sedes p {
+        font-size: 14px;
+        color: var(--g-muted);
+        margin: 0 0 12px;
+    }
+</style>
+
+<div class="cp-page ng-page">
+    <div class="cp-header">
+        <div>
+            <h1><i class="bi bi-shop" aria-hidden="true"></i> Datos del negocio</h1>
+            <p>Lo que sale en las notas de venta impresas y en las que se envían por WhatsApp.</p>
+        </div>
+    </div>
+
+    @if (TempData["Exito"] is string exito)
+    {
+        <div class="cp-aviso exito" role="status">
+            <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+            <span>@exito</span>
+            <button type="button" aria-label="Cerrar mensaje" onclick="this.parentElement.remove()"><i class="bi bi-x" aria-hidden="true"></i></button>
+        </div>
+    }
+
+    @if (errores.Count > 0)
+    {
+        <div class="cp-resumen" role="alert" tabindex="-1" id="resumenErrores" aria-labelledby="resumenTitulo">
+            <h2 id="resumenTitulo">Revisa estos datos antes de guardar:</h2>
+            <ul>
+                @foreach (var e in errores)
+                {
+                    <li><a href="#@e.Campo">@e.ErrorMessage</a></li>
+                }
+            </ul>
+        </div>
+    }
+
+    <div class="ng-grid">
+        <form class="cp-form-card" method="post" asp-action="Index" novalidate>
+            <p class="cp-nota">Los campos con <span class="cp-req" aria-hidden="true">*</span><span class="visually-hidden">asterisco</span> son obligatorios.</p>
+            @foreach (var c in campos)
+            {
+                var ayudaId = string.IsNullOrEmpty(c.Ayuda) ? null : c.Nombre + "-ayuda";
+                <div class="cp-campo">
+                    <label for="@c.Nombre">
+                        @c.Etiqueta
+                        @if (c.Req)
+                        {
+                            <span class="cp-req" aria-hidden="true">*</span>
+                        }
+                        else
+                        {
+                            <span class="cp-opcional">(opcional)</span>
+                        }
+                    </label>
+                    <input id="@c.Nombre" name="@c.Nombre" type="@c.Tipo" inputmode="@c.Modo" value="@Valor(c.Nombre)" maxlength="@c.Max"
+                           placeholder="Ej.: @c.Ejemplo" autocomplete="off"
+                           required="@c.Req" aria-required="@(c.Req ? "true" : null)"
+                           aria-invalid="@(Error(c.Nombre) != null ? "true" : null)"
+                           aria-describedby="@Describe(c.Nombre, ayudaId)" />
+                    @if (ayudaId != null)
+                    {
+                        <p class="cp-ayuda" id="@ayudaId">@c.Ayuda</p>
+                    }
+                    @if (Error(c.Nombre) is string err)
+                    {
+                        <p class="cp-error" id="@(c.Nombre)-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @err</p>
+                    }
+                </div>
+            }
+            <div class="cp-botones">
+                <button type="submit" class="btn-g-primary"><i class="bi bi-check-lg" aria-hidden="true"></i> Guardar datos</button>
+            </div>
+        </form>
+
+        <aside class="ng-vista" aria-labelledby="tituloVista">
+            <h2 id="tituloVista">Así sale en la nota</h2>
+            @await Html.PartialAsync("_VistaPreviaNota", (datos, sede?.Nombre ?? "Sede", sede?.Direccion, sede?.Ciudad, sede?.Telefono,
+                sede?.Telefono == null ? "Telefono" : "", (string?)null))
+        </aside>
+    </div>
+
+    <section class="ng-sedes" aria-labelledby="tituloSedes">
+        <div class="ng-sedes-cab">
+            <div>
+                <h2 id="tituloSedes">Sedes</h2>
+                <p>Cada nota sale con la dirección y el teléfono de la sede donde se vendió.</p>
+            </div>
+            <a class="btn-g-primary" asp-action="NuevaSede"><i class="bi bi-plus-lg" aria-hidden="true"></i> Nueva sede</a>
+        </div>
+        <div class="cp-panel">
+            <div class="cp-tabla-wrap">
+                <table class="cp-tabla">
+                    <thead>
+                        <tr>
+                            <th scope="col">Sede</th>
+                            <th scope="col">Dirección</th>
+                            <th scope="col">Teléfono</th>
+                            <th scope="col">Zonas</th>
+                            <th scope="col"><span class="visually-hidden">Acciones</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var s in Model.Sedes)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="cp-nombre">@s.Nombre</div>
+                                    <div class="cp-sub">@s.Usuarios @(s.Usuarios == 1 ? "cuenta" : "cuentas")</div>
+                                </td>
+                                <td>
+                                    <div>@s.Direccion</div>
+                                    <div class="cp-sub">@s.Ciudad</div>
+                                </td>
+                                <td class="cp-doc">@(s.Telefono ?? "Usa el del negocio")</td>
+                                <td>@s.Zonas</td>
+                                <td>
+                                    <div class="cp-acciones">
+                                        <a class="cp-icono-btn" asp-action="Zonas" asp-route-id="@s.Id" aria-label="Zonas de la sede @s.Nombre" title="Zonas">
+                                            <i class="bi bi-grid-3x3-gap" aria-hidden="true"></i>
+                                        </a>
+                                        <a class="cp-icono-btn" asp-action="Sede" asp-route-id="@s.Id" aria-label="Editar la sede @s.Nombre" title="Editar">
+                                            <i class="bi bi-pencil" aria-hidden="true"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+</div>
+
+@await Html.PartialAsync("_ScriptVistaPrevia")
+
+@section Scripts {
+    <script>
+        document.getElementById('resumenErrores')?.focus();
+    </script>
+}

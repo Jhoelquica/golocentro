@@ -6,7 +6,10 @@ namespace GestionAlmacen_Golocentro.Services
 {
     // Las alertas se mantienen solas: cada sincronización crea las que faltan, actualiza el mensaje
     // de las pendientes y da por atendidas las que ya no aplican (llegó mercadería, se vendió lo que vencía...).
-    // Mismas reglas que la pantalla de Stock: stock <= mínimo, o vence en 30 días o menos y todavía hay stock.
+    // Reglas: stock <= mínimo, o vence en 30 días o menos y todavía hay stock.
+    // El stock bajo solo se avisa en las sedes que manejan el producto (alguna vez tuvo stock ahí); un producto
+    // que nunca tuvo stock en ninguna sede se avisa en todas, porque hay que comprarlo. Así una sede nueva no se
+    // llena de alertas por todo el catálogo.
     public static class AlertasStock
     {
         public const string StockMinimo = "stock_minimo";
@@ -29,6 +32,8 @@ namespace GestionAlmacen_Golocentro.Services
                     .Select(g => new { g.Key.IdProducto, g.Key.IdSede, Cantidad = g.Sum(pu => pu.CantidadActual) })
                     .ToListAsync())
                 .ToDictionary(s => (s.IdProducto, s.IdSede), s => s.Cantidad);
+            // Las filas de stock quedan aunque lleguen a 0: dicen qué productos maneja cada sede
+            var conStockAlgunaVez = stock.Keys.Select(k => k.IdProducto).ToHashSet();
 
             var pendientes = (await db.Alerta.Where(a => a.Estado == Pendiente).ToListAsync())
                 .GroupBy(a => (a.IdProducto, a.IdSede, a.Tipo))
@@ -60,8 +65,9 @@ namespace GestionAlmacen_Golocentro.Services
             {
                 foreach (var p in productos)
                 {
+                    var maneja = stock.ContainsKey((p.IdProducto, idSede)) || !conStockAlgunaVez.Contains(p.IdProducto);
                     var cantidad = stock.GetValueOrDefault((p.IdProducto, idSede));
-                    if (cantidad <= p.StockMinimo)
+                    if (maneja && cantidad <= p.StockMinimo)
                         Vigente(p.IdProducto, idSede, StockMinimo, cantidad <= 0
                             ? $"Sin stock: {p.Nombre} (mínimo {p.StockMinimo})"
                             : $"Stock bajo: {p.Nombre} ({cantidad} unidades, mínimo {p.StockMinimo})");

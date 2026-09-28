@@ -1,0 +1,87 @@
+@using GestionAlmacen_Golocentro.ViewModels
+@model ZonaFormViewModel
+@{
+    ViewData["Title"] = $"Zona {Model.Codigo}";
+    string? Error(string campo) => ViewData.ModelState[campo]?.Errors.FirstOrDefault()?.ErrorMessage;
+    string? Describe(string campo, string? extra = null)
+    {
+        var ids = new[] { extra, Error(campo) != null ? campo + "-error" : null }.Where(x => x != null);
+        var valor = string.Join(" ", ids);
+        return valor.Length == 0 ? null : valor;
+    }
+}
+
+@await Html.PartialAsync("~/Views/Shared/_EstilosGestion.cshtml")
+
+<style>
+    .cp-campo select {
+        width: 100%;
+        min-height: 44px;
+        padding: 10px 12px;
+        border: 1px solid var(--g-input-border);
+        border-radius: 8px;
+        font-size: 15px;
+        font-family: inherit;
+        color: var(--g-text);
+        background: var(--g-white);
+    }
+</style>
+
+<div class="cp-page">
+    <a class="cp-volver" asp-action="Zonas" asp-route-id="@Model.SedeId"><i class="bi bi-arrow-left" aria-hidden="true"></i> Zonas de @Model.SedeNombre</a>
+    <div class="cp-header">
+        <div>
+            <h1><i class="bi bi-pencil-square" aria-hidden="true"></i> Editar zona</h1>
+            <p>@Model.SedeNombre</p>
+        </div>
+    </div>
+
+    <form class="cp-form-card" method="post" asp-action="Zona" asp-route-id="@Model.Id" novalidate>
+        <p class="cp-nota">
+            Si cambias el código, cambia también el cartel pegado en el piso (Mapa → Imprimir carteles).
+            El historial de entradas, ventas y conteos se conserva.
+        </p>
+
+        <div class="cp-campo">
+            <label for="Codigo">Código <span class="cp-req" aria-hidden="true">*</span></label>
+            <input id="Codigo" name="Codigo" type="text" value="@Model.Codigo" maxlength="20" autocomplete="off" autocapitalize="characters"
+                   required aria-required="true"
+                   aria-invalid="@(Error("Codigo") != null ? "true" : null)" aria-describedby="@Describe("Codigo", "Codigo-ayuda")" />
+            <p class="cp-ayuda" id="Codigo-ayuda">Letras, números y guiones, sin espacios. Ej.: A-06</p>
+            @if (Error("Codigo") is string eCodigo)
+            {
+                <p class="cp-error" id="Codigo-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @eCodigo</p>
+            }
+        </div>
+
+        <div class="cp-campo">
+            <label for="Descripcion">Descripción <span class="cp-opcional">(opcional)</span></label>
+            <input id="Descripcion" name="Descripcion" type="text" value="@Model.Descripcion" maxlength="200" autocomplete="off"
+                   aria-invalid="@(Error("Descripcion") != null ? "true" : null)" aria-describedby="@Describe("Descripcion")" />
+            @if (Error("Descripcion") is string eDesc)
+            {
+                <p class="cp-error" id="Descripcion-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @eDesc</p>
+            }
+        </div>
+
+        <div class="cp-campo">
+            <label for="Tipo">Tipo</label>
+            <select id="Tipo" name="Tipo" aria-describedby="Tipo-ayuda">
+                <option value="@TipoZona.Almacenaje" selected="@(Model.Tipo == TipoZona.Almacenaje)">Almacenaje</option>
+                <option value="@TipoZona.Recepcion" selected="@(Model.Tipo == TipoZona.Recepcion)">Recepción</option>
+            </select>
+            <p class="cp-ayuda" id="Tipo-ayuda">Recepción es donde se deja lo que llega antes de ordenarlo; la entrada la sugiere para productos nuevos.</p>
+        </div>
+
+        <div class="cp-botones">
+            <a class="btn-g-outline" asp-action="Zonas" asp-route-id="@Model.SedeId">Cancelar</a>
+            <button type="submit" class="btn-g-primary"><i class="bi bi-check-lg" aria-hidden="true"></i> Guardar zona</button>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <script>
+        document.querySelector('[aria-invalid="true"]')?.focus();
+    </script>
+}

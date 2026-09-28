@@ -1,0 +1,73 @@
+@* Encabezado y pie de la nota de venta tal como salen en el ticket. Los data-vista se actualizan al escribir. *@
+@using GestionAlmacen_Golocentro.ViewModels
+@* CampoTelefono: el campo del formulario que mueve el teléfono de la vista previa (vacío si ninguno);
+   RespaldoTelefono: lo que se muestra si ese campo queda vacío *@
+@model (DatosNegocio Negocio, string Sede, string? Direccion, string? Ciudad, string? TelefonoSede, string CampoTelefono, string? RespaldoTelefono)
+@{
+    var n = Model.Negocio;
+    var telefono = Model.TelefonoSede ?? n.Telefono;
+}
+<style>
+    .vp-papel {
+        width: 80mm;
+        max-width: 100%;
+        margin: 0 auto;
+        padding: 5mm 4mm;
+        background: #FFFFFF;
+        color: #000000;
+        font-family: 'Inter', Arial, sans-serif;
+        font-size: 11.5px;
+        line-height: 1.4;
+        text-align: center;
+        box-shadow: 0 6px 14px rgba(15,23,42,0.16);
+    }
+
+    .vp-marca {
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+        overflow-wrap: anywhere;
+    }
+
+    .vp-sep {
+        border-top: 1px dashed #000000;
+        margin: 8px 0;
+    }
+
+    .vp-doc {
+        font-weight: 700;
+        letter-spacing: 0.12em;
+    }
+
+    .vp-relleno {
+        color: #94A3B8;
+        font-size: 11px;
+    }
+
+    .vp-pie {
+        font-weight: 600;
+        overflow-wrap: anywhere;
+    }
+
+    .vp-papel [hidden] {
+        display: none;
+    }
+</style>
+<div class="vp-papel" aria-label="Vista previa de la nota de venta">
+    <div class="vp-marca" data-vista="NombreComercial">@n.NombreComercial</div>
+    <div data-vista="RazonSocial" hidden="@(string.IsNullOrEmpty(n.RazonSocial))">@n.RazonSocial</div>
+    <div data-vista="Ruc" data-prefijo="RUC " hidden="@(string.IsNullOrEmpty(n.Ruc))">RUC @n.Ruc</div>
+    <div data-vista="Sede">@Model.Sede</div>
+    <div data-vista="Direccion" hidden="@(string.IsNullOrEmpty(Model.Direccion))">@Model.Direccion</div>
+    <div data-vista="Ciudad" hidden="@(string.IsNullOrEmpty(Model.Ciudad))">@Model.Ciudad</div>
+    <div data-vista="@Model.CampoTelefono" data-prefijo="Tel. " data-respaldo="@(Model.RespaldoTelefono ?? "")"
+         hidden="@(string.IsNullOrEmpty(telefono))">Tel. @telefono</div>
+    <div data-vista="Correo" hidden="@(string.IsNullOrEmpty(n.Correo))">@n.Correo</div>
+    <div class="vp-sep"></div>
+    <div class="vp-doc">NOTA DE VENTA</div>
+    <div>NV01-000123</div>
+    <div class="vp-relleno">… fecha, cliente y productos …</div>
+    <div class="vp-sep"></div>
+    <div class="vp-pie" data-vista="MensajeNota" data-respaldo="@DatosNegocio.MensajePorDefecto">@n.MensajeNota</div>
+</div>

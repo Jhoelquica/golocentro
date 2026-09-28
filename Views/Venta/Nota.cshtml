@@ -13,7 +13,7 @@
     // Texto del mensaje de WhatsApp (el PDF va aparte)
     var lineasMensaje = new List<string>
     {
-        "*DISTRIBUIDORA GOLOCENTRO*",
+        $"*{Model.Negocio.NombreComercial.ToUpperInvariant()}*",
         $"Nota de venta *{Model.Numero}*",
         $"Fecha: {fecha} {hora}"
     };
@@ -30,7 +30,7 @@
     lineasMensaje.Add($"*Total: S/ {Monto(Model.Total)}*");
     lineasMensaje.Add($"Pago: {Model.MetodoPago}");
     lineasMensaje.Add("");
-    lineasMensaje.Add("¡Gracias por su compra!");
+    lineasMensaje.Add(Model.Negocio.MensajeNota);
     var mensaje = string.Join("\n", lineasMensaje);
 
     var celular = !Model.EsPublicoGeneral && Model.ClienteCelular is { Length: 9 } cel ? cel : null;
@@ -571,7 +571,15 @@
             <div class="nv-papel">
                 <article class="nv-ticket" id="ticket" aria-label="Nota de venta @Model.Numero">
                     <header class="nv-cab">
-                        <div class="nv-marca">DISTRIBUIDORA GOLOCENTRO</div>
+                        <div class="nv-marca">@Model.Negocio.NombreComercial.ToUpperInvariant()</div>
+                        @if (!string.IsNullOrWhiteSpace(Model.Negocio.RazonSocial))
+                        {
+                            <div>@Model.Negocio.RazonSocial</div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Model.Negocio.Ruc))
+                        {
+                            <div>RUC @Model.Negocio.Ruc</div>
+                        }
                         <div>@Model.SedeNombre</div>
                         @if (!string.IsNullOrWhiteSpace(Model.SedeDireccion))
                         {
@@ -580,6 +588,14 @@
                         @if (!string.IsNullOrWhiteSpace(Model.SedeCiudad))
                         {
                             <div>@Model.SedeCiudad</div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Model.Telefono))
+                        {
+                            <div>Tel. @Model.Telefono</div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Model.Negocio.Correo))
+                        {
+                            <div>@Model.Negocio.Correo</div>
                         }
                     </header>
 
@@ -637,7 +653,7 @@
                     }
 
                     <div class="nv-sep"></div>
-                    <footer class="nv-pie">¡Gracias por su compra!</footer>
+                    <footer class="nv-pie">@Model.Negocio.MensajeNota</footer>
                 </article>
             </div>
         </div>

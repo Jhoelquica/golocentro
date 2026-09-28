@@ -277,6 +277,8 @@ namespace GestionAlmacen_Golocentro.Controllers
             if (venta.Nota == null)
                 return RedirectToAction("Detalle", "Movimiento", new { id });
 
+            var negocio = await NegocioInfo.Cargar(_context);
+
             return View(new NotaVentaViewModel
             {
                 IdMovimiento = venta.IdMovimiento,
@@ -286,6 +288,8 @@ namespace GestionAlmacen_Golocentro.Controllers
                 SedeNombre = venta.Sede.Nombre,
                 SedeDireccion = venta.Sede.Direccion,
                 SedeCiudad = venta.Sede.Ciudad,
+                Telefono = venta.Sede.Telefono ?? negocio.Telefono,
+                Negocio = negocio,
                 EsPublicoGeneral = venta.Cliente?.RucDni == ClienteGeneral.RucDni,
                 ClienteNombre = venta.Cliente?.Nombre ?? "Público en general",
                 ClienteDocumento = venta.Cliente?.RucDni,
