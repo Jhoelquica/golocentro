@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using GestionAlmacen_Golocentro.Data;
 using GestionAlmacen_Golocentro.Helpers;
@@ -53,9 +55,28 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         };
     });
 
+// En el servidor, Nginx atiende HTTPS y le pasa la visita a la app por HTTP:
+// estos encabezados le dicen a la app que la visita original era HTTPS (sin bucles de redirección).
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+});
+
+// Las llaves que firman la cookie de sesión se guardan en disco: así reiniciar el servicio
+// no cierra la sesión de todos. Solo si se configura DataProtection:KeysPath (en el servidor).
+var carpetaLlaves = builder.Configuration["DataProtection:KeysPath"];
+if (!string.IsNullOrWhiteSpace(carpetaLlaves))
+{
+    builder.Services.AddDataProtection()
+        .PersistKeysToFileSystem(new DirectoryInfo(carpetaLlaves))
+        .SetApplicationName("GestionAlmacen_Golocentro");
+}
+
 builder.Services.AddControllersWithViews();
 
 var app = builder.Build();
+
+app.UseForwardedHeaders();
 
 // En desarrollo se ve la página técnica del error; en producción, la página amable (el detalle va al log)
 if (!app.Environment.IsDevelopment())
