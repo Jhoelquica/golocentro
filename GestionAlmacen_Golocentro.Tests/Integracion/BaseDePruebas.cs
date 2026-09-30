@@ -1,5 +1,6 @@
 using GestionAlmacen_Golocentro.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Testcontainers.PostgreSql;
 
 namespace GestionAlmacen_Golocentro.Tests.Integracion;
@@ -35,8 +36,8 @@ public sealed class BaseDePruebas : IAsyncLifetime
 
     public async Task DisposeAsync() => await _contenedor.DisposeAsync();
 
-    public AppDbContext NuevoContexto() =>
-        new(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(CadenaConexion).Options);
+    public AppDbContext NuevoContexto(params IInterceptor[] interceptores) =>
+        new(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(CadenaConexion).AddInterceptors(interceptores).Options);
 
     // Deja todas las tablas vacías (y los contadores de id en 1) antes de cada prueba
     public async Task LimpiarAsync()
