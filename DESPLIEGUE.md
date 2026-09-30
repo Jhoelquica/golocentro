@@ -13,6 +13,46 @@ Guía para instalar Golocentro en un servidor pequeño con **Ubuntu 22.04 o 24.0
 
 ---
 
+## Forma rápida: los scripts de `deploy/`
+
+Hacen los pasos de esta guía y guardan un registro de cada uno en `~/evidencias` del servidor (sirve de evidencia).
+
+Sirven también en un **servidor compartido**:
+- no actualizan todo el sistema;
+- no cambian la hora del servidor, porque la hora de Perú va solo en el servicio de Golocentro (`TZ`) y en su conexión a la base;
+- no tocan el firewall;
+- no tocan las otras webs de Nginx.
+
+1. Revisa `deploy/config.sh`: dominio, puerto interno y nombres.
+2. **En tu PC**, saca la copia de la base en formato texto. Te pedirá la contraseña de tu PostgreSQL local:
+   ```powershell
+   & "C:\Program Files\PostgreSQL\18\bin\pg_dump.exe" -h localhost -U postgres --no-owner --no-privileges -d NOMBRE_BD_LOCAL -f "$env:USERPROFILE\golocentro.sql"
+   ```
+3. **En tu PC (Git Bash)**, publica y sube todo:
+   ```bash
+   bash deploy/subir-desde-pc.sh golocentro@IP_DEL_SERVIDOR 22 --con-base
+   ```
+4. **En el servidor**, dentro de `cd ~/golocentro-deploy`, corre en orden:
+
+   | Script | Qué hace | ¿sudo? |
+   |---|---|---|
+   | `00-diagnostico.sh` | Revisa el servidor sin cambiar nada | no |
+   | `01-preparar-servidor.sh` | Instala .NET 8, PostgreSQL, Nginx y crea las carpetas | sí |
+   | `02-base-de-datos.sh` | Crea la base y carga la copia (pide la contraseña nueva de la base) | sí |
+   | `03-instalar-app.sh` | Instala el sistema como servicio | sí |
+   | `04-nginx-https.sh` | Publica el sistema con el dominio y pone HTTPS | sí |
+   | `05-respaldos.sh` | Copia de seguridad diaria | sí |
+   | `06-arranque-real.sh` | Borra el historial de prueba (pide escribir BORRAR) | sí |
+   | `07-verificacion.sh` | Comprueba que todo funcione | no |
+
+   Se corren así: `bash 00-diagnostico.sh` y `sudo bash 01-preparar-servidor.sh`.
+
+Para **actualizar** más adelante: corre `bash deploy/subir-desde-pc.sh golocentro@IP` (sin `--con-base`) y en el servidor `sudo bash 03-instalar-app.sh`.
+
+Lo que sigue es la guía paso a paso, por si se hace a mano.
+
+---
+
 ## 1. Preparar el servidor (una sola vez)
 
 ```bash
