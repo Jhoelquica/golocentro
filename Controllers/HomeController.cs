@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using GestionAlmacen_Golocentro.Data;
+using GestionAlmacen_Golocentro.Helpers;
 using GestionAlmacen_Golocentro.Services;
 using GestionAlmacen_Golocentro.ViewModels;
 using Microsoft.AspNetCore.Authorization;
@@ -20,11 +21,10 @@ namespace GestionAlmacen_Golocentro.Controllers
 
         public async Task<IActionResult> Index()
         {
-            // Las alertas del resumen deben reflejar el stock de ahora
-            await AlertasStock.Sincronizar(_context);
+            // Las alertas del resumen reflejan el stock de ahora (si cambió, AppDbContext ya pidió recalcularlas)
+            await AlertasStock.SincronizarSiToca(_context);
 
-            string? sedeIdClaim = User.FindFirst("SedeId")?.Value;
-            int? sedeId = string.IsNullOrEmpty(sedeIdClaim) ? null : int.Parse(sedeIdClaim);
+            var sedeId = User.SedeId();
 
             var movimientosQuery = _context.Movimientos.AsQueryable();
             var alertasQuery = _context.Alerta.Where(a => a.Estado == "pendiente");

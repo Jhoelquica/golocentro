@@ -1,4 +1,5 @@
 using GestionAlmacen_Golocentro.Data;
+using GestionAlmacen_Golocentro.Helpers;
 using GestionAlmacen_Golocentro.Models;
 using GestionAlmacen_Golocentro.ViewModels;
 using Microsoft.AspNetCore.Authorization;
@@ -20,7 +21,7 @@ namespace GestionAlmacen_Golocentro.Controllers
 
         public async Task<IActionResult> Index(string? q, string? tipo, int pagina = 1)
         {
-            var sedeId = SedeDelUsuario();
+            var sedeId = User.SedeId();
             var query = _context.Productos.AsQueryable();
             if (!string.IsNullOrWhiteSpace(q))
             {
@@ -193,7 +194,7 @@ namespace GestionAlmacen_Golocentro.Controllers
         // La dueña elige la sede (o todas); los demás ven la suya. Buscar y filtrar se hace en la página.
         public async Task<IActionResult> Stock(int? sede, string? q, string? filtro)
         {
-            var sedeUsuario = SedeDelUsuario();
+            var sedeUsuario = User.SedeId();
             var sedes = await _context.Sedes.OrderBy(s => s.Nombre).Select(s => new SedeOpcion(s.IdSede, s.Nombre)).ToListAsync();
             var sedeId = sedeUsuario ?? (sedes.Any(s => s.Id == sede) ? sede : null);
 
@@ -240,13 +241,6 @@ namespace GestionAlmacen_Golocentro.Controllers
                 Busqueda = q,
                 Filtro = filtro is "reponer" or "sin_stock" or "vencer" ? filtro : "todos"
             });
-        }
-
-        [NonAction]
-        private int? SedeDelUsuario()
-        {
-            var claim = User.FindFirst("SedeId")?.Value;
-            return string.IsNullOrEmpty(claim) ? null : int.Parse(claim);
         }
 
         [NonAction]

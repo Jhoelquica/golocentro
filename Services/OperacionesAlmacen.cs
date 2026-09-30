@@ -64,10 +64,14 @@ namespace GestionAlmacen_Golocentro.Services
             return null;
         }
 
+        // Program.cs la fija con la carpeta wwwroot real: en IIS o en un servicio de Linux el directorio
+        // actual del proceso no siempre es el de la aplicación.
+        public static string CarpetaEvidencias { get; set; } = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "evidencias");
+
         // Llamar después de ValidarEvidencia. Se guarda con un nombre generado (sin el nombre original).
         public static async Task GuardarEvidencia(AppDbContext context, int movimientoId, IFormFile archivo, string tipoMovimiento)
         {
-            var carpeta = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "evidencias");
+            var carpeta = CarpetaEvidencias;
             Directory.CreateDirectory(carpeta);
 
             var nombre = $"{Guid.NewGuid():N}{Path.GetExtension(archivo.FileName).ToLowerInvariant()}";

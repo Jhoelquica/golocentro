@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using GestionAlmacen_Golocentro.Data;
+using GestionAlmacen_Golocentro.Helpers;
 using GestionAlmacen_Golocentro.Models;
 using GestionAlmacen_Golocentro.Services;
 using GestionAlmacen_Golocentro.ViewModels;
@@ -33,7 +34,7 @@ namespace GestionAlmacen_Golocentro.Controllers
 
             var inicio = modelo.Desde.ToDateTime(TimeOnly.MinValue);
             var fin = modelo.Hasta.AddDays(1).ToDateTime(TimeOnly.MinValue);
-            var sedeId = SedeDelUsuario();
+            var sedeId = User.SedeId();
 
             var query = _context.NotaVenta
                 .Where(n => n.IdMovimientoNavigation.Fecha >= inicio && n.IdMovimientoNavigation.Fecha < fin)
@@ -128,7 +129,7 @@ namespace GestionAlmacen_Golocentro.Controllers
                         ModelState.AddModelError("", $"El precio de {nombre} debe ser 0 o más, con máximo 2 decimales.");
                 }
 
-                var (sedeResuelta, errorSede) = await OperacionesAlmacen.ResolverSedeMovimiento(_context, items.Select(i => i.UbicacionId), SedeDelUsuario());
+                var (sedeResuelta, errorSede) = await OperacionesAlmacen.ResolverSedeMovimiento(_context, items.Select(i => i.UbicacionId), User.SedeId());
                 if (errorSede != null)
                     ModelState.AddModelError("", errorSede);
                 sedeVenta = sedeResuelta;
@@ -218,6 +219,14 @@ namespace GestionAlmacen_Golocentro.Controllers
                     await _context.SaveChangesAsync();
                     break;
                 }
+                catch (DbUpdateConcurrencyException)
+                {
+                    // Otra venta (o una entrada, un traslado, un conteo) cambió el stock de estas zonas mientras tanto
+                    ModelState.AddModelError("", "El stock cambió mientras registrabas la venta. Revisa las cantidades y vuelve a intentarlo.");
+                    _context.ChangeTracker.Clear();
+                    await LlenarDatos(model);
+                    return View(model);
+                }
                 catch (DbUpdateException ex) when (intento < 3 && ex.InnerException is Npgsql.PostgresException { SqlState: "23505" })
                 {
                 }
@@ -271,7 +280,7 @@ namespace GestionAlmacen_Golocentro.Controllers
 
             if (venta == null)
                 return NotFound();
-            if (SedeDelUsuario() is int sede && venta.IdSede != sede)
+            if (User.SedeId() is int sede && venta.IdSede != sede)
                 return RedirectToAction("AccessDenied", "Account");
             // Salidas registradas antes de las notas de venta: se ven en el detalle de movimiento
             if (venta.Nota == null)
@@ -333,7 +342,7 @@ namespace GestionAlmacen_Golocentro.Controllers
                 .FirstOrDefaultAsync();
             if (venta == null)
                 return NotFound();
-            if (SedeDelUsuario() is int sede && venta.IdSede != sede)
+            if (User.SedeId() is int sede && venta.IdSede != sede)
                 return RedirectToAction("AccessDenied", "Account");
 
             var numeroNota = NumeroNota(venta.Serie, venta.Numero);
@@ -379,7 +388,16 @@ namespace GestionAlmacen_Golocentro.Controllers
                 stock.CantidadActual += linea.Cantidad;
                 stock.UltimaActualizacion = ahora;
             }
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                // Sin CommitAsync la transacción se descarta: la nota tampoco queda anulada
+                TempData["Error"] = "Alguien cambió el stock de estos productos en ese mismo momento. Vuelve a intentar la anulación.";
+                return RedirectToAction(nameof(Nota), new { id });
+            }
             await transaccion.CommitAsync();
 
             TempData["Exito"] = $"Venta {numeroNota} anulada. Los productos volvieron al stock de sus zonas.";
@@ -397,7 +415,7 @@ namespace GestionAlmacen_Golocentro.Controllers
                 .FirstOrDefaultAsync();
             if (venta == null)
                 return NotFound();
-            if (SedeDelUsuario() is int sede && venta.IdSede != sede)
+            if (User.SedeId() is int sede && venta.IdSede != sede)
                 return RedirectToAction("AccessDenied", "Account");
 
             if (venta.Anulada)
@@ -445,16 +463,9 @@ namespace GestionAlmacen_Golocentro.Controllers
         }
 
         [NonAction]
-        private int? SedeDelUsuario()
-        {
-            var claim = User.FindFirst("SedeId")?.Value;
-            return string.IsNullOrEmpty(claim) ? null : int.Parse(claim);
-        }
-
-        [NonAction]
         private async Task LlenarDatos(VentaFormViewModel model)
         {
-            var sedeId = SedeDelUsuario();
+            var sedeId = User.SedeId();
 
             // Solo productos con stock en la sede; cada uno con sus zonas, la de más cantidad primero
             var stock = await _context.ProductoUbicacions

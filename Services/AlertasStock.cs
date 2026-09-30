@@ -18,8 +18,27 @@ namespace GestionAlmacen_Golocentro.Services
         public const string Atendida = "atendida";
         public const int DiasAvisoVencimiento = 30;
 
+        // El globito del menú pide el conteo en cada página: recalcular todo cada vez sería leer el catálogo
+        // entero por página. Basta una vez por minuto, salvo que haya cambiado el stock o un producto
+        // (AppDbContext llama a Invalidar y la página siguiente ya recalcula).
+        private static long _ultimaSincronizacion;
+        private static readonly long Intervalo = TimeSpan.FromMinutes(1).Ticks;
+
+        public static void Invalidar() => Interlocked.Exchange(ref _ultimaSincronizacion, 0);
+
+        public static Task SincronizarSiToca(AppDbContext db)
+        {
+            var ultima = Interlocked.Read(ref _ultimaSincronizacion);
+            var ahora = DateTime.UtcNow.Ticks;
+            // Si otra página ganó la carrera, esa hace el recálculo y esta no lo repite
+            if (ahora - ultima < Intervalo || Interlocked.CompareExchange(ref _ultimaSincronizacion, ahora, ultima) != ultima)
+                return Task.CompletedTask;
+            return Sincronizar(db);
+        }
+
         public static async Task Sincronizar(AppDbContext db)
         {
+            Interlocked.Exchange(ref _ultimaSincronizacion, DateTime.UtcNow.Ticks);
             var hoy = DateOnly.FromDateTime(DateTime.Today);
             var ahora = DateTime.Now;
 

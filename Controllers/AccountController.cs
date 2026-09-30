@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using System.Security.Claims;
@@ -124,6 +125,7 @@ namespace GestionAlmacen_Golocentro.Controllers
 
 
         private readonly AppDbContext _context;
+        public const string LimiteIngreso = "ingreso";
 
 
         // GET: Account/Login
@@ -133,9 +135,10 @@ namespace GestionAlmacen_Golocentro.Controllers
             return View();
         }
 
-        // POST: Account/Login
+        // POST: Account/Login (con límite de intentos por equipo, ver Program.cs)
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [EnableRateLimiting(LimiteIngreso)]
         public async Task<IActionResult> Login(string nombreUsuario, string contraseña, string? returnUrl = null)
         {
             ViewData["ReturnUrl"] = returnUrl;
@@ -230,7 +233,9 @@ namespace GestionAlmacen_Golocentro.Controllers
             return RedirectToAction(nameof(Perfil));
         }
 
-        // GET: Account/Logout
+        // POST: Account/Logout (por POST y con token: un enlace o una imagen de otra página no puede cerrar la sesión)
+        [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Logout()
         {
             await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);

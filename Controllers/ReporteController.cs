@@ -1,5 +1,6 @@
 using System.Globalization;
 using GestionAlmacen_Golocentro.Data;
+using GestionAlmacen_Golocentro.Helpers;
 using GestionAlmacen_Golocentro.Services;
 using GestionAlmacen_Golocentro.ViewModels;
 using Microsoft.AspNetCore.Authorization;
@@ -543,13 +544,6 @@ namespace GestionAlmacen_Golocentro.Controllers
 
         // ===== Auxiliares =====
 
-        [NonAction]
-        private int? SedeDelUsuario()
-        {
-            var claim = User.FindFirst("SedeId")?.Value;
-            return string.IsNullOrEmpty(claim) ? null : int.Parse(claim);
-        }
-
         // Periodo por defecto: el mes en curso. La encargada queda fija en su sede.
         [NonAction]
         private async Task<FiltroReporte> Filtro(DateOnly? desde, DateOnly? hasta, int? sede, string accion)
@@ -565,7 +559,7 @@ namespace GestionAlmacen_Golocentro.Controllers
             if (filtro.Hasta < filtro.Desde)
                 (filtro.Desde, filtro.Hasta) = (filtro.Hasta, filtro.Desde);
 
-            var sedeUsuario = SedeDelUsuario();
+            var sedeUsuario = User.SedeId();
             filtro.PuedeElegirSede = sedeUsuario == null;
             filtro.SedeId = sedeUsuario ?? (filtro.Sedes.Any(s => s.Id == sede) ? sede : null);
             filtro.SedeNombre = filtro.Sedes.FirstOrDefault(s => s.Id == filtro.SedeId)?.Nombre ?? "Todas las sedes";
@@ -618,7 +612,7 @@ namespace GestionAlmacen_Golocentro.Controllers
             for (var dia = filtro.Desde; dia <= filtro.Hasta; dia = dia.AddDays(1))
             {
                 var ventas = porDia.GetValueOrDefault(dia) ?? new();
-                dias.Add(new VentaPorPeriodo(dia.ToString("dd/MM", Inv), dia.ToString("dddd dd/MM/yyyy", new CultureInfo("es-PE")),
+                dias.Add(new VentaPorPeriodo(dia.ToString("dd/MM", Inv), dia.ToString("dddd dd/MM/yyyy", Cultura.Peru),
                     ventas.Count, ventas.Sum(v => v.Total)));
             }
             return dias;
@@ -627,7 +621,7 @@ namespace GestionAlmacen_Golocentro.Controllers
         [NonAction]
         private static List<VentaPorPeriodo> AgruparPorMes(FiltroReporte filtro, List<VentaReporteFila> validas)
         {
-            var es = new CultureInfo("es-PE");
+            var es = Cultura.Peru;
             var porMes = validas.GroupBy(f => (f.Fecha.Year, f.Fecha.Month)).ToDictionary(g => g.Key, g => g.ToList());
             var meses = new List<VentaPorPeriodo>();
             for (var mes = new DateOnly(filtro.Desde.Year, filtro.Desde.Month, 1); mes <= filtro.Hasta; mes = mes.AddMonths(1))

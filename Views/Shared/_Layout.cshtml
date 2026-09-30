@@ -307,6 +307,10 @@
                 text-decoration: none;
                 transition: background var(--transition);
             }
+            button.g-dropdown-item {
+                width: 100%; border: 0; background: transparent;
+                font-family: inherit; text-align: left; cursor: pointer;
+            }
             .g-dropdown-item:hover { background: var(--g-bg); }
             .g-dropdown-item i { font-size: 15px; color: var(--g-teal); }
             .g-dropdown-item.danger { color: var(--g-danger); }
@@ -650,9 +654,11 @@
                         <i class="bi bi-camera"></i> Cambiar Foto
                     </a>
                     <div class="g-dropdown-divider"></div>
-                    <a class="g-dropdown-item danger" asp-controller="Account" asp-action="Logout">
-                        <i class="bi bi-box-arrow-right"></i> Cerrar Sesión
-                    </a>
+                    <form method="post" asp-controller="Account" asp-action="Logout" class="m-0">
+                        <button type="submit" class="g-dropdown-item danger">
+                            <i class="bi bi-box-arrow-right"></i> Cerrar Sesión
+                        </button>
+                    </form>
                 </div>
             </div>
 

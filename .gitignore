@@ -68,3 +68,5 @@ TestResults/
 *.deploy.targets
 *Deploy.bat
 *Deploy.ps1
+## Carpeta que genera dotnet publish (se copia al servidor, no se versiona)
+publish/

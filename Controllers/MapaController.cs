@@ -1,4 +1,5 @@
 using GestionAlmacen_Golocentro.Data;
+using GestionAlmacen_Golocentro.Helpers;
 using GestionAlmacen_Golocentro.Models;
 using GestionAlmacen_Golocentro.ViewModels;
 using Microsoft.AspNetCore.Authorization;
@@ -27,7 +28,7 @@ namespace GestionAlmacen_Golocentro.Controllers
         [NonAction]
         private async Task<MapaViewModel> CargarMapa(int? sede)
         {
-            var sedeUsuario = SedeDelUsuario();
+            var sedeUsuario = User.SedeId();
             var sedesConPlano = await _context.Sedes
                 .Where(s => s.PlanoAncho != null && s.PlanoAlto != null)
                 .Where(s => sedeUsuario == null || s.IdSede == sedeUsuario)
@@ -151,25 +152,28 @@ namespace GestionAlmacen_Golocentro.Controllers
                 IdUbicacionDestino = destino!.Id
             });
             _context.Traslados.Add(traslado);
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                ModelState.AddModelError("", "El stock de esas zonas cambió mientras movías (alguien vendió o recibió al mismo tiempo). Revisa y vuelve a intentarlo.");
+                _context.ChangeTracker.Clear();
+                await LlenarDatosMover(model);
+                return View(model);
+            }
 
             TempData["Exito"] = $"Listo: {cantidad} de {nombreProducto} pasaron de {origen.Codigo} a {destino.Codigo}.";
             // Se queda en el mismo origen para seguir ordenando (por ejemplo, vaciando Recepción)
             return RedirectToAction(nameof(Mover), new { origen = origen.Id, sede = sedeId });
         }
 
-        [NonAction]
-        private int? SedeDelUsuario()
-        {
-            var claim = User.FindFirst("SedeId")?.Value;
-            return string.IsNullOrEmpty(claim) ? null : int.Parse(claim);
-        }
-
         // Devuelve la sede con la que se trabaja (null si no hay zonas) y deja listos los datos de la vista
         [NonAction]
         private async Task<int?> LlenarDatosMover(MoverFormViewModel model)
         {
-            var sedeUsuario = SedeDelUsuario();
+            var sedeUsuario = User.SedeId();
             var sedes = await _context.Sedes
                 .Where(s => sedeUsuario == null || s.IdSede == sedeUsuario)
                 .Where(s => s.Ubicacions.Any())

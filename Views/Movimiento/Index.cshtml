@@ -227,6 +227,8 @@
             color: var(--g-danger-text);
         }
 
+    .mv-recorte { font-size: 13px; color: var(--g-muted, #64748b); margin-top: 4px; }
+    .mv-recorte a { color: inherit; font-weight: 600; }
     .mv-sub {
         font-size: 13px;
         color: var(--g-muted);
@@ -258,6 +260,10 @@
         <div>
             <h1><i class="bi bi-arrow-down-up" aria-hidden="true"></i> Movimientos</h1>
             <p>@Model.Total @(Model.Total == 1 ? "movimiento" : "movimientos") @periodo · entradas, ventas, traslados y conteos</p>
+            @if (Model.RangoRecortado)
+            {
+                <p class="mv-recorte"><i class="bi bi-info-circle" aria-hidden="true"></i> Aquí se ven hasta 3 meses a la vez. Para periodos más largos usa <a asp-controller="Reporte" asp-action="Index">Reportes</a>.</p>
+            }
         </div>
         <div class="mv-acciones">
             <a class="btn-g-outline" asp-controller="Venta" asp-action="Nueva"><i class="bi bi-cart3" aria-hidden="true"></i> Nueva venta</a>

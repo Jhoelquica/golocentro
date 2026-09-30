@@ -4,6 +4,13 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Servidor de pocos recursos: el recolector de memoria "de estación" usa mucha menos RAM que el de servidor -->
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <!-- Fechas, montos y meses en español necesitan la globalización completa (en Linux: paquete libicu) -->
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <!-- Solo los textos en español e inglés de las librerías (ClosedXML trae decenas de idiomas) -->
+    <SatelliteResourceLanguages>es;en</SatelliteResourceLanguages>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,6 +26,14 @@
 
   <ItemGroup>
     <Folder Include="wwwroot\uploads\perfiles\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- La configuración de esta PC (con la contraseña de la BD local) no viaja al servidor:
+         allá la conexión va en variables de entorno (ver DESPLIEGUE.md) -->
+    <Content Update="appsettings.json;appsettings.Development.json;dotnet-tools.json" CopyToPublishDirectory="Never" />
+    <!-- Las fotos subidas en esta PC son de prueba: el servidor tiene las suyas y una actualización no las toca -->
+    <Content Update="wwwroot/evidencias/**;wwwroot/uploads/**" CopyToPublishDirectory="Never" />
   </ItemGroup>
 
 </Project>

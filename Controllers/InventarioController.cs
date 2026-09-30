@@ -1,4 +1,5 @@
 using GestionAlmacen_Golocentro.Data;
+using GestionAlmacen_Golocentro.Helpers;
 using GestionAlmacen_Golocentro.Models;
 using GestionAlmacen_Golocentro.ViewModels;
 using Microsoft.AspNetCore.Authorization;
@@ -22,7 +23,7 @@ namespace GestionAlmacen_Golocentro.Controllers
 
         public async Task<IActionResult> Index(int? sede)
         {
-            var sedeUsuario = SedeDelUsuario();
+            var sedeUsuario = User.SedeId();
             var sedes = await _context.Sedes
                 .Where(s => sedeUsuario == null || s.IdSede == sedeUsuario)
                 .Where(s => s.Ubicacions.Any())
@@ -170,7 +171,18 @@ namespace GestionAlmacen_Golocentro.Controllers
             }
 
             _context.AjusteInventarios.Add(ajuste);
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                // Una venta o entrada tocó la zona mientras se contaba: se muestran las cantidades nuevas del sistema
+                ModelState.AddModelError("", "Mientras contabas, alguien vendió o recibió mercadería en esta zona. Revisa lo contado y vuelve a guardar.");
+                _context.ChangeTracker.Clear();
+                await LlenarDatos(model, id);
+                return View(model);
+            }
 
             var coinciden = aGuardar.Count - cambios;
             TempData["Exito"] = $"Conteo de {datos.ZonaCodigo} guardado: " +
@@ -188,13 +200,6 @@ namespace GestionAlmacen_Golocentro.Controllers
                 .OrderBy(p => p.Nombre)
                 .Select(p => new ProductoCatalogo(p.IdProducto, p.Nombre, p.Codigo))
                 .ToListAsync());
-
-        [NonAction]
-        private int? SedeDelUsuario()
-        {
-            var claim = User.FindFirst("SedeId")?.Value;
-            return string.IsNullOrEmpty(claim) ? null : int.Parse(claim);
-        }
 
         // false si la zona no existe o no es de la sede del usuario
         [NonAction]
@@ -214,7 +219,7 @@ namespace GestionAlmacen_Golocentro.Controllers
                 })
                 .FirstOrDefaultAsync();
 
-            var sedeUsuario = SedeDelUsuario();
+            var sedeUsuario = User.SedeId();
             if (zona == null || (sedeUsuario.HasValue && zona.IdSede != sedeUsuario.Value))
                 return false;
 

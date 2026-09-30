@@ -70,6 +70,8 @@ namespace GestionAlmacen_Golocentro.ViewModels
         public string Tipo { get; set; } = "todos";
         public DateOnly Desde { get; set; }
         public DateOnly Hasta { get; set; }
+        // El periodo pedido pasaba de 3 meses y se acortó
+        public bool RangoRecortado { get; set; }
         public bool VariasSedes { get; set; }
         public Dictionary<string, int> PorTipo { get; set; } = new();
         public List<ActividadFila> Filas { get; set; } = new();

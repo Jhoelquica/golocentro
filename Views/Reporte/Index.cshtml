@@ -4,7 +4,7 @@
 @{
     ViewData["Title"] = "Reportes";
     var inv = CultureInfo.InvariantCulture;
-    var mes = DateTime.Today.ToString("MMMM", new CultureInfo("es-PE")).ToLowerInvariant();
+    var mes = DateTime.Today.ToString("MMMM", GestionAlmacen_Golocentro.Helpers.Cultura.Peru).ToLowerInvariant();
 }
 
 @await Html.PartialAsync("_EstilosReporte")

@@ -1,5 +1,6 @@
 using System.Globalization;
 using GestionAlmacen_Golocentro.Data;
+using GestionAlmacen_Golocentro.Helpers;
 using GestionAlmacen_Golocentro.Models;
 using GestionAlmacen_Golocentro.Services;
 using GestionAlmacen_Golocentro.ViewModels;
@@ -14,6 +15,8 @@ namespace GestionAlmacen_Golocentro.Controllers
     {
         private const int TamanoPagina = 25;
         private const int MaxFactura = 50;
+        public const int MaxCantidadEntrada = 1_000_000;
+        private const int MaxDiasLista = 92;
         private readonly AppDbContext _context;
 
         public MovimientoController(AppDbContext context)
@@ -33,10 +36,16 @@ namespace GestionAlmacen_Golocentro.Controllers
             };
             if (modelo.Hasta < modelo.Desde)
                 (modelo.Desde, modelo.Hasta) = (modelo.Hasta, modelo.Desde);
+            // La lista se arma en memoria: un rango de años saturaría un servidor chico. Para más, están los reportes.
+            if (modelo.Hasta.DayNumber - modelo.Desde.DayNumber > MaxDiasLista)
+            {
+                modelo.Desde = modelo.Hasta.AddDays(-MaxDiasLista);
+                modelo.RangoRecortado = true;
+            }
 
             var inicio = modelo.Desde.ToDateTime(TimeOnly.MinValue);
             var fin = modelo.Hasta.AddDays(1).ToDateTime(TimeOnly.MinValue);
-            var sedeId = SedeDelUsuario();
+            var sedeId = User.SedeId();
             modelo.VariasSedes = sedeId == null && await _context.Sedes.CountAsync() > 1;
 
             var filas = new List<ActividadFila>();
@@ -173,7 +182,7 @@ namespace GestionAlmacen_Golocentro.Controllers
             if (!int.TryParse(User.FindFirst("UsuarioId")?.Value, out var usuarioId))
                 return RedirectToAction("Login", "Account");
 
-            var sedeUsuario = SedeDelUsuario();
+            var sedeUsuario = User.SedeId();
             var detalles = model.Detalles.Where(d => d.ProductoId > 0).ToList();
             model.NumeroFactura = string.IsNullOrWhiteSpace(model.NumeroFactura) ? null : model.NumeroFactura.Trim();
 
@@ -198,6 +207,8 @@ namespace GestionAlmacen_Golocentro.Controllers
                     ModelState.AddModelError("", "Uno de los productos ya no existe. Quítalo y vuelve a agregarlo.");
                 if (detalles.Any(d => d.Cantidad < 1))
                     ModelState.AddModelError("", "Cada producto debe tener una cantidad de 1 o más.");
+                else if (detalles.Any(d => d.Cantidad > MaxCantidadEntrada))
+                    ModelState.AddModelError("", $"La cantidad de un producto no puede pasar de {MaxCantidadEntrada:N0} unidades por entrada.");
             }
 
             if (model.ProveedorId == null || !await _context.Proveedores.AnyAsync(p => p.IdProveedor == model.ProveedorId))
@@ -250,7 +261,18 @@ namespace GestionAlmacen_Golocentro.Controllers
                 stock.UltimaActualizacion = ahora;
             }
 
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                // Otra operación cambió el stock de estas zonas mientras tanto: nada se guardó, se puede reintentar
+                ModelState.AddModelError("", "El stock de alguna zona cambió mientras registrabas la entrada. Vuelve a registrarla.");
+                _context.ChangeTracker.Clear();
+                await CargarDatosEntrada(model);
+                return View(model);
+            }
 
             if (model.Evidencia is { Length: > 0 })
                 await OperacionesAlmacen.GuardarEvidencia(_context, movimiento.IdMovimiento, model.Evidencia, "Entrada");
@@ -295,7 +317,7 @@ namespace GestionAlmacen_Golocentro.Controllers
 
             if (mov == null)
                 return NotFound();
-            if (SedeDelUsuario() is int sede && mov.IdSede != sede)
+            if (User.SedeId() is int sede && mov.IdSede != sede)
                 return RedirectToAction("AccessDenied", "Account");
             if (mov.TieneNota)
                 return RedirectToAction("Nota", "Venta", new { id });
@@ -329,7 +351,7 @@ namespace GestionAlmacen_Golocentro.Controllers
                 .FirstOrDefaultAsync();
             if (mov == null)
                 return NotFound();
-            if (SedeDelUsuario() is int sede && mov.IdSede != sede)
+            if (User.SedeId() is int sede && mov.IdSede != sede)
                 return RedirectToAction("AccessDenied", "Account");
 
             if (foto is not { Length: > 0 })
@@ -348,16 +370,9 @@ namespace GestionAlmacen_Golocentro.Controllers
         public IActionResult Salida() => RedirectToAction("Nueva", "Venta");
 
         [NonAction]
-        private int? SedeDelUsuario()
-        {
-            var claim = User.FindFirst("SedeId")?.Value;
-            return string.IsNullOrEmpty(claim) ? null : int.Parse(claim);
-        }
-
-        [NonAction]
         private async Task CargarDatosEntrada(MovimientoEntradaViewModel model)
         {
-            var sedeId = SedeDelUsuario();
+            var sedeId = User.SedeId();
             var datos = model.Datos;
 
             datos.Productos = await _context.Productos

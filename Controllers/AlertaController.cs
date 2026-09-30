@@ -1,4 +1,5 @@
 using GestionAlmacen_Golocentro.Data;
+using GestionAlmacen_Golocentro.Helpers;
 using GestionAlmacen_Golocentro.Services;
 using GestionAlmacen_Golocentro.ViewModels;
 using Microsoft.AspNetCore.Authorization;
@@ -23,7 +24,7 @@ namespace GestionAlmacen_Golocentro.Controllers
         {
             await AlertasStock.Sincronizar(_context);
 
-            var sedeId = SedeDelUsuario();
+            var sedeId = User.SedeId();
             var hoy = DateOnly.FromDateTime(DateTime.Today);
 
             var pendientes = await _context.Alerta
@@ -92,8 +93,8 @@ namespace GestionAlmacen_Golocentro.Controllers
         [HttpGet]
         public async Task<IActionResult> ConteoActivas()
         {
-            await AlertasStock.Sincronizar(_context);
-            var sedeId = SedeDelUsuario();
+            await AlertasStock.SincronizarSiToca(_context);
+            var sedeId = User.SedeId();
             var total = await _context.Alerta.CountAsync(a => a.Estado == AlertasStock.Pendiente && (sedeId == null || a.IdSede == sedeId));
             return Json(new { total });
         }
@@ -101,12 +102,5 @@ namespace GestionAlmacen_Golocentro.Controllers
         private record AlertaPendiente(
             string Tipo, int IdProducto, int IdSede, DateTime FechaGenerada, string Sede, string Codigo, string Nombre,
             string Unidad, int StockMinimo, DateOnly? FechaVencimiento, string? Lote);
-
-        [NonAction]
-        private int? SedeDelUsuario()
-        {
-            var claim = User.FindFirst("SedeId")?.Value;
-            return string.IsNullOrEmpty(claim) ? null : int.Parse(claim);
-        }
     }
 }
