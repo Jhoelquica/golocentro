@@ -1,0 +1,176 @@
+@using GestionAlmacen_Golocentro.ViewModels
+@model UsuarioListaViewModel
+@{
+    ViewData["Title"] = "Usuarios";
+    var activos = Model.Filas.Count(f => f.Activo);
+}
+
+@await Html.PartialAsync("~/Views/Shared/_EstilosGestion.cshtml")
+
+<style>
+    .us-nota {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        max-width: 760px;
+        padding: 12px 14px;
+        margin-bottom: 1rem;
+        border-radius: 10px;
+        background: rgba(4,120,87,0.06);
+        border: 1px solid rgba(4,120,87,0.2);
+        font-size: 14px;
+        color: var(--g-text);
+    }
+
+        .us-nota i {
+            color: var(--g-teal);
+            margin-top: 2px;
+        }
+
+    .us-chip {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+        .us-chip.duena {
+            background: rgba(51,65,85,0.12);
+            color: var(--g-navy);
+        }
+
+        .us-chip.encargada {
+            background: rgba(4,120,87,0.12);
+            color: var(--g-teal);
+        }
+
+        .us-chip.trabajador {
+            background: rgba(37,99,235,0.1);
+            color: #1D4ED8;
+        }
+
+        .us-chip.activo {
+            background: rgba(4,120,87,0.12);
+            color: var(--g-teal);
+        }
+
+        .us-chip.inactivo {
+            background: rgba(220,38,38,0.1);
+            color: var(--g-danger-text);
+        }
+
+    .us-inactivo td {
+        color: var(--g-muted);
+    }
+
+    @@container (max-width: 760px) {
+        .us-col-actividad {
+            display: none;
+        }
+    }
+</style>
+
+<div class="cp-page">
+    <div class="cp-header">
+        <div>
+            <h1><i class="bi bi-person-badge" aria-hidden="true"></i> Usuarios</h1>
+            <p>@activos @(activos == 1 ? "cuenta activa" : "cuentas activas") de @Model.Filas.Count</p>
+        </div>
+        <a class="btn-g-primary" asp-action="Crear"><i class="bi bi-person-plus" aria-hidden="true"></i> Nuevo usuario</a>
+    </div>
+
+    @if (TempData["Exito"] is string exito)
+    {
+        <div class="cp-aviso exito" role="status">
+            <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+            <span>@exito</span>
+            <button type="button" aria-label="Cerrar mensaje" onclick="this.parentElement.remove()"><i class="bi bi-x" aria-hidden="true"></i></button>
+        </div>
+    }
+    @if (TempData["Error"] is string error)
+    {
+        <div class="cp-aviso error" role="alert">
+            <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+            <span>@error</span>
+            <button type="button" aria-label="Cerrar mensaje" onclick="this.parentElement.remove()"><i class="bi bi-x" aria-hidden="true"></i></button>
+        </div>
+    }
+
+    <p class="us-nota">
+        <i class="bi bi-info-circle" aria-hidden="true"></i>
+        <span>
+            Nadie puede registrarse solo desde el login: las cuentas las creas tú aquí y le pasas a cada persona su usuario y contraseña.
+            Si alguien deja de trabajar, <strong>desactiva</strong> su cuenta; no se borra porque sus ventas y entradas quedan en el historial.
+        </span>
+    </p>
+
+    <section class="cp-panel" aria-label="Lista de usuarios">
+        <div class="cp-tabla-wrap">
+            <table class="cp-tabla">
+                <thead>
+                    <tr>
+                        <th scope="col">Nombre</th>
+                        <th scope="col">Rol</th>
+                        <th scope="col">Sede</th>
+                        <th scope="col">Estado</th>
+                        <th scope="col" class="us-col-actividad">Última actividad</th>
+                        <th scope="col"><span class="visually-hidden">Acciones</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var f in Model.Filas)
+                    {
+                        <tr class="@(f.Activo ? null : "us-inactivo")">
+                            <td>
+                                <div class="cp-nombre">@f.Nombre</div>
+                                <div class="cp-sub">Usuario: @f.Usuario</div>
+                            </td>
+                            <td><span class="us-chip @f.Rol">@RolHelper.Etiqueta(f.Rol)</span></td>
+                            <td>@(f.Sede ?? "Todas")</td>
+                            <td><span class="us-chip @(f.Activo ? "activo" : "inactivo")">@(f.Activo ? "Activa" : "Desactivada")</span></td>
+                            <td class="us-col-actividad cp-doc">
+                                @if (f.UltimoMovimiento is DateTime ultimo)
+                                {
+                                    <span>@ultimo.ToString("dd/MM/yyyy")</span>
+                                }
+                                else
+                                {
+                                    <span class="cp-mov-ninguno">Sin movimientos</span>
+                                }
+                            </td>
+                            <td>
+                                <div class="cp-acciones">
+                                    @if (f.EsDuena)
+                                    {
+                                        <a class="cp-limpiar" asp-controller="Account" asp-action="Perfil">Mi perfil</a>
+                                    }
+                                    else
+                                    {
+                                        <a class="cp-icono-btn" asp-action="Editar" asp-route-id="@f.Id"
+                                           aria-label="Editar la cuenta de @f.Nombre" title="Editar">
+                                            <i class="bi bi-pencil" aria-hidden="true"></i>
+                                        </a>
+                                        <a class="cp-icono-btn" asp-action="Contrasena" asp-route-id="@f.Id"
+                                           aria-label="Restablecer la contraseña de @f.Nombre" title="Restablecer contraseña">
+                                            <i class="bi bi-key" aria-hidden="true"></i>
+                                        </a>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        @if (Model.Filas.All(f => f.EsDuena))
+        {
+            <div class="cp-vacio">
+                <i class="bi bi-people" aria-hidden="true"></i>
+                Todavía no hay cuentas para la encargada ni los trabajadores.<br />
+                <a asp-action="Crear">Crear la primera</a>
+            </div>
+        }
+    </section>
+</div>

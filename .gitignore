@@ -36,6 +36,9 @@ appsettings.Development.json
 appsettings.Production.json
 !appsettings.Example.json
 
+## Ignorar configuración de MCP local (puede contener API keys, ej. 21st.dev)
+.mcp.json
+
 ## Ignorar uploads de usuario (fotos/evidencias reales, no versionar)
 wwwroot/uploads/*
 !wwwroot/uploads/.gitkeep
@@ -65,3 +68,5 @@ TestResults/
 *.deploy.targets
 *Deploy.bat
 *Deploy.ps1
+## Carpeta que genera dotnet publish (se copia al servidor, no se versiona)
+publish/

@@ -1,0 +1,230 @@
+@using GestionAlmacen_Golocentro.ViewModels
+@model ContraparteListaViewModel
+@{
+    var t = Model.Tipo;
+    ViewData["Title"] = t.Plural;
+    var pluralMin = t.Plural.ToLowerInvariant();
+    var hayBusqueda = !string.IsNullOrWhiteSpace(Model.Busqueda);
+    var tituloMovimientos = char.ToUpper(t.MovimientoPlural[0]) + t.MovimientoPlural[1..];
+}
+
+@await Html.PartialAsync("~/Views/Shared/_EstilosGestion.cshtml")
+
+<style>
+    /* Depende del ancho del panel (no de la ventana): con sidebar el panel se angosta antes */
+    @@container (max-width: 720px) {
+        .cp-col-direccion {
+            display: none;
+        }
+    }
+</style>
+
+<div class="cp-page">
+
+    <div class="cp-header">
+        <div>
+            <h1><i class="bi @t.Icono" aria-hidden="true"></i> @t.Plural</h1>
+            <p>
+                @if (hayBusqueda)
+                {
+                    <span>@Model.Total @(Model.Total == 1 ? "resultado" : "resultados") para «@Model.Busqueda»</span>
+                }
+                else
+                {
+                    <span>@Model.Total @(Model.Total == 1 ? t.Singular + " registrado" : pluralMin + " registrados")</span>
+                }
+            </p>
+        </div>
+        <a class="btn-g-primary" asp-controller="@t.Controlador" asp-action="Crear">
+            <i class="bi bi-plus-lg" aria-hidden="true"></i> Nuevo @t.Singular
+        </a>
+    </div>
+
+    @if (TempData["Exito"] is string exito)
+    {
+        <div class="cp-aviso exito" role="status">
+            <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+            <span>@exito</span>
+            <button type="button" aria-label="Cerrar mensaje" onclick="this.parentElement.remove()"><i class="bi bi-x" aria-hidden="true"></i></button>
+        </div>
+    }
+    @if (TempData["Error"] is string error)
+    {
+        <div class="cp-aviso error" role="alert">
+            <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+            <span>@error</span>
+            <button type="button" aria-label="Cerrar mensaje" onclick="this.parentElement.remove()"><i class="bi bi-x" aria-hidden="true"></i></button>
+        </div>
+    }
+
+    <form class="cp-busqueda" method="get" role="search" asp-controller="@t.Controlador" asp-action="Index">
+        <label for="q" class="visually-hidden">Buscar @pluralMin por nombre o @t.DocEtiqueta</label>
+        <div class="cp-busqueda-campo">
+            <i class="bi bi-search" aria-hidden="true"></i>
+            <input id="q" name="q" type="search" value="@Model.Busqueda"
+                   placeholder="Buscar por nombre o @t.DocEtiqueta" autocomplete="off" />
+        </div>
+        <button type="submit" class="btn-g-outline">Buscar</button>
+        @if (hayBusqueda)
+        {
+            <a class="cp-limpiar" asp-controller="@t.Controlador" asp-action="Index">Limpiar búsqueda</a>
+        }
+    </form>
+
+    <section class="cp-panel" aria-label="Lista de @pluralMin">
+        @if (Model.Filas.Count == 0)
+        {
+            <div class="cp-vacio">
+                @if (hayBusqueda)
+                {
+                    <i class="bi bi-search" aria-hidden="true"></i>
+                    <p>No encontramos @pluralMin con «@Model.Busqueda».</p>
+                    <p>Revisa cómo está escrito o busca por @t.DocEtiqueta.
+                        <a asp-controller="@t.Controlador" asp-action="Index">Ver todos</a></p>
+                }
+                else
+                {
+                    <i class="bi @t.Icono" aria-hidden="true"></i>
+                    <p>Aún no hay @pluralMin registrados.</p>
+                    <a asp-controller="@t.Controlador" asp-action="Crear">Registrar el primero</a>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="cp-tabla-wrap">
+                <table class="cp-tabla">
+                    <caption class="visually-hidden">@t.Plural, página @Model.Pagina de @Model.TotalPaginas</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">Nombre</th>
+                            <th scope="col">@t.DocEtiqueta</th>
+                            <th scope="col" class="cp-col-direccion">Dirección</th>
+                            <th scope="col">@tituloMovimientos</th>
+                            <th scope="col"><span class="visually-hidden">Acciones</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var f in Model.Filas)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="cp-nombre">@f.Nombre</div>
+                                    @{
+                                        // El contacto suele ser el mismo número que el celular: no repetirlo
+                                        var datosContacto = new[] { f.Celular != null ? "Cel. " + f.Celular : null, f.Contacto != f.Celular ? f.Contacto : null }
+                                            .Where(x => !string.IsNullOrEmpty(x))
+                                            .ToList();
+                                    }
+                                    @if (datosContacto.Count > 0)
+                                    {
+                                        <div class="cp-sub">@string.Join(" · ", datosContacto)</div>
+                                    }
+                                </td>
+                                <td class="cp-doc">@f.Documento</td>
+                                <td class="cp-col-direccion">@(f.Direccion ?? "—")</td>
+                                <td class="cp-mov">
+                                    @if (f.Movimientos == 0)
+                                    {
+                                        <span class="cp-mov-ninguno">Sin @t.MovimientoPlural</span>
+                                    }
+                                    else
+                                    {
+                                        <div>@f.Movimientos @(f.Movimientos == 1 ? t.MovimientoSingular : t.MovimientoPlural)</div>
+                                        <div class="cp-sub">Última: @f.UltimoMovimiento?.ToString("dd/MM/yyyy")</div>
+                                    }
+                                </td>
+                                <td>
+                                    @if (t.TieneCelular && f.Documento == ClienteGeneral.RucDni)
+                                    {
+                                        <div class="cp-acciones"><span class="cp-sub">Por defecto en ventas</span></div>
+                                    }
+                                    else
+                                    {
+                                        <div class="cp-acciones">
+                                            <a class="cp-icono-btn" asp-controller="@t.Controlador" asp-action="Editar" asp-route-id="@f.Id"
+                                               aria-label="Editar @f.Nombre" title="Editar">
+                                                <i class="bi bi-pencil" aria-hidden="true"></i>
+                                            </a>
+                                            @if (f.Movimientos == 0)
+                                            {
+                                                <button type="button" class="cp-icono-btn peligro" data-bs-toggle="modal" data-bs-target="#modalEliminar"
+                                                        data-nombre="@f.Nombre" data-url="@Url.Action("Eliminar", t.Controlador, new { id = f.Id })"
+                                                        aria-label="Eliminar @f.Nombre" title="Eliminar">
+                                                    <i class="bi bi-trash3" aria-hidden="true"></i>
+                                                </button>
+                                            }
+                                        </div>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @if (Model.TotalPaginas > 1)
+            {
+                <nav class="cp-paginacion" aria-label="Paginación">
+                    @if (Model.Pagina > 1)
+                    {
+                        <a class="btn-g-outline" asp-controller="@t.Controlador" asp-action="Index"
+                           asp-route-q="@Model.Busqueda" asp-route-pagina="@(Model.Pagina - 1)">
+                            <i class="bi bi-chevron-left" aria-hidden="true"></i> Anterior
+                        </a>
+                    }
+                    else
+                    {
+                        <span class="cp-pag-espacio"></span>
+                    }
+                    <span>Página @Model.Pagina de @Model.TotalPaginas</span>
+                    @if (Model.Pagina < Model.TotalPaginas)
+                    {
+                        <a class="btn-g-outline" asp-controller="@t.Controlador" asp-action="Index"
+                           asp-route-q="@Model.Busqueda" asp-route-pagina="@(Model.Pagina + 1)">
+                            Siguiente <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                        </a>
+                    }
+                    else
+                    {
+                        <span class="cp-pag-espacio"></span>
+                    }
+                </nav>
+            }
+        }
+    </section>
+</div>
+
+<div class="modal fade cp-modal" id="modalEliminar" tabindex="-1" aria-labelledby="modalEliminarTitulo" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="post" id="formEliminar">
+                @Html.AntiForgeryToken()
+                <div class="modal-body">
+                    <div class="cp-modal-icono" aria-hidden="true"><i class="bi bi-trash3"></i></div>
+                    <h2 id="modalEliminarTitulo">¿Eliminar este @t.Singular?</h2>
+                    <p>Se eliminará <strong id="nombreEliminar"></strong>. Esta acción no se puede deshacer.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-g-outline" data-bs-dismiss="modal" id="btnCancelarEliminar">Cancelar</button>
+                    <button type="submit" class="btn-g-danger">Sí, eliminar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const modalEliminar = document.getElementById('modalEliminar');
+        modalEliminar.addEventListener('show.bs.modal', function (e) {
+            const boton = e.relatedTarget;
+            document.getElementById('formEliminar').action = boton.dataset.url;
+            document.getElementById('nombreEliminar').textContent = boton.dataset.nombre;
+        });
+        // En una acción destructiva el foco inicial va a "Cancelar", no al botón que borra
+        modalEliminar.addEventListener('shown.bs.modal', function () {
+            document.getElementById('btnCancelarEliminar').focus();
+        });
+    </script>
+}

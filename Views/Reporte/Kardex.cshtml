@@ -1,0 +1,392 @@
+@using System.Globalization
+@using GestionAlmacen_Golocentro.ViewModels
+@model ReporteKardexViewModel
+@{
+    ViewData["Title"] = Model.ProductoId == null ? "Kardex por producto" : $"Kardex de {Model.ProductoNombre}";
+    var inv = CultureInfo.InvariantCulture;
+    var f = Model.Filtro;
+    string Iso(DateOnly d) => d.ToString("yyyy-MM-dd", inv);
+    var todasLasSedes = f.SedeId == null && f.Sedes.Count > 1;
+    if (Model.ProductoId != null)
+        ViewData["FiltroExtra"] = new Dictionary<string, string> { ["producto"] = Model.ProductoId.Value.ToString(inv) };
+
+    string Icono(string tipo) => tipo switch
+    {
+        TipoKardex.Entrada => "bi-box-arrow-in-down",
+        TipoKardex.Venta => "bi-cart3",
+        TipoKardex.Anulacion => "bi-arrow-counterclockwise",
+        TipoKardex.Conteo => "bi-clipboard-check",
+        TipoKardex.Traslado => "bi-arrow-left-right",
+        _ => "bi-box-arrow-up"
+    };
+    string ConSigno(int n) => n > 0 ? "+" + n.ToString("N0", inv) : n < 0 ? "−" + (-n).ToString("N0", inv) : "0";
+    var columnas = todasLasSedes ? 10 : 9;
+}
+
+@await Html.PartialAsync("_EstilosReporte")
+
+<style>
+    .kx-buscar {
+        position: relative;
+        max-width: 460px;
+        margin: 12px 1.25rem 0;
+    }
+
+        .kx-buscar i {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--g-muted);
+            pointer-events: none;
+        }
+
+        .kx-buscar input {
+            width: 100%;
+            height: 44px;
+            padding: 0 12px 0 38px;
+            border: 1px solid var(--g-input-border);
+            border-radius: 8px;
+            font-size: 15px;
+            font-family: inherit;
+            color: var(--g-text);
+            background: var(--g-white);
+        }
+
+            .kx-buscar input:focus {
+                outline: none;
+                border-color: var(--g-teal);
+                box-shadow: 0 0 0 3px rgba(4,120,87,0.25);
+            }
+
+    .kx-lista {
+        list-style: none;
+        margin: 0;
+        padding: 12px 1.25rem 16px;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 8px;
+    }
+
+        .kx-lista a {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 2px 10px;
+            align-items: center;
+            min-height: 56px;
+            padding: 9px 12px;
+            border: 1px solid var(--g-border);
+            border-radius: 10px;
+            text-decoration: none;
+            color: var(--g-text);
+        }
+
+            .kx-lista a:hover {
+                border-color: var(--g-teal);
+                background: rgba(4,120,87,0.04);
+            }
+
+            .kx-lista a:focus-visible {
+                outline: 2px solid var(--g-teal);
+                outline-offset: 1px;
+            }
+
+        .kx-lista strong {
+            font-size: 14px;
+        }
+
+        .kx-lista .cp-sub {
+            grid-row: 2;
+        }
+
+        .kx-lista .kx-stock {
+            grid-row: span 2;
+            font-size: 13px;
+            color: var(--g-muted);
+            white-space: nowrap;
+        }
+
+    .kx-producto {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 1rem;
+        padding: 14px 16px;
+        border: 1px solid rgba(4,120,87,0.3);
+        border-radius: 14px;
+        background: rgba(4,120,87,0.04);
+    }
+
+        .kx-producto h2 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--g-navy);
+            margin: 0;
+        }
+
+        .kx-producto p {
+            margin: 2px 0 0;
+            font-size: 14px;
+            color: var(--g-muted);
+        }
+
+    .kx-tipo {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 2px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+        .kx-tipo.entrada {
+            background: rgba(4,120,87,0.1);
+            color: var(--g-teal);
+        }
+
+        .kx-tipo.venta, .kx-tipo.salida {
+            background: rgba(51,65,85,0.1);
+            color: var(--g-navy);
+        }
+
+        .kx-tipo.anulacion {
+            background: rgba(220,38,38,0.1);
+            color: var(--g-danger-text);
+        }
+
+        .kx-tipo.conteo {
+            background: rgba(245,158,11,0.16);
+            color: #92400E;
+        }
+
+        .kx-tipo.traslado {
+            background: rgba(37,99,235,0.1);
+            color: #1D4ED8;
+        }
+
+    .kx-saldo-fila td {
+        background: var(--g-bg);
+        font-weight: 600;
+    }
+
+    .kx-saldo {
+        font-weight: 700;
+    }
+
+    .kx-aviso {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        padding: 12px 14px;
+        margin-bottom: 1rem;
+        border-radius: 10px;
+        background: rgba(245,158,11,0.12);
+        border: 1px solid rgba(245,158,11,0.4);
+        color: #78350F;
+        font-size: 14px;
+    }
+</style>
+
+<div class="cp-page rp-page">
+    <a class="cp-volver" asp-action="Index"><i class="bi bi-arrow-left" aria-hidden="true"></i> Reportes</a>
+    <div class="cp-header">
+        <div>
+            <h1><i class="bi bi-clock-history" aria-hidden="true"></i> Kardex por producto</h1>
+            <p>@f.SedeNombre · @f.Periodo</p>
+        </div>
+    </div>
+
+    @if (Model.ProductoId == null)
+    {
+        <section class="rp-seccion" aria-labelledby="tituloElegir">
+            <div class="rp-seccion-cab">
+                <h2 id="tituloElegir">Elige el producto</h2>
+                <p>Verás cada entrada, venta, anulación, conteo y traslado con su saldo</p>
+            </div>
+            <div class="kx-buscar">
+                <i class="bi bi-search" aria-hidden="true"></i>
+                <input type="search" id="buscarProducto" placeholder="Buscar por nombre o código" autocomplete="off"
+                       aria-label="Buscar producto" aria-controls="listaProductos" />
+            </div>
+            <ul class="kx-lista" id="listaProductos">
+                @foreach (var p in Model.Productos)
+                {
+                    <li data-busqueda="@($"{p.Nombre} {p.Codigo}".ToLowerInvariant())">
+                        <a asp-action="Kardex" asp-route-producto="@p.Id" asp-route-desde="@Iso(f.Desde)" asp-route-hasta="@Iso(f.Hasta)"
+                           asp-route-sede="@(f.PuedeElegirSede ? f.SedeId : null)">
+                            <strong>@p.Nombre</strong>
+                            <span class="kx-stock">Stock: @p.Stock</span>
+                            <span class="cp-sub">@p.Codigo</span>
+                        </a>
+                    </li>
+                }
+            </ul>
+            <p class="rp-nota-pie" id="sinResultados" hidden>No hay productos con ese nombre o código.</p>
+        </section>
+    }
+    else
+    {
+        <div class="kx-producto">
+            <div>
+                <h2>@Model.ProductoNombre</h2>
+                <p>@Model.ProductoCodigo · en @Model.Unidad · @(string.IsNullOrEmpty(Model.ZonasActuales) ? $"hoy hay {Model.StockActual}" : $"hoy hay {Model.StockActual} en {Model.ZonasActuales}")</p>
+            </div>
+            <a class="btn-g-outline rp-no-imprimir" asp-action="Kardex" asp-route-desde="@Iso(f.Desde)" asp-route-hasta="@Iso(f.Hasta)"
+               asp-route-sede="@(f.PuedeElegirSede ? f.SedeId : null)">
+                <i class="bi bi-arrow-repeat" aria-hidden="true"></i> Cambiar producto
+            </a>
+        </div>
+
+        @await Html.PartialAsync("_Filtro", f)
+
+        @if (Model.Descuadre)
+        {
+            <p class="kx-aviso" role="note">
+                <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
+                <span>
+                    El historial no cuadra con el stock de hoy: el saldo inicial sale negativo. Suele pasar cuando se borraron registros
+                    o se cargó stock directo en la base de datos. Un conteo de sus zonas lo deja al día.
+                </span>
+            </p>
+        }
+
+        <div class="rp-kpis">
+            <div class="rp-kpi">
+                <div class="rp-kpi-etiqueta">Saldo inicial</div>
+                <div class="rp-kpi-valor">@Model.SaldoInicial.ToString("N0", inv)</div>
+                <div class="rp-kpi-sub">al @f.Desde.ToString("dd/MM/yyyy", inv)</div>
+            </div>
+            <div class="rp-kpi">
+                <div class="rp-kpi-etiqueta">Entradas</div>
+                <div class="rp-kpi-valor">@ConSigno(Model.Entradas)</div>
+                <div class="rp-kpi-sub">recibido de proveedores</div>
+            </div>
+            <div class="rp-kpi">
+                <div class="rp-kpi-etiqueta">Ventas</div>
+                <div class="rp-kpi-valor">@ConSigno(-Model.Ventas)</div>
+                <div class="rp-kpi-sub">salió vendido</div>
+            </div>
+            <div class="rp-kpi">
+                <div class="rp-kpi-etiqueta">Anulaciones</div>
+                <div class="rp-kpi-valor">@ConSigno(Model.Devoluciones)</div>
+                <div class="rp-kpi-sub">volvió al stock</div>
+            </div>
+            <div class="rp-kpi">
+                <div class="rp-kpi-etiqueta">Conteos</div>
+                <div class="rp-kpi-valor">@ConSigno(Model.Ajustes)</div>
+                <div class="rp-kpi-sub">diferencia al contar</div>
+            </div>
+            <div class="rp-kpi principal">
+                <div class="rp-kpi-etiqueta">Saldo final</div>
+                <div class="rp-kpi-valor">@Model.SaldoFinal.ToString("N0", inv)</div>
+                <div class="rp-kpi-sub">al @f.Hasta.ToString("dd/MM/yyyy", inv)</div>
+            </div>
+        </div>
+
+        <section class="rp-seccion" aria-labelledby="tituloMovimientos">
+            <div class="rp-seccion-cab">
+                <h2 id="tituloMovimientos">Movimientos</h2>
+                <p>@Model.Filas.Count @(Model.Filas.Count == 1 ? "movimiento" : "movimientos") · el saldo es el stock @(f.SedeId == null ? "de todas las sedes" : "de la sede") después de cada uno</p>
+            </div>
+            <div class="cp-tabla-wrap">
+                <table class="cp-tabla">
+                    <thead>
+                        <tr>
+                            <th scope="col">Fecha</th>
+                            <th scope="col">Movimiento</th>
+                            <th scope="col">Documento</th>
+                            <th scope="col">Detalle</th>
+                            <th scope="col">Zona</th>
+                            <th scope="col" class="rp-num">Entra</th>
+                            <th scope="col" class="rp-num">Sale</th>
+                            <th scope="col" class="rp-num">Saldo</th>
+                            <th scope="col">Usuario</th>
+                            @if (todasLasSedes)
+                            {
+                                <th scope="col">Sede</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="kx-saldo-fila">
+                            <td class="cp-doc">@f.Desde.ToString("dd/MM/yyyy", inv)</td>
+                            <td colspan="6">Saldo inicial</td>
+                            <td class="rp-num kx-saldo">@Model.SaldoInicial.ToString("N0", inv)</td>
+                            <td colspan="@(columnas - 8)"></td>
+                        </tr>
+                        @if (Model.Filas.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="@columnas" class="cp-mov-ninguno">Sin movimientos en este periodo: el stock se mantuvo igual.</td>
+                            </tr>
+                        }
+                        @foreach (var m in Model.Filas)
+                        {
+                            <tr>
+                                <td class="cp-doc">@m.Fecha.ToString("dd/MM/yyyy HH:mm", inv)</td>
+                                <td><span class="kx-tipo @m.Tipo"><i class="bi @Icono(m.Tipo)" aria-hidden="true"></i> @m.TipoTexto</span></td>
+                                <td>
+                                    @if (m.Enlace != null)
+                                    {
+                                        <a class="rp-enlace" href="@m.Enlace">@m.Documento</a>
+                                    }
+                                    else
+                                    {
+                                        <span>@m.Documento</span>
+                                    }
+                                </td>
+                                <td>@(m.Detalle ?? "—")</td>
+                                <td class="cp-doc">@m.Zona</td>
+                                <td class="rp-num">@(m.Entra is int e ? "+" + e.ToString("N0", inv) : "")</td>
+                                <td class="rp-num">@(m.Sale is int s ? "−" + s.ToString("N0", inv) : "")</td>
+                                <td class="rp-num kx-saldo">@m.Saldo.ToString("N0", inv)</td>
+                                <td>@m.Usuario</td>
+                                @if (todasLasSedes)
+                                {
+                                    <td>@m.Sede</td>
+                                }
+                            </tr>
+                        }
+                        <tr class="kx-saldo-fila">
+                            <td class="cp-doc">@f.Hasta.ToString("dd/MM/yyyy", inv)</td>
+                            <td colspan="6">Saldo final</td>
+                            <td class="rp-num kx-saldo">@Model.SaldoFinal.ToString("N0", inv)</td>
+                            <td colspan="@(columnas - 8)"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="rp-nota-pie">Los traslados entre zonas y los conteos que cuadran no cambian el saldo; se listan para saber dónde estuvo el producto.</p>
+        </section>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        const buscar = document.getElementById('buscarProducto');
+        if (buscar) {
+            const items = [...document.querySelectorAll('#listaProductos li')];
+            const sinResultados = document.getElementById('sinResultados');
+            const normalizar = t => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+            buscar.addEventListener('input', () => {
+                const q = normalizar(buscar.value.trim());
+                let visibles = 0;
+                items.forEach(li => {
+                    const ve = !q || normalizar(li.dataset.busqueda).includes(q);
+                    li.hidden = !ve;
+                    if (ve) visibles++;
+                });
+                sinResultados.hidden = visibles > 0;
+            });
+            buscar.addEventListener('keydown', e => {
+                if (e.key !== 'Enter') return;
+                e.preventDefault();
+                items.find(li => !li.hidden)?.querySelector('a').click();
+            });
+        }
+    </script>
+}

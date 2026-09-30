@@ -1,0 +1,241 @@
+@model GestionAlmacen_Golocentro.Models.ErrorViewModel
+@{
+    // Sin layout: si la falla vino del layout, esta página igual se puede mostrar
+    Layout = null;
+    var (icono, titulo, texto) = Model.Codigo switch
+    {
+        404 => ("bi-signpost-split", "No encontramos esta página",
+                "Puede que el enlace esté mal escrito o que lo que buscas ya no exista (por ejemplo, una nota o una entrada que se borró)."),
+        400 => ("bi-exclamation-diamond", "No se pudo procesar el pedido",
+                "Los datos que llegaron no son válidos. Vuelve a la página anterior e inténtalo de nuevo."),
+        403 => ("bi-shield-lock", "No tienes acceso a esta página",
+                "Si crees que deberías tenerlo, pídeselo a la dueña."),
+        429 => ("bi-hourglass-split", "Demasiados intentos",
+                "Por seguridad hay que esperar un minuto antes de volver a intentar entrar. Si olvidaste tu contraseña, pídele a la dueña que te ponga una nueva."),
+        >= 500 => ("bi-cone-striped", "Algo salió mal",
+                "No es tu culpa. Intenta de nuevo en un momento; si vuelve a pasar, avisa a la dueña con el código de abajo."),
+        _ => ("bi-exclamation-circle", "No se pudo mostrar la página",
+                "Vuelve a la página anterior e inténtalo de nuevo.")
+    };
+    var autenticado = User.Identity?.IsAuthenticated == true;
+}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>@titulo - Golocentro</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --navy: #334155;
+            --teal: #047857;
+            --teal-oscuro: #065F46;
+            --bg: #F8FAFC;
+            --white: #FFFFFF;
+            --border: #E6E8EA;
+            --text: #0F172A;
+            --muted: #475569;
+            --input-border: #8492A6;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px 16px;
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', system-ui, sans-serif;
+        }
+
+        main {
+            width: 100%;
+            max-width: 460px;
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 2rem 1.5rem 1.75rem;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+        }
+
+        .marca {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--navy);
+            text-decoration: none;
+            margin-bottom: 1.5rem;
+        }
+
+            .marca span {
+                width: 30px;
+                height: 30px;
+                border-radius: 8px;
+                background: var(--teal);
+                color: #FFFFFF;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+        .icono {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 1rem;
+            border-radius: 50%;
+            background: rgba(4, 120, 87, 0.1);
+            color: var(--teal);
+            font-size: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .foto {
+            display: block;
+            width: 160px;
+            height: 160px;
+            margin: 0 auto 1.25rem;
+            border-radius: 20px;
+            object-fit: cover;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
+        }
+
+        .numero {
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            color: var(--muted);
+            margin: 0 0 4px;
+        }
+
+        h1 {
+            font-size: 22px;
+            font-weight: 600;
+            color: var(--navy);
+            margin: 0 0 8px;
+        }
+
+        p {
+            font-size: 15px;
+            line-height: 1.5;
+            color: var(--muted);
+            margin: 0 0 1.25rem;
+        }
+
+        .codigo {
+            margin: -0.25rem 0 1.25rem;
+            padding: 10px 12px;
+            border-radius: 10px;
+            background: var(--bg);
+            border: 1px dashed var(--input-border);
+            font-size: 13px;
+            color: var(--muted);
+            word-break: break-all;
+        }
+
+            .codigo code {
+                display: block;
+                margin-top: 2px;
+                font-size: 13px;
+                color: var(--text);
+            }
+
+        .botones {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .boton {
+            min-height: 44px;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            text-decoration: none;
+            cursor: pointer;
+            border: 1px solid var(--input-border);
+            background: var(--white);
+            color: var(--navy);
+        }
+
+            .boton:hover {
+                border-color: var(--teal);
+                color: var(--teal);
+            }
+
+            .boton.principal {
+                background: var(--teal);
+                border-color: var(--teal);
+                color: #FFFFFF;
+            }
+
+                .boton.principal:hover {
+                    background: var(--teal-oscuro);
+                    border-color: var(--teal-oscuro);
+                    color: #FFFFFF;
+                }
+
+            .boton:focus-visible,
+            .marca:focus-visible {
+                outline: 2px solid var(--teal);
+                outline-offset: 2px;
+            }
+
+        @@media (max-width: 420px) {
+            .boton {
+                flex: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <a class="marca" href="~/"><span aria-hidden="true"><i class="bi bi-boxes"></i></span> Golocentro</a>
+        @if (Model.Codigo == 404)
+        {
+            <img class="foto" src="~/img/cajas-480.webp" alt="" width="160" height="160" decoding="async" />
+        }
+        else
+        {
+            <div class="icono" aria-hidden="true"><i class="bi @icono"></i></div>
+        }
+        <p class="numero">ERROR @Model.Codigo</p>
+        <h1>@titulo</h1>
+        <p>@texto</p>
+        @if (Model.ShowRequestId)
+        {
+            <div class="codigo">
+                Código para reportar el problema:
+                <code>@Model.RequestId</code>
+            </div>
+        }
+        <div class="botones">
+            <button type="button" class="boton" onclick="history.back()"><i class="bi bi-arrow-left" aria-hidden="true"></i> Volver</button>
+            <a class="boton principal" href="@(autenticado ? Url.Content("~/") : Url.Action("Login", "Account"))">
+                <i class="bi @(autenticado ? "bi-house" : "bi-box-arrow-in-right")" aria-hidden="true"></i> @(autenticado ? "Ir al inicio" : "Iniciar sesión")
+            </a>
+        </div>
+    </main>
+</body>
+</html>

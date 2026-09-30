@@ -1,0 +1,13 @@
+@* Copia lo que se escribe en los campos a la vista previa de la nota (elementos con data-vista = nombre del campo,
+   o el data-vista del campo si lo tiene) *@
+<script>
+    document.querySelectorAll('input[name], textarea[name]').forEach(input => {
+        const destinos = document.querySelectorAll(`.vp-papel [data-vista="${input.dataset.vista || input.name}"]`);
+        if (!destinos.length) return;
+        input.addEventListener('input', () => destinos.forEach(el => {
+            const valor = input.value.trim() || el.dataset.respaldo || '';
+            el.textContent = valor ? (el.dataset.prefijo ?? '') + valor : '';
+            el.hidden = !valor;
+        }));
+    });
+</script>

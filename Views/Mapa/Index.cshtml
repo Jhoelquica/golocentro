@@ -1,0 +1,686 @@
+@using System.Globalization
+@using GestionAlmacen_Golocentro.ViewModels
+@model MapaViewModel
+@{
+    ViewData["Title"] = "Mapa del almacén";
+    // Escala del plano: 1 cuadrito = 20 unidades del SVG
+    const decimal S = 20m;
+    var anchoSvg = Model.Ancho * S;
+    var altoSvg = Model.Alto * S;
+    var zonasEnPlano = Model.Zonas.Where(z => z.X.HasValue && z.Y.HasValue && z.Ancho.HasValue && z.Alto.HasValue).ToList();
+}
+
+@functions {
+    // El SVG necesita punto decimal; con la cultura es-PE "1.5" saldría como "1,5"
+    static string F(decimal v) => v.ToString("0.##", CultureInfo.InvariantCulture);
+
+    static string Productos(int n) => n == 0 ? "vacía" : n == 1 ? "1 producto" : $"{n} productos";
+}
+
+@await Html.PartialAsync("~/Views/Shared/_EstilosGestion.cshtml")
+
+<style>
+    .mp-layout {
+        display: grid;
+        grid-template-columns: minmax(280px, 340px) 1fr;
+        grid-template-areas: "buscar mapa" "detalle mapa";
+        grid-template-rows: auto 1fr;
+        gap: 1rem;
+        align-items: start;
+    }
+
+    .mp-buscar { grid-area: buscar; }
+    .mp-mapa-wrap { grid-area: mapa; }
+    .mp-detalle { grid-area: detalle; }
+
+    @@media (max-width: 1100px) {
+        .mp-layout {
+            grid-template-columns: 1fr;
+            grid-template-areas: "buscar" "mapa" "detalle";
+        }
+    }
+
+    .mp-panel {
+        background: var(--g-white);
+        border: 1px solid var(--g-border);
+        border-radius: 14px;
+        padding: 1rem 1.1rem;
+    }
+
+    .mp-panel h2 {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--g-navy);
+        margin: 0 0 8px;
+    }
+
+    .mp-label {
+        display: block;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--g-text);
+        margin-bottom: 6px;
+    }
+
+    .mp-campo {
+        position: relative;
+    }
+
+        .mp-campo i {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--g-muted);
+            pointer-events: none;
+        }
+
+        .mp-campo input,
+        .mp-select {
+            width: 100%;
+            height: 44px;
+            border: 1px solid var(--g-input-border);
+            border-radius: 8px;
+            font-size: 15px;
+            font-family: inherit;
+            color: var(--g-text);
+            background: var(--g-white);
+        }
+
+        .mp-campo input {
+            padding: 0 12px 0 38px;
+        }
+
+    .mp-select {
+        padding: 0 10px;
+    }
+
+        .mp-campo input::placeholder {
+            color: #64748B;
+        }
+
+        .mp-campo input:focus,
+        .mp-select:focus {
+            outline: none;
+            border-color: var(--g-teal);
+            box-shadow: 0 0 0 3px rgba(4,120,87,0.25);
+        }
+
+    .mp-ayuda {
+        font-size: 13px;
+        color: var(--g-muted);
+        margin: 6px 0 0;
+    }
+
+    .mp-estado {
+        font-size: 13px;
+        color: var(--g-muted);
+        margin: 10px 0 6px;
+    }
+
+    .mp-resultados {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+
+    .mp-res {
+        padding: 10px 0;
+        border-top: 1px solid var(--g-border);
+    }
+
+    .mp-res-cab {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 6px;
+        font-size: 14px;
+    }
+
+        .mp-res-cab strong {
+            color: var(--g-text);
+        }
+
+    .mp-cod-prod {
+        font-size: 12px;
+        color: var(--g-muted);
+    }
+
+    .mp-bajo {
+        font-size: 12px;
+        font-weight: 600;
+        color: #92400E;
+        background: rgba(245,158,11,0.15);
+        padding: 1px 8px;
+        border-radius: 20px;
+    }
+
+    .mp-nada {
+        font-size: 13px;
+        color: var(--g-muted);
+        margin: 4px 0 0;
+    }
+
+    .mp-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 8px;
+    }
+
+    .mp-chip {
+        min-height: 32px;
+        padding: 4px 12px;
+        border-radius: 20px;
+        border: 1px solid var(--g-teal);
+        background: rgba(4,120,87,0.08);
+        color: var(--g-teal);
+        font-size: 13px;
+        font-weight: 600;
+        font-family: inherit;
+        cursor: pointer;
+        font-variant-numeric: tabular-nums;
+    }
+
+        .mp-chip:hover {
+            background: var(--g-teal);
+            color: #FFFFFF;
+        }
+
+        .mp-chip:focus-visible {
+            outline: 2px solid var(--g-teal);
+            outline-offset: 2px;
+        }
+
+    .mp-mapa-wrap {
+        padding: 0.75rem;
+    }
+
+    .mp-mapa {
+        width: 100%;
+        height: auto;
+        display: block;
+    }
+
+    .mp-zona {
+        cursor: pointer;
+    }
+
+        .mp-zona:focus {
+            outline: none;
+        }
+
+        .mp-zona rect {
+            fill: rgba(4,120,87,0.10);
+            stroke: var(--g-teal);
+            stroke-width: 1;
+            transition: fill var(--transition), stroke-width var(--transition), opacity var(--transition);
+        }
+
+        .mp-zona.vacia rect {
+            fill: #FFFFFF;
+            stroke: #94A3B8;
+        }
+
+        .mp-zona.recepcion rect {
+            fill: #F1F5F9;
+            stroke: #64748B;
+            stroke-width: 1.5;
+            stroke-dasharray: 6 4;
+        }
+
+        .mp-zona:hover rect,
+        .mp-zona:focus-visible rect {
+            stroke-width: 3;
+        }
+
+        .mp-zona:focus-visible rect {
+            stroke: var(--g-navy);
+        }
+
+        .mp-zona.coincide rect {
+            fill: var(--g-teal);
+            stroke: #065F46;
+            stroke-dasharray: none;
+        }
+
+        .mp-zona.seleccionada rect {
+            stroke: var(--g-navy);
+            stroke-width: 3.5;
+        }
+
+        .mp-zona.atenuada {
+            opacity: 0.35;
+        }
+
+    .mp-cod {
+        fill: #0F172A;
+        font-size: 13px;
+        font-weight: 600;
+        pointer-events: none;
+    }
+
+    .mp-sub {
+        fill: #475569;
+        font-size: 11px;
+        pointer-events: none;
+    }
+
+    .mp-zona.coincide .mp-cod,
+    .mp-zona.coincide .mp-sub {
+        fill: #FFFFFF;
+    }
+
+    .mp-texto-plano {
+        fill: #475569;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .mp-leyenda {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 16px;
+        margin-top: 10px;
+        font-size: 13px;
+        color: var(--g-muted);
+    }
+
+        .mp-leyenda span {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+    .mp-muestra {
+        display: inline-block;
+        width: 18px;
+        height: 12px;
+        border-radius: 2px;
+        border: 1px solid var(--g-teal);
+        background: rgba(4,120,87,0.10);
+    }
+
+        .mp-muestra.vacia {
+            background: #FFFFFF;
+            border-color: #94A3B8;
+        }
+
+        .mp-muestra.recepcion {
+            background: #F1F5F9;
+            border: 1.5px dashed #64748B;
+        }
+
+        .mp-muestra.coincide {
+            background: var(--g-teal);
+        }
+
+    .mp-detalle [hidden] {
+        display: none !important;
+    }
+
+    .mp-detalle-desc {
+        font-size: 13px;
+        color: var(--g-muted);
+        margin: 0 0 8px;
+    }
+
+    .mp-detalle-lista {
+        list-style: none;
+        margin: 0 0 12px;
+        padding: 0;
+    }
+
+        .mp-detalle-lista li {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 0;
+            border-top: 1px solid var(--g-border);
+            font-size: 14px;
+        }
+
+    .mp-detalle-nombre {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .mp-detalle-cant {
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .mp-mover-link {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--g-teal);
+        padding: 6px 4px;
+    }
+
+    .mp-sin-plano {
+        text-align: center;
+        padding: 2.5rem 1rem;
+        color: var(--g-muted);
+    }
+
+        .mp-sin-plano i {
+            font-size: 32px;
+            display: block;
+            margin-bottom: 10px;
+        }
+
+    @@media (prefers-reduced-motion: reduce) {
+        .mp-zona rect {
+            transition: none;
+        }
+    }
+</style>
+
+<div class="cp-page" style="max-width:1400px">
+
+    <div class="cp-header">
+        <div>
+            <h1><i class="bi bi-map" aria-hidden="true"></i> Mapa del almacén</h1>
+            <p>@(Model.SedeId == null ? "Sin plano registrado" : Model.SedeNombre)</p>
+        </div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center">
+            @if (Model.PuedeElegirSede)
+            {
+                <form method="get" asp-action="Index">
+                    <label for="sede" class="visually-hidden">Sede</label>
+                    <select id="sede" name="sede" class="mp-select" style="width:auto" onchange="this.form.submit()">
+                        @foreach (var s in Model.Sedes)
+                        {
+                            <option value="@s.Id" selected="@(s.Id == Model.SedeId)">@s.Nombre</option>
+                        }
+                    </select>
+                </form>
+            }
+            @if (Model.SedeId != null)
+            {
+                @if (User.IsInRole("duena"))
+                {
+                    <a class="btn-g-outline" asp-controller="Negocio" asp-action="Plano" asp-route-id="@Model.SedeId">
+                        <i class="bi bi-bounding-box" aria-hidden="true"></i> Editar plano
+                    </a>
+                }
+                <a class="btn-g-outline" asp-action="Carteles" asp-route-sede="@Model.SedeId">
+                    <i class="bi bi-printer" aria-hidden="true"></i> Imprimir carteles
+                </a>
+            }
+            <a class="btn-g-primary" asp-action="Mover" asp-route-sede="@Model.SedeId">
+                <i class="bi bi-arrow-left-right" aria-hidden="true"></i> Mover mercadería
+            </a>
+        </div>
+    </div>
+
+    @if (Model.SedeId == null)
+    {
+        <div class="mp-panel mp-sin-plano">
+            <i class="bi bi-map" aria-hidden="true"></i>
+            <p>Tu sede todavía no tiene un plano del almacén.</p>
+        </div>
+    }
+    else
+    {
+        <div class="mp-layout">
+
+            <section class="mp-panel mp-buscar" aria-labelledby="tituloBuscar">
+                <h2 id="tituloBuscar">¿Dónde está?</h2>
+                <label for="buscar" class="visually-hidden">Buscar producto por nombre o código</label>
+                <div class="mp-campo">
+                    <i class="bi bi-search" aria-hidden="true"></i>
+                    <input id="buscar" type="search" autocomplete="off" placeholder="Nombre o código del producto"
+                           aria-describedby="ayudaBuscar" aria-controls="resultados" />
+                </div>
+                <p class="mp-ayuda" id="ayudaBuscar">Se marcan en el plano las zonas donde hay ese producto.</p>
+                <p class="mp-estado" id="estadoBusqueda" role="status" aria-live="polite"></p>
+                <ul class="mp-resultados" id="resultados"></ul>
+
+                <label for="selZona" class="mp-label" style="margin-top:12px">Ver qué hay en una zona</label>
+                <select id="selZona" class="mp-select">
+                    <option value="">Elige una zona…</option>
+                    @foreach (var z in Model.Zonas)
+                    {
+                        <option value="@z.Id">@(z.Codigo + (string.IsNullOrEmpty(z.Descripcion) ? "" : " — " + z.Descripcion))</option>
+                    }
+                </select>
+            </section>
+
+            <section class="mp-panel mp-mapa-wrap" aria-label="Plano de @Model.SedeNombre">
+                <svg class="mp-mapa" viewBox="-6 -6 @F(anchoSvg + 12) @F(altoSvg + 12)" role="group"
+                     aria-label="Plano de @Model.SedeNombre. Cada zona es un botón que muestra lo que contiene.">
+                    <rect x="0" y="0" width="@F(anchoSvg)" height="@F(altoSvg)" fill="#FFFFFF" stroke="#334155" stroke-width="4" aria-hidden="true" />
+
+                    @foreach (var l in Model.Lineas.Where(l => l.Tipo == "pasillo"))
+                    {
+                        <line x1="@F(l.X1 * S)" y1="@F(l.Y1 * S)" x2="@F(l.X2 * S)" y2="@F(l.Y2 * S)"
+                              stroke="#CBD5E1" stroke-width="2" stroke-dasharray="2 6" stroke-linecap="round" aria-hidden="true" />
+                    }
+
+                    @foreach (var z in zonasEnPlano)
+                    {
+                        var x = z.X!.Value * S;
+                        var y = z.Y!.Value * S;
+                        var w = z.Ancho!.Value * S;
+                        var h = z.Alto!.Value * S;
+                        var conSub = w >= 64 && h >= 40;
+                        var sub = z.EsRecepcion ? "Recepción" : Productos(z.Stock.Count);
+                        var clases = "mp-zona" + (z.EsRecepcion ? " recepcion" : z.Stock.Count == 0 ? " vacia" : "");
+                        var etiqueta = $"Zona {z.Codigo}{(string.IsNullOrEmpty(z.Descripcion) ? "" : ", " + z.Descripcion)}: {Productos(z.Stock.Count)}";
+                        <g class="@clases" data-id="@z.Id" role="button" tabindex="0" aria-pressed="false" aria-label="@etiqueta">
+                            <rect x="@F(x + 2)" y="@F(y + 2)" width="@F(w - 4)" height="@F(h - 4)" rx="3" />
+                            <text class="mp-cod" x="@F(x + w / 2)" y="@F(conSub ? y + h / 2 - 7 : y + h / 2)" text-anchor="middle" dominant-baseline="central">@z.Codigo</text>
+                            <text class="mp-sub" x="@F(x + w / 2)" y="@F(y + h / 2 + 9)" text-anchor="middle" dominant-baseline="central">@(conSub ? sub : "")</text>
+                        </g>
+                    }
+
+                    @foreach (var l in Model.Lineas.Where(l => l.Tipo == "division"))
+                    {
+                        <line x1="@F(l.X1 * S)" y1="@F(l.Y1 * S)" x2="@F(l.X2 * S)" y2="@F(l.Y2 * S)"
+                              stroke="#64748B" stroke-width="2.5" stroke-dasharray="10 6" aria-hidden="true" />
+                    }
+
+                    @foreach (var l in Model.Lineas.Where(l => l.Tipo == "entrada"))
+                    {
+                        <g aria-hidden="true">
+                            <line x1="@F(l.X1 * S)" y1="@F(l.Y1 * S)" x2="@F(l.X2 * S)" y2="@F(l.Y2 * S)" stroke="#FFFFFF" stroke-width="6" />
+                            <text class="mp-texto-plano" x="@F(l.X1 * S + 8)" y="@F(l.Y1 * S + 12)" dominant-baseline="central">Entrada</text>
+                        </g>
+                    }
+                </svg>
+
+                <div class="mp-leyenda" aria-hidden="true">
+                    <span><i class="mp-muestra"></i> Con mercadería</span>
+                    <span><i class="mp-muestra vacia"></i> Vacía</span>
+                    <span><i class="mp-muestra recepcion"></i> Recepción</span>
+                    <span><i class="mp-muestra coincide"></i> Coincide con tu búsqueda</span>
+                </div>
+            </section>
+
+            <section class="mp-panel mp-detalle" id="detalle" aria-labelledby="detalleTitulo" hidden>
+                <h2 id="detalleTitulo"></h2>
+                <p class="mp-detalle-desc" id="detalleDesc"></p>
+                <ul class="mp-detalle-lista" id="detalleLista"></ul>
+                <p class="mp-nada" id="detalleVacia" hidden>Zona vacía: hay espacio libre.</p>
+                <div style="display:flex; gap:8px; flex-wrap:wrap">
+                    <a class="btn-g-outline" id="detalleMover" href="#">
+                        <i class="bi bi-arrow-left-right" aria-hidden="true"></i> Mover desde esta zona
+                    </a>
+                    <a class="btn-g-outline" id="detalleContar" href="#">
+                        <i class="bi bi-clipboard-check" aria-hidden="true"></i> Contar esta zona
+                    </a>
+                </div>
+            </section>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    @if (Model.SedeId != null)
+    {
+        <script>
+            const zonas = @Json.Serialize(Model.Zonas);
+            const productos = @Json.Serialize(Model.Productos);
+            const urlMover = '@Url.Action("Mover", "Mapa")';
+            const urlContar = '@Url.Action("Contar", "Inventario")';
+            const sedeId = @Model.SedeId;
+
+            const zonaPorId = new Map(zonas.map(z => [z.id, z]));
+            const productoPorId = new Map(productos.map(p => [p.id, p]));
+            const zonasPorProducto = new Map();
+            zonas.forEach(z => z.stock.forEach(s => {
+                if (!zonasPorProducto.has(s.productoId)) zonasPorProducto.set(s.productoId, []);
+                zonasPorProducto.get(s.productoId).push({ zona: z, cantidad: s.cantidad });
+            }));
+            const elementosZona = new Map([...document.querySelectorAll('.mp-zona')].map(g => [Number(g.dataset.id), g]));
+
+            const inputBuscar = document.getElementById('buscar');
+            const estado = document.getElementById('estadoBusqueda');
+            const listaResultados = document.getElementById('resultados');
+            const selZona = document.getElementById('selZona');
+            const detalle = document.getElementById('detalle');
+            const movimientoSuave = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+            function normalizar(texto) {
+                return (texto || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+            }
+
+            function esBajo(p) {
+                return p.stockTotal <= p.stockMinimo;
+            }
+
+            function crear(etiqueta, clase, texto) {
+                const el = document.createElement(etiqueta);
+                if (clase) el.className = clase;
+                if (texto !== undefined) el.textContent = texto;
+                return el;
+            }
+
+            function marcarZonas(ids) {
+                elementosZona.forEach((g, id) => {
+                    g.classList.toggle('coincide', ids.has(id));
+                    g.classList.toggle('atenuada', ids.size > 0 && !ids.has(id));
+                });
+            }
+
+            function mostrarResultados() {
+                const consulta = normalizar(inputBuscar.value);
+                listaResultados.replaceChildren();
+                if (!consulta) {
+                    estado.textContent = '';
+                    marcarZonas(new Set());
+                    return;
+                }
+
+                const encontrados = productos
+                    .filter(p => normalizar(p.nombre).includes(consulta) || normalizar(p.codigo).includes(consulta))
+                    .slice(0, 8);
+                const zonasMarcadas = new Set();
+
+                if (encontrados.length === 0) {
+                    estado.textContent = `No encontramos «${inputBuscar.value.trim()}». Revisa cómo está escrito o prueba con el código.`;
+                    marcarZonas(new Set());
+                    return;
+                }
+
+                encontrados.forEach(p => {
+                    const item = crear('li', 'mp-res');
+                    const cabecera = crear('div', 'mp-res-cab');
+                    cabecera.append(crear('strong', '', p.nombre), crear('span', 'mp-cod-prod', p.codigo));
+                    if (p.stockTotal > 0 && esBajo(p)) cabecera.append(crear('span', 'mp-bajo', 'Stock bajo'));
+                    item.append(cabecera);
+
+                    const ubicado = (zonasPorProducto.get(p.id) || []).slice().sort((a, b) => b.cantidad - a.cantidad);
+                    if (ubicado.length === 0) {
+                        item.append(crear('p', 'mp-nada', 'No hay en el almacén.'));
+                    } else {
+                        const chips = crear('div', 'mp-chips');
+                        ubicado.forEach(u => {
+                            zonasMarcadas.add(u.zona.id);
+                            const chip = crear('button', 'mp-chip', `${u.zona.codigo} · ${u.cantidad}`);
+                            chip.type = 'button';
+                            chip.setAttribute('aria-label', `Ver zona ${u.zona.codigo}: ${u.cantidad} de ${p.nombre}`);
+                            chip.addEventListener('click', () => seleccionarZona(u.zona.id, true));
+                            chips.append(chip);
+                        });
+                        item.append(chips);
+                    }
+                    listaResultados.append(item);
+                });
+
+                marcarZonas(zonasMarcadas);
+                const n = encontrados.length;
+                estado.textContent = `${n} ${n === 1 ? 'producto encontrado' : 'productos encontrados'}` +
+                    (zonasMarcadas.size ? `, en ${zonasMarcadas.size} ${zonasMarcadas.size === 1 ? 'zona' : 'zonas'} del plano.` : '.');
+            }
+
+            function seleccionarZona(id, llevarAlPlano) {
+                const zona = zonaPorId.get(id);
+                if (!zona) return;
+
+                elementosZona.forEach((g, gid) => {
+                    g.classList.toggle('seleccionada', gid === id);
+                    g.setAttribute('aria-pressed', String(gid === id));
+                });
+                selZona.value = String(id);
+
+                detalle.hidden = false;
+                document.getElementById('detalleTitulo').textContent = `Zona ${zona.codigo}` + (zona.esRecepcion ? ' · Recepción' : '');
+                document.getElementById('detalleDesc').textContent = zona.descripcion || '';
+
+                const lista = document.getElementById('detalleLista');
+                lista.replaceChildren();
+                zona.stock.forEach(s => {
+                    const p = productoPorId.get(s.productoId);
+                    const item = crear('li');
+                    const nombre = crear('span', 'mp-detalle-nombre', p ? p.nombre : 'Producto');
+                    if (p && esBajo(p)) nombre.append(' ', crear('span', 'mp-bajo', 'Stock bajo'));
+                    const mover = crear('a', 'mp-mover-link', 'Mover');
+                    mover.href = `${urlMover}?origen=${zona.id}&producto=${s.productoId}&sede=${sedeId}`;
+                    mover.setAttribute('aria-label', `Mover ${p ? p.nombre : 'producto'} desde ${zona.codigo}`);
+                    item.append(nombre, crear('span', 'mp-detalle-cant', String(s.cantidad)), mover);
+                    lista.append(item);
+                });
+
+                const vacia = zona.stock.length === 0;
+                document.getElementById('detalleVacia').hidden = !vacia;
+                const moverZona = document.getElementById('detalleMover');
+                moverZona.hidden = vacia;
+                moverZona.href = `${urlMover}?origen=${zona.id}&sede=${sedeId}`;
+                document.getElementById('detalleContar').href = `${urlContar}/${zona.id}`;
+
+                if (llevarAlPlano) {
+                    elementosZona.get(id)?.scrollIntoView({ block: 'nearest', behavior: movimientoSuave ? 'smooth' : 'auto' });
+                }
+            }
+
+            let temporizador;
+            inputBuscar.addEventListener('input', () => {
+                clearTimeout(temporizador);
+                temporizador = setTimeout(mostrarResultados, 120);
+            });
+
+            selZona.addEventListener('change', () => {
+                if (selZona.value) seleccionarZona(Number(selZona.value), true);
+            });
+
+            // Desde Productos ("¿Dónde está?") se llega con ?buscar=CODIGO
+            const buscarInicial = new URLSearchParams(location.search).get('buscar');
+            if (buscarInicial) {
+                inputBuscar.value = buscarInicial;
+                mostrarResultados();
+            }
+
+            elementosZona.forEach((g, id) => {
+                g.addEventListener('click', () => seleccionarZona(id, false));
+                g.addEventListener('keydown', e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        seleccionarZona(id, false);
+                    }
+                });
+            });
+        </script>
+    }
+}

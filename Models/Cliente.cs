@@ -15,5 +15,7 @@ public partial class Cliente
 
     public string? Direccion { get; set; }
 
+    public string? Celular { get; set; }
+
     public virtual ICollection<Movimiento> Movimientos { get; set; } = new List<Movimiento>();
 }

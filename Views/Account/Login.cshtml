@@ -1,6 +1,7 @@
-﻿@{
+@{
     ViewData["Title"] = "Iniciar Sesión - Golocentro";
     Layout = null;
+    var usuarioPrevio = ViewData["NombreUsuario"] as string ?? "";
 }
 <!DOCTYPE html>
 <html lang="es">
@@ -9,424 +10,624 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"]</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-            *, *::before, *::after {
-                box-sizing: border-box;
-                margin: 0;
-                padding: 0;
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            background: #F8FAFC;
+            color: #0F172A;
+        }
+
+        :focus-visible {
+            outline: 2px solid #047857;
+            outline-offset: 2px;
+        }
+
+        /* Pantalla partida: foto del almacén a la izquierda, acceso a la derecha.
+           El formulario va primero en el HTML para lectores de pantalla y teclado. */
+        .lg-pantalla {
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: minmax(0, 1.15fr) minmax(420px, 1fr);
+            grid-template-areas: "foto panel";
+        }
+
+        .lg-foto {
+            grid-area: foto;
+            position: relative;
+            overflow: hidden;
+            isolation: isolate;
+            color: #FFFFFF;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 40px 48px;
+            background: #1E293B;
+        }
+
+            /* La foto grande solo se descarga en pantallas grandes (en el celular va una más liviana) */
+            .lg-foto::before {
+                content: '';
+                position: absolute;
+                inset: 0;
+                z-index: -2;
+                background-position: center;
+                background-size: cover;
+                animation: lg-acercar 1.6s cubic-bezier(.2, .7, .2, 1) both;
             }
 
-            body {
-                font-family: 'Plus Jakarta Sans', sans-serif;
-                min-height: 100vh;
-                background: #001F36;
-                display: flex;
+            .lg-foto::after {
+                content: '';
+                position: absolute;
+                inset: 0;
+                z-index: -1;
+                background:
+                    linear-gradient(180deg, rgba(15,23,42,0.55) 0%, rgba(15,23,42,0.2) 38%, rgba(15,23,42,0.9) 100%),
+                    linear-gradient(90deg, rgba(4,120,87,0.22) 0%, transparent 55%);
+            }
+
+        @@media (min-width: 901px) {
+            .lg-foto::before {
+                background-image: url('/img/login-almacen-960.webp');
+            }
+        }
+
+        .lg-marca {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+        }
+
+        .lg-logo {
+            width: 40px;
+            height: 40px;
+            border-radius: 11px;
+            background: #047857;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 6px 18px rgba(4,120,87,0.45);
+        }
+
+            .lg-logo i {
+                font-size: 20px;
+                color: #FFFFFF;
+            }
+
+        .lg-texto {
+            max-width: 460px;
+        }
+
+        .lg-kicker {
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #A7F3D0;
+            margin-bottom: 10px;
+        }
+
+        .lg-texto h2 {
+            font-size: clamp(28px, 3.2vw, 40px);
+            font-weight: 700;
+            line-height: 1.15;
+            letter-spacing: -0.01em;
+            margin-bottom: 12px;
+        }
+
+        .lg-texto > p:not(.lg-kicker) {
+            font-size: 16px;
+            line-height: 1.55;
+            color: #E2E8F0;
+            margin-bottom: 20px;
+        }
+
+        .lg-puntos {
+            list-style: none;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+            .lg-puntos li {
+                display: inline-flex;
                 align-items: center;
-                justify-content: center;
-                padding: 1rem;
-                position: relative;
-                overflow: hidden;
+                gap: 7px;
+                padding: 7px 12px;
+                border-radius: 999px;
+                background: rgba(15,23,42,0.55);
+                border: 1px solid rgba(255,255,255,0.18);
+                font-size: 13px;
+                font-weight: 500;
+                color: #F8FAFC;
             }
 
-                /* Decoración de fondo */
-                body::before {
-                    content: '';
-                    position: absolute;
-                    width: 500px;
-                    height: 500px;
-                    background: radial-gradient(circle, rgba(28,85,96,0.4) 0%, transparent 70%);
-                    top: -150px;
-                    right: -100px;
-                    border-radius: 50%;
+                .lg-puntos li i {
+                    color: #6EE7B7;
                 }
 
-                body::after {
-                    content: '';
-                    position: absolute;
-                    width: 400px;
-                    height: 400px;
-                    background: radial-gradient(circle, rgba(121,174,146,0.15) 0%, transparent 70%);
-                    bottom: -100px;
-                    left: -80px;
-                    border-radius: 50%;
-                }
+        .lg-panel {
+            grid-area: panel;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            padding: 32px 24px;
+            background:
+                radial-gradient(circle at 100% 0%, rgba(4,120,87,0.08), transparent 45%),
+                #F8FAFC;
+        }
 
-            /* Tarjeta principal */
-            .login-card {
-                background: #ffffff;
-                border-radius: 20px;
-                width: 100%;
-                max-width: 400px;
-                overflow: hidden;
-                position: relative;
-                z-index: 1;
-                box-shadow: 0 24px 60px rgba(0,0,0,0.35);
+        .login-card {
+            width: 100%;
+            max-width: 400px;
+            background: #FFFFFF;
+            border: 1px solid #E2E8F0;
+            border-radius: 18px;
+            box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 16px 40px rgba(15,23,42,0.08);
+            animation: lg-subir 0.45s ease-out 0.1s both;
+        }
+
+        .login-header {
+            padding: 1.75rem 2rem 0;
+        }
+
+            .login-header .lg-marca {
+                color: #334155;
+                font-size: 16px;
+                margin-bottom: 1.25rem;
             }
 
-            /* Cabecera */
-            .login-header {
-                background: #001F36;
-                padding: 2rem 2rem 1.75rem;
-                text-align: center;
-                border-bottom: 3px solid #1C5560;
-            }
-
-            .login-logo-wrap {
-                width: 72px;
-                height: 72px;
-                background: #1C5560;
-                border-radius: 18px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                margin: 0 auto 1rem;
-                box-shadow: 0 8px 20px rgba(28,85,96,0.5);
-            }
-
-                .login-logo-wrap i {
-                    font-size: 34px;
-                    color: #FBFFCD;
+                .login-header .lg-marca .lg-logo {
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 10px;
+                    box-shadow: 0 4px 12px rgba(4,120,87,0.35);
                 }
 
             .login-header h1 {
                 font-size: 22px;
-                font-weight: 600;
-                color: #FBFFCD;
-                letter-spacing: 0.02em;
+                font-weight: 700;
+                color: #0F172A;
                 margin-bottom: 4px;
             }
 
             .login-header p {
-                font-size: 12px;
-                color: #79AE92;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 4px;
+                font-size: 14px;
+                color: #475569;
             }
 
-            /* Cuerpo */
-            .login-body {
-                padding: 2rem;
-                background: #fff;
+        @@keyframes lg-acercar {
+            from { transform: scale(1.06); }
+            to { transform: none; }
+        }
+
+        @@keyframes lg-subir {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: none; }
+        }
+
+        /* Celular y tablet: la foto pasa a ser una franja arriba y el acceso sube sobre ella */
+        @@media (max-width: 900px) {
+            .lg-pantalla {
+                grid-template-columns: 1fr;
+                grid-template-areas: "foto" "panel";
             }
 
-                .login-body h2 {
-                    font-size: 15px;
-                    font-weight: 600;
-                    color: #001F36;
-                    margin-bottom: 1.5rem;
-                    text-align: center;
-                }
-
-            /* Alerta error */
-            .alert-error {
-                background: rgba(192,57,43,0.08);
-                border: 1px solid rgba(192,57,43,0.25);
-                border-radius: 10px;
-                padding: 10px 14px;
-                font-size: 13px;
-                color: #c0392b;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                margin-bottom: 1.25rem;
+            .lg-foto {
+                min-height: 200px;
+                padding: 20px 20px 36px;
             }
 
-                .alert-error i {
-                    font-size: 16px;
-                    flex-shrink: 0;
+                .lg-foto::before {
+                    background-image: url('/img/login-almacen-640.webp');
+                    background-position: center 35%;
                 }
 
-                .alert-error .btn-close-error {
-                    margin-left: auto;
-                    background: none;
-                    border: none;
-                    color: #c0392b;
-                    cursor: pointer;
-                    font-size: 16px;
-                    padding: 0;
-                }
-
-            /* Campos */
-            .field-group {
-                margin-bottom: 1rem;
+            .lg-texto h2 {
+                font-size: 24px;
+                margin-bottom: 0;
             }
 
-                .field-group label {
-                    display: block;
-                    font-size: 12px;
-                    font-weight: 600;
-                    color: #5a7d6e;
-                    letter-spacing: 0.06em;
-                    text-transform: uppercase;
-                    margin-bottom: 6px;
-                }
+            .lg-texto > p:not(.lg-kicker),
+            .lg-puntos {
+                display: none;
+            }
 
-            .field-input-wrap {
+            .lg-panel {
                 position: relative;
+                margin-top: -18px;
+                border-radius: 18px 18px 0 0;
+                justify-content: flex-start;
+                padding: 20px 16px 24px;
             }
 
-                .field-input-wrap i {
-                    position: absolute;
-                    left: 12px;
-                    top: 50%;
-                    transform: translateY(-50%);
-                    font-size: 17px;
-                    color: #79AE92;
-                    pointer-events: none;
-                }
+            .login-card {
+                box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 8px 24px rgba(15,23,42,0.06);
+            }
 
-                .field-input-wrap input {
-                    width: 100%;
-                    padding: 11px 12px 11px 40px;
-                    border: 1.5px solid rgba(121,174,146,0.35);
-                    border-radius: 10px;
-                    font-size: 14px;
-                    color: #001F36;
-                    font-family: inherit;
-                    outline: none;
-                    transition: border-color 0.18s, box-shadow 0.18s;
-                    background: #f8fbfa;
-                }
+            /* La marca ya está en la franja de la foto */
+            .login-header .lg-marca {
+                display: none;
+            }
+        }
 
-                    .field-input-wrap input:focus {
-                        border-color: #1C5560;
-                        background: #fff;
-                        box-shadow: 0 0 0 3px rgba(28,85,96,0.1);
-                    }
+        .login-body {
+            padding: 2rem;
+        }
 
-                    .field-input-wrap input::placeholder {
-                        color: #b0c4bb;
-                    }
+            .login-body h2 {
+                font-size: 16px;
+                font-weight: 600;
+                color: #0F172A;
+                margin-bottom: 1.5rem;
+                text-align: center;
+            }
 
-            /* Toggle contraseña */
-            .toggle-pass {
-                position: absolute;
-                right: 12px;
-                top: 50%;
-                transform: translateY(-50%);
+        /* Error: #B91C1C sobre el fondo rosado da 5.5:1 (el rojo #DC2626 se quedaba en 4.1:1) */
+        .alert-error {
+            background: rgba(220,38,38,0.08);
+            border: 1px solid rgba(220,38,38,0.3);
+            border-radius: 10px;
+            padding: 8px 8px 8px 14px;
+            font-size: 13px;
+            color: #B91C1C;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 1.25rem;
+        }
+
+            .alert-error > i {
+                font-size: 16px;
+                flex-shrink: 0;
+            }
+
+            .alert-error .btn-close-error {
+                margin-left: auto;
                 background: none;
                 border: none;
-                color: #79AE92;
+                color: #B91C1C;
                 cursor: pointer;
-                font-size: 17px;
-                padding: 0;
-                pointer-events: all;
-            }
-
-                .toggle-pass:hover {
-                    color: #1C5560;
-                }
-
-            /* Sede */
-            .field-group select {
-                width: 100%;
-                padding: 11px 12px 11px 40px;
-                border: 1.5px solid rgba(121,174,146,0.35);
-                border-radius: 10px;
-                font-size: 14px;
-                color: #001F36;
-                font-family: inherit;
-                outline: none;
-                transition: border-color 0.18s;
-                background: #f8fbfa;
-                appearance: none;
-                cursor: pointer;
-            }
-
-                .field-group select:focus {
-                    border-color: #1C5560;
-                    background: #fff;
-                    box-shadow: 0 0 0 3px rgba(28,85,96,0.1);
-                }
-
-            .select-wrap {
-                position: relative;
-            }
-
-                .select-wrap i.icon-left {
-                    position: absolute;
-                    left: 12px;
-                    top: 50%;
-                    transform: translateY(-50%);
-                    font-size: 17px;
-                    color: #79AE92;
-                    pointer-events: none;
-                    z-index: 1;
-                }
-
-                .select-wrap i.icon-right {
-                    position: absolute;
-                    right: 12px;
-                    top: 50%;
-                    transform: translateY(-50%);
-                    font-size: 14px;
-                    color: #79AE92;
-                    pointer-events: none;
-                }
-
-            /* Botón */
-            .btn-login {
-                width: 100%;
-                padding: 12px;
-                background: #1C5560;
-                color: #FBFFCD;
-                border: none;
-                border-radius: 10px;
-                font-size: 15px;
-                font-weight: 600;
-                font-family: inherit;
-                cursor: pointer;
-                margin-top: 1.25rem;
+                font-size: 18px;
+                width: 32px;
+                height: 32px;
+                border-radius: 6px;
+                flex-shrink: 0;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                gap: 8px;
-                transition: background 0.18s, transform 0.1s;
             }
 
-                .btn-login:hover {
-                    background: #17464f;
+                .alert-error .btn-close-error:hover {
+                    background: rgba(220,38,38,0.1);
                 }
 
-                .btn-login:active {
-                    transform: scale(0.98);
-                }
+        .field-group {
+            margin-bottom: 1rem;
+        }
 
-                .btn-login i {
-                    font-size: 18px;
-                }
-
-            /* Footer */
-            .login-footer {
-                background: #f8fbfa;
-                border-top: 1px solid rgba(121,174,146,0.2);
-                padding: 12px;
-                text-align: center;
-                font-size: 11px;
-                color: #79AE92;
+            .field-group label {
+                display: block;
+                font-size: 12px;
+                font-weight: 600;
+                color: #475569;
+                letter-spacing: 0.06em;
+                text-transform: uppercase;
+                margin-bottom: 6px;
             }
 
-                .login-footer strong {
-                    color: #1C5560;
+        .field-input-wrap {
+            position: relative;
+        }
+
+            .field-input-wrap > .field-icon {
+                position: absolute;
+                left: 12px;
+                top: 50%;
+                transform: translateY(-50%);
+                font-size: 17px;
+                color: #475569;
+                pointer-events: none;
+            }
+
+            /* Borde #8492A6: 3.2:1 contra el blanco de la tarjeta (WCAG 1.4.11 pide 3:1) */
+            .field-input-wrap input {
+                width: 100%;
+                height: 46px;
+                padding: 0 12px 0 40px;
+                border: 1px solid #8492A6;
+                border-radius: 10px;
+                font-size: 15px;
+                color: #0F172A;
+                font-family: inherit;
+                background: #F8FAFC;
+                transition: border-color 0.18s, box-shadow 0.18s, background 0.18s;
+            }
+
+                .field-input-wrap input:focus {
+                    outline: none;
+                    border-color: #047857;
+                    background: #fff;
+                    box-shadow: 0 0 0 3px rgba(4,120,87,0.25);
                 }
+
+                .field-input-wrap input::placeholder {
+                    color: #64748B;
+                }
+
+                .field-input-wrap input.con-toggle {
+                    padding-right: 48px;
+                }
+
+        .toggle-pass {
+            position: absolute;
+            right: 5px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: none;
+            border: none;
+            color: #475569;
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.18s, background 0.18s;
+        }
+
+            .toggle-pass:hover {
+                color: #047857;
+                background: rgba(4,120,87,0.08);
+            }
+
+        .caps-aviso {
+            margin-top: 6px;
+            font-size: 12px;
+            color: #B45309;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+            .caps-aviso[hidden] {
+                display: none;
+            }
+
+        .btn-login {
+            width: 100%;
+            height: 48px;
+            background: #047857;
+            color: #FFFFFF;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            margin-top: 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: background 0.18s, transform 0.1s;
+        }
+
+            .btn-login:hover {
+                background: #065F46;
+            }
+
+            .btn-login:active {
+                transform: scale(0.98);
+            }
+
+            .btn-login:disabled {
+                background: #065F46;
+                cursor: wait;
+                transform: none;
+            }
+
+            .btn-login i {
+                font-size: 18px;
+            }
+
+        .spinner {
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255,255,255,0.35);
+            border-top-color: #FFFFFF;
+            border-radius: 50%;
+            animation: girar 0.7s linear infinite;
+        }
+
+        @@keyframes girar {
+            to { transform: rotate(360deg); }
+        }
+
+        .login-ayuda {
+            margin: 14px 0 0;
+            text-align: center;
+            font-size: 13px;
+            color: #475569;
+        }
+
+        .login-footer {
+            text-align: center;
+            font-size: 12px;
+            color: #475569;
+        }
+
+            .login-footer strong {
+                color: #047857;
+            }
+
+        @@media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                transition: none !important;
+            }
+
+            .lg-foto::before,
+            .login-card {
+                animation: none !important;
+            }
+
+            .btn-login:active {
+                transform: none;
+            }
+        }
     </style>
 </head>
 <body>
+    <div class="lg-pantalla">
+        <main class="lg-panel">
+            <div class="login-card">
+                <div class="login-header">
+                    <div class="lg-marca">
+                        <span class="lg-logo" aria-hidden="true"><i class="bi bi-boxes"></i></span>
+                        Golocentro
+                    </div>
+                    <h1>Acceso al sistema</h1>
+                    <p>Ingresa con el usuario que te dio la dueña.</p>
+                </div>
 
-    <div class="login-card">
+                <div class="login-body">
+                        @if (ViewBag.Error != null)
+                        {
+                            <div class="alert-error" id="alertError" role="alert">
+                                <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+                                <span>@ViewBag.Error</span>
+                                <button class="btn-close-error" type="button" aria-label="Cerrar mensaje"
+                                        onclick="document.getElementById('alertError').remove()">
+                                    <i class="bi bi-x" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                        }
 
-        <!-- Cabecera -->
-        <div class="login-header">
-            <div class="login-logo-wrap">
-                <i class="bi bi-boxes"></i>
+                        <form method="post" asp-controller="Account" asp-action="Login" id="formLogin">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="returnUrl" value="@ViewData["ReturnUrl"]" />
+
+                            <div class="field-group">
+                                <label for="nombreUsuario">Usuario</label>
+                                <div class="field-input-wrap">
+                                    <i class="bi bi-person field-icon" aria-hidden="true"></i>
+                                    <input type="text"
+                                           id="nombreUsuario"
+                                           name="nombreUsuario"
+                                           value="@usuarioPrevio"
+                                           placeholder="Ingresa tu usuario"
+                                           required
+                                           autocapitalize="none"
+                                           spellcheck="false"
+                                           autocomplete="username"
+                                           autofocus="@string.IsNullOrEmpty(usuarioPrevio)" />
+                                </div>
+                            </div>
+
+                            <div class="field-group">
+                                <label for="contraseña">Contraseña</label>
+                                <div class="field-input-wrap">
+                                    <i class="bi bi-lock field-icon" aria-hidden="true"></i>
+                                    <input type="password"
+                                           id="contraseña"
+                                           name="contraseña"
+                                           class="con-toggle"
+                                           placeholder="••••••••"
+                                           required
+                                           autocomplete="current-password"
+                                           autofocus="@(!string.IsNullOrEmpty(usuarioPrevio))" />
+                                    <button type="button" class="toggle-pass" id="togglePass"
+                                            aria-label="Mostrar contraseña" aria-pressed="false" aria-controls="contraseña">
+                                        <i class="bi bi-eye" id="toggleIcon" aria-hidden="true"></i>
+                                    </button>
+                                </div>
+                                <p class="caps-aviso" id="capsAviso" aria-live="polite" hidden>
+                                    <i class="bi bi-capslock-fill" aria-hidden="true"></i>
+                                    Bloq Mayús está activado
+                                </p>
+                            </div>
+
+                            <button type="submit" class="btn-login" id="btnLogin">
+                                <i class="bi bi-box-arrow-in-right" aria-hidden="true"></i>
+                                <span>Ingresar al Sistema</span>
+                            </button>
+                            <p class="login-ayuda">¿No tienes cuenta u olvidaste tu contraseña? Pídesela a la dueña.</p>
+                        </form>
+                </div>
             </div>
-            <h1>Golocentro</h1>
-            <p><i class="bi bi-geo-alt-fill"></i> Ayacucho, Perú</p>
-        </div>
+            <div class="login-footer">
+                © @DateTime.Now.Year <strong>Distribuidora Golocentro</strong> · Ayacucho, Perú
+            </div>
+        </main>
 
-        <!-- Cuerpo -->
-        <div class="login-body">
-            <h2>Acceso al Sistema</h2>
-
-            @* Mensaje de error — mismo ViewBag.Error que tenías *@
-            @if (ViewBag.Error != null)
-            {
-                <div class="alert-error" id="alertError">
-                    <i class="bi bi-exclamation-triangle-fill"></i>
-                    <span>@ViewBag.Error</span>
-                    <button class="btn-close-error" onclick="document.getElementById('alertError').remove()"
-                            type="button" aria-label="Cerrar">
-                        <i class="bi bi-x"></i>
-                    </button>
-                </div>
-            }
-
-            @* Formulario — mismos name que tenías: nombreUsuario, contraseña *@
-            <form method="post" asp-controller="Account" asp-action="Login">
-                @Html.AntiForgeryToken()
-
-                @* Usuario *@
-                <div class="field-group">
-                    <label for="nombreUsuario">Usuario</label>
-                    <div class="field-input-wrap">
-                        <i class="bi bi-person"></i>
-                        <input type="text"
-                               id="nombreUsuario"
-                               name="nombreUsuario"
-                               placeholder="Ingresa tu usuario"
-                               required autofocus
-                               autocomplete="username" />
-                    </div>
-                </div>
-
-                @* Contraseña *@
-                <div class="field-group">
-                    <label for="contraseña">Contraseña</label>
-                    <div class="field-input-wrap">
-                        <i class="bi bi-lock"></i>
-                        <input type="password"
-                               id="contraseña"
-                               name="contraseña"
-                               placeholder="••••••••"
-                               required
-                               autocomplete="current-password" />
-                        <button type="button" class="toggle-pass" id="togglePass"
-                                aria-label="Ver contraseña">
-                            <i class="bi bi-eye" id="toggleIcon"></i>
-                        </button>
-                    </div>
-                </div>
-
-                @* Sede *@
-                <div class="field-group">
-                    <label for="idSede">Sede</label>
-                    <div class="select-wrap">
-                        <i class="bi bi-building icon-left"></i>
-                        <select id="idSede" name="idSede" required>
-                            <option value="" disabled selected>Selecciona tu sede</option>
-                            @if (ViewBag.Sedes != null)
-                            {
-                                foreach (var sede in ViewBag.Sedes)
-                                {
-                                    <option value="@sede.IdSede">@sede.Nombre</option>
-                                }
-                            }
-                        </select>
-                        <i class="bi bi-chevron-down icon-right"></i>
-                    </div>
-                </div>
-
-                <button type="submit" class="btn-login">
-                    <i class="bi bi-box-arrow-in-right"></i>
-                    Ingresar al Sistema
-                </button>
-
-            </form>
-        </div>
-
-        <!-- Footer -->
-        <div class="login-footer">
-            © 2025 <strong>Distribuidora Golocentro</strong> · Todos los derechos reservados
-        </div>
-
+        <aside class="lg-foto" aria-label="Golocentro">
+            <div class="lg-marca">
+                <span class="lg-logo" aria-hidden="true"><i class="bi bi-boxes"></i></span>
+                Golocentro
+            </div>
+            <div class="lg-texto">
+                <p class="lg-kicker">Distribuidora Golocentro · Almacén</p>
+                <h2>Tu almacén, en orden.</h2>
+                <p>Stock, ventas y zonas del almacén en un solo lugar, desde la computadora o el celular.</p>
+                <ul class="lg-puntos">
+                    <li><i class="bi bi-boxes" aria-hidden="true"></i> Stock por zona</li>
+                    <li><i class="bi bi-receipt" aria-hidden="true"></i> Notas de venta</li>
+                    <li><i class="bi bi-map" aria-hidden="true"></i> Mapa del almacén</li>
+                </ul>
+            </div>
+        </aside>
     </div>
 
     <script>
-            // Toggle mostrar/ocultar contraseña
-            document.getElementById('togglePass').addEventListener('click', function () {
-                const input = document.getElementById('contraseña');
-                const icon  = document.getElementById('toggleIcon');
-                if (input.type === 'password') {
-                    input.type = 'text';
-                    icon.className = 'bi bi-eye-slash';
-                } else {
-                    input.type = 'password';
-                    icon.className = 'bi bi-eye';
-                }
-            });
+        const inputPass = document.getElementById('contraseña');
+        const btnToggle = document.getElementById('togglePass');
+        const iconToggle = document.getElementById('toggleIcon');
+        const capsAviso = document.getElementById('capsAviso');
+        const form = document.getElementById('formLogin');
+        const btnLogin = document.getElementById('btnLogin');
+        const contenidoBoton = btnLogin.innerHTML;
+
+        btnToggle.addEventListener('click', function () {
+            const visible = inputPass.type === 'password';
+            inputPass.type = visible ? 'text' : 'password';
+            iconToggle.className = visible ? 'bi bi-eye-slash' : 'bi bi-eye';
+            btnToggle.setAttribute('aria-pressed', String(visible));
+        });
+
+        function revisarBloqMayus(e) {
+            if (typeof e.getModifierState !== 'function') return;
+            capsAviso.hidden = !e.getModifierState('CapsLock');
+        }
+        inputPass.addEventListener('keydown', revisarBloqMayus);
+        inputPass.addEventListener('keyup', revisarBloqMayus);
+        inputPass.addEventListener('blur', () => capsAviso.hidden = true);
+
+        form.addEventListener('submit', function () {
+            btnLogin.disabled = true;
+            btnLogin.setAttribute('aria-busy', 'true');
+            btnLogin.innerHTML = '<span class="spinner" aria-hidden="true"></span><span>Ingresando…</span>';
+        });
+
+        // Si el navegador restaura la página con "Atrás", el botón no debe quedar bloqueado
+        window.addEventListener('pageshow', function () {
+            btnLogin.disabled = false;
+            btnLogin.removeAttribute('aria-busy');
+            btnLogin.innerHTML = contenidoBoton;
+        });
     </script>
 
 </body>

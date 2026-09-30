@@ -1,0 +1,392 @@
+@using GestionAlmacen_Golocentro.ViewModels
+@model UsuarioFormViewModel
+@{
+    var esNuevo = Model.Id == null;
+    ViewData["Title"] = esNuevo ? "Nuevo usuario" : "Editar usuario";
+
+    string? Error(string campo) => ViewData.ModelState[campo]?.Errors.FirstOrDefault()?.ErrorMessage;
+    string? Describe(string campo, string? extra = null)
+    {
+        var ids = new[] { extra, Error(campo) != null ? campo + "-error" : null }.Where(x => x != null);
+        var valor = string.Join(" ", ids);
+        return valor.Length == 0 ? null : valor;
+    }
+
+    var orden = new[] { "Nombre", "NombreUsuario", "Rol", "SedeId", "Contrasena", "ConfirmarContrasena" };
+    var errores = ViewData.ModelState
+        .Where(kv => kv.Value!.Errors.Count > 0)
+        .SelectMany(kv => kv.Value!.Errors.Select(e => (Campo: string.IsNullOrEmpty(kv.Key) ? "Nombre" : kv.Key, e.ErrorMessage)))
+        .OrderBy(e => Array.IndexOf(orden, e.Campo) is var i && i >= 0 ? i : orden.Length)
+        .ToList();
+    string Ancla(string campo) => campo == "Rol" ? "rol-" + Roles.Asignables[0].Valor : campo;
+}
+
+@await Html.PartialAsync("~/Views/Shared/_EstilosGestion.cshtml")
+
+<style>
+    .us-bloque {
+        border: none;
+        padding: 0;
+        margin: 0 0 1.1rem;
+        min-width: 0;
+    }
+
+        .us-bloque legend {
+            float: none;
+            width: auto;
+            padding: 0;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--g-text);
+            margin-bottom: 6px;
+        }
+
+    .us-roles {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+
+    @@media (max-width: 560px) {
+        .us-roles {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .us-radio {
+        position: absolute;
+        opacity: 0;
+        width: 1px;
+        height: 1px;
+        pointer-events: none;
+    }
+
+    .us-roles label {
+        display: block;
+        height: 100%;
+        padding: 12px 14px;
+        border: 1px solid var(--g-input-border);
+        border-radius: 10px;
+        background: var(--g-white);
+        cursor: pointer;
+    }
+
+        .us-roles label strong {
+            display: block;
+            font-size: 15px;
+            color: var(--g-text);
+        }
+
+        .us-roles label span {
+            display: block;
+            font-size: 13px;
+            color: var(--g-muted);
+            margin-top: 2px;
+        }
+
+    .us-radio:checked + label {
+        border-color: var(--g-teal);
+        background: rgba(4,120,87,0.06);
+        box-shadow: inset 0 0 0 1px var(--g-teal);
+    }
+
+        .us-radio:checked + label strong {
+            color: var(--g-teal);
+        }
+
+    .us-radio:focus-visible + label {
+        outline: 2px solid var(--g-teal);
+        outline-offset: 2px;
+    }
+
+    .cp-campo select {
+        width: 100%;
+        min-height: 44px;
+        padding: 10px 12px;
+        border: 1px solid var(--g-input-border);
+        border-radius: 8px;
+        font-size: 15px;
+        font-family: inherit;
+        color: var(--g-text);
+        background: var(--g-white);
+    }
+
+        .cp-campo select:focus {
+            outline: none;
+            border-color: var(--g-teal);
+            box-shadow: 0 0 0 3px rgba(4,120,87,0.25);
+        }
+
+        .cp-campo select[aria-invalid="true"] {
+            border-color: var(--g-danger);
+        }
+
+    .us-estado {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        padding: 12px 14px;
+        border: 1px solid var(--g-border);
+        border-radius: 10px;
+        margin-bottom: 1.1rem;
+    }
+
+        .us-estado input {
+            width: 22px;
+            height: 22px;
+            margin-top: 1px;
+            accent-color: var(--g-teal);
+            flex: none;
+        }
+
+        .us-estado label {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--g-text);
+            cursor: pointer;
+        }
+
+        .us-estado p {
+            margin: 2px 0 0;
+            font-size: 13px;
+            color: var(--g-muted);
+        }
+
+        .us-estado.apagado {
+            border-color: rgba(220,38,38,0.35);
+            background: rgba(220,38,38,0.05);
+        }
+
+    .us-separador {
+        border: none;
+        border-top: 1px solid var(--g-border);
+        margin: 1.25rem 0;
+    }
+
+    .us-subtitulo {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--g-navy);
+        margin: 0 0 4px;
+    }
+</style>
+
+<div class="cp-page">
+    <a class="cp-volver" asp-action="Index"><i class="bi bi-arrow-left" aria-hidden="true"></i> Volver a usuarios</a>
+
+    <div class="cp-header">
+        <div>
+            <h1><i class="bi @(esNuevo ? "bi-person-plus" : "bi-person-gear")" aria-hidden="true"></i> @(esNuevo ? "Nuevo usuario" : "Editar usuario")</h1>
+            <p>@(esNuevo ? "Crea la cuenta y pásale a la persona su usuario y contraseña." : Model.Nombre)</p>
+        </div>
+    </div>
+
+    @if (errores.Count > 0)
+    {
+        <div class="cp-resumen" role="alert" tabindex="-1" id="resumenErrores" aria-labelledby="resumenTitulo">
+            <h2 id="resumenTitulo">Revisa estos datos antes de guardar:</h2>
+            <ul>
+                @foreach (var e in errores)
+                {
+                    <li><a href="#@Ancla(e.Campo)">@e.ErrorMessage</a></li>
+                }
+            </ul>
+        </div>
+    }
+
+    <form class="cp-form-card" method="post" novalidate id="formUsuario" autocomplete="off"
+          asp-action="@(esNuevo ? "Crear" : "Editar")" asp-route-id="@Model.Id">
+
+        <p class="cp-nota">Los campos con <span class="cp-req" aria-hidden="true">*</span><span class="visually-hidden">asterisco</span> son obligatorios.</p>
+
+        <div class="cp-campo">
+            <label for="Nombre">Nombre completo <span class="cp-req" aria-hidden="true">*</span></label>
+            <input id="Nombre" name="Nombre" type="text" value="@Model.Nombre" maxlength="100" autocomplete="off"
+                   required aria-required="true"
+                   aria-invalid="@(Error("Nombre") != null ? "true" : null)"
+                   aria-describedby="@Describe("Nombre")" />
+            @if (Error("Nombre") is string eNombre)
+            {
+                <p class="cp-error" id="Nombre-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @eNombre</p>
+            }
+        </div>
+
+        <div class="cp-campo">
+            <label for="NombreUsuario">Usuario para entrar <span class="cp-req" aria-hidden="true">*</span></label>
+            <input id="NombreUsuario" name="NombreUsuario" type="text" value="@Model.NombreUsuario" maxlength="50"
+                   autocomplete="off" autocapitalize="none" spellcheck="false" required aria-required="true"
+                   aria-invalid="@(Error("NombreUsuario") != null ? "true" : null)"
+                   aria-describedby="@Describe("NombreUsuario", "NombreUsuario-ayuda")" />
+            <p class="cp-ayuda" id="NombreUsuario-ayuda">Sin espacios ni tildes; se guarda en minúsculas. Ej.: maria.quispe</p>
+            @if (Error("NombreUsuario") is string eUsuario)
+            {
+                <p class="cp-error" id="NombreUsuario-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @eUsuario</p>
+            }
+        </div>
+
+        <fieldset class="us-bloque" aria-describedby="@(Error("Rol") != null ? "Rol-error" : null)">
+            <legend>Rol <span class="cp-req" aria-hidden="true">*</span></legend>
+            <div class="us-roles">
+                @foreach (var (valor, texto, descripcion) in Roles.Asignables)
+                {
+                    <input type="radio" class="us-radio" name="Rol" id="rol-@valor" value="@valor" checked="@(Model.Rol == valor)" />
+                    <label for="rol-@valor"><strong>@texto</strong><span>@descripcion</span></label>
+                }
+            </div>
+            @if (Error("Rol") is string eRol)
+            {
+                <p class="cp-error" id="Rol-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @eRol</p>
+            }
+        </fieldset>
+
+        <div class="cp-campo">
+            <label for="SedeId">Sede donde trabaja <span class="cp-req" aria-hidden="true">*</span></label>
+            <select id="SedeId" name="SedeId" required aria-required="true"
+                    aria-invalid="@(Error("SedeId") != null ? "true" : null)"
+                    aria-describedby="@Describe("SedeId", "SedeId-ayuda")">
+                <option value="">Elige la sede</option>
+                @foreach (var s in Model.Sedes)
+                {
+                    <option value="@s.Id" selected="@(Model.SedeId == s.Id)">@s.Nombre</option>
+                }
+            </select>
+            <p class="cp-ayuda" id="SedeId-ayuda">Solo verá y moverá la mercadería de esta sede.</p>
+            @if (Error("SedeId") is string eSede)
+            {
+                <p class="cp-error" id="SedeId-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @eSede</p>
+            }
+        </div>
+
+        @if (!esNuevo)
+        {
+            <div class="us-estado @(Model.Activo ? null : "apagado")" id="cajaEstado">
+                <input type="checkbox" id="Activo" name="Activo" value="true" checked="@Model.Activo" aria-describedby="Activo-ayuda" />
+                <div>
+                    <label for="Activo">Cuenta activa</label>
+                    <p id="Activo-ayuda">Si la desactivas, no podrá entrar y su sesión abierta se cerrará. Puedes volver a activarla cuando quieras.</p>
+                </div>
+            </div>
+            <input type="hidden" name="Activo" value="false" />
+        }
+        else
+        {
+            <input type="hidden" name="Activo" value="true" />
+
+            <hr class="us-separador" />
+            <h2 class="us-subtitulo">Contraseña inicial</h2>
+            <p class="cp-nota">Pásasela a la persona en privado. Después podrá cambiarla desde Mi perfil.</p>
+
+            <div class="cp-campo">
+                <label for="Contrasena">Contraseña <span class="cp-req" aria-hidden="true">*</span></label>
+                <div class="cp-clave">
+                    <input id="Contrasena" name="Contrasena" type="password" autocomplete="new-password" maxlength="72"
+                           required aria-required="true"
+                           aria-invalid="@(Error("Contrasena") != null ? "true" : null)"
+                           aria-describedby="@Describe("Contrasena", "Contrasena-ayuda")" />
+                    <button type="button" class="cp-clave-ver" aria-controls="Contrasena" aria-pressed="false" aria-label="Mostrar contraseña"><i class="bi bi-eye" aria-hidden="true"></i></button>
+                </div>
+                <p class="cp-ayuda" id="Contrasena-ayuda">Mínimo 8 caracteres, distinta del usuario.</p>
+                @if (Error("Contrasena") is string eClave)
+                {
+                    <p class="cp-error" id="Contrasena-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @eClave</p>
+                }
+            </div>
+
+            <div class="cp-campo">
+                <label for="ConfirmarContrasena">Repite la contraseña <span class="cp-req" aria-hidden="true">*</span></label>
+                <div class="cp-clave">
+                    <input id="ConfirmarContrasena" name="ConfirmarContrasena" type="password" autocomplete="new-password" maxlength="72"
+                           required aria-required="true"
+                           aria-invalid="@(Error("ConfirmarContrasena") != null ? "true" : null)"
+                           aria-describedby="@Describe("ConfirmarContrasena")" />
+                    <button type="button" class="cp-clave-ver" aria-controls="ConfirmarContrasena" aria-pressed="false" aria-label="Mostrar contraseña"><i class="bi bi-eye" aria-hidden="true"></i></button>
+                </div>
+                @if (Error("ConfirmarContrasena") is string eConfirmar)
+                {
+                    <p class="cp-error" id="ConfirmarContrasena-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @eConfirmar</p>
+                }
+            </div>
+        }
+
+        <div class="cp-botones">
+            <a class="btn-g-outline" asp-action="Index">Cancelar</a>
+            <button type="submit" class="btn-g-primary" id="btnGuardar">
+                <i class="bi bi-check-lg" aria-hidden="true"></i> @(esNuevo ? "Crear cuenta" : "Guardar cambios")
+            </button>
+        </div>
+    </form>
+</div>
+
+@if (!esNuevo && Model.Activo)
+{
+    <div class="modal fade cp-modal" id="modalDesactivar" tabindex="-1" aria-labelledby="tituloDesactivar" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-body">
+                    <div class="cp-modal-icono" aria-hidden="true"><i class="bi bi-person-slash"></i></div>
+                    <h2 id="tituloDesactivar">¿Desactivar la cuenta de @Model.Nombre?</h2>
+                    <p>No podrá entrar al sistema y su sesión abierta se cerrará. Sus ventas y entradas se conservan.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-g-outline" data-bs-dismiss="modal" id="btnCancelarDesactivar">Cancelar</button>
+                    <button type="button" class="btn-g-danger" id="btnConfirmarDesactivar">Sí, desactivar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@await Html.PartialAsync("~/Views/Shared/_MostrarContrasena.cshtml")
+
+@section Scripts {
+    <script>
+        document.getElementById('resumenErrores')?.focus();
+
+        const form = document.getElementById('formUsuario');
+        const btnGuardar = document.getElementById('btnGuardar');
+        const contenidoGuardar = btnGuardar.innerHTML;
+        const inputUsuario = document.getElementById('NombreUsuario');
+
+        // Al crear, sugiere el usuario a partir del nombre (nombre.apellido) mientras no lo hayan escrito a mano
+        const inputNombre = document.getElementById('Nombre');
+        if (@Json.Serialize(Model.Id == null) && !inputUsuario.value) {
+            let escritoAMano = false;
+            inputUsuario.addEventListener('input', () => escritoAMano = true);
+            inputNombre.addEventListener('input', () => {
+                if (escritoAMano) return;
+                const partes = inputNombre.value.normalize('NFD').replace(/[̀-ͯ]/g, '')
+                    .toLowerCase().replace(/[^a-z0-9 ]/g, '').trim().split(/\s+/).filter(Boolean);
+                inputUsuario.value = partes.slice(0, 2).join('.').slice(0, 50);
+            });
+        }
+
+        // Desactivar pide confirmación
+        const casilla = document.getElementById('Activo');
+        const modal = document.getElementById('modalDesactivar');
+        let confirmado = false;
+        casilla?.addEventListener('change', () =>
+            document.getElementById('cajaEstado').classList.toggle('apagado', !casilla.checked));
+
+        form.addEventListener('submit', e => {
+            if (modal && !casilla.checked && !confirmado) {
+                e.preventDefault();
+                bootstrap.Modal.getOrCreateInstance(modal).show();
+                return;
+            }
+            btnGuardar.disabled = true;
+            btnGuardar.innerHTML = '<span class="cp-spinner" aria-hidden="true"></span> Guardando…';
+        });
+        if (modal) {
+            modal.addEventListener('shown.bs.modal', () => document.getElementById('btnCancelarDesactivar').focus());
+            document.getElementById('btnConfirmarDesactivar').addEventListener('click', () => {
+                confirmado = true;
+                bootstrap.Modal.getInstance(modal).hide();
+                form.requestSubmit();
+            });
+        }
+        window.addEventListener('pageshow', () => {
+            btnGuardar.disabled = false;
+            btnGuardar.innerHTML = contenidoGuardar;
+        });
+    </script>
+}

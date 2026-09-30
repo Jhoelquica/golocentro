@@ -1,0 +1,264 @@
+@using GestionAlmacen_Golocentro.ViewModels
+@model SedeFormViewModel
+@{
+    ViewData["Title"] = Model.EsNueva ? "Nueva sede" : "Editar sede";
+
+    string? Error(string campo) => ViewData.ModelState[campo]?.Errors.FirstOrDefault()?.ErrorMessage;
+    string? Describe(string campo, string? extra = null)
+    {
+        var ids = new[] { extra, Error(campo) != null ? campo + "-error" : null }.Where(x => x != null);
+        var valor = string.Join(" ", ids);
+        return valor.Length == 0 ? null : valor;
+    }
+    var errores = ViewData.ModelState
+        .Where(kv => kv.Value!.Errors.Count > 0)
+        .SelectMany(kv => kv.Value!.Errors.Select(e => (Campo: kv.Key, e.ErrorMessage)))
+        .ToList();
+    var campos = new[]
+    {
+        (Nombre: "Nombre", Etiqueta: "Nombre de la sede", Req: true, Max: 100, Tipo: "text", Valor: Model.Nombre, Ayuda: "", Ejemplo: "Sede Principal"),
+        (Nombre: "Direccion", Etiqueta: "Dirección", Req: true, Max: 200, Tipo: "text", Valor: Model.Direccion, Ayuda: "", Ejemplo: "Jr. Los Álamos 123, Ayacucho"),
+        (Nombre: "Ciudad", Etiqueta: "Ciudad", Req: true, Max: 80, Tipo: "text", Valor: Model.Ciudad, Ayuda: "", Ejemplo: "Huamanga"),
+        (Nombre: "Telefono", Etiqueta: "Teléfono de la sede", Req: false, Max: 15, Tipo: "tel", Valor: Model.Telefono,
+            Ayuda: Model.Negocio.Telefono == null ? "Si lo dejas vacío, la nota no muestra teléfono." : $"Si lo dejas vacío, sale el del negocio ({Model.Negocio.Telefono}).",
+            Ejemplo: "066 312345")
+    };
+}
+
+@await Html.PartialAsync("~/Views/Shared/_EstilosGestion.cshtml")
+
+<style>
+    .ng-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 640px) 340px;
+        gap: 20px;
+        align-items: start;
+    }
+
+    @@media (max-width: 900px) {
+        .ng-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .ng-opcion {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        padding: 12px 14px;
+        border: 1px solid var(--g-border);
+        border-radius: 10px;
+        margin-bottom: 1rem;
+    }
+
+        .ng-opcion input {
+            width: 22px;
+            height: 22px;
+            margin-top: 1px;
+            accent-color: var(--g-teal);
+            flex: none;
+        }
+
+        .ng-opcion label {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--g-text);
+            cursor: pointer;
+        }
+
+        .ng-opcion p {
+            margin: 2px 0 0;
+            font-size: 13px;
+            color: var(--g-muted);
+        }
+
+    .ng-borrar {
+        margin-top: 1.5rem;
+        padding-top: 1.25rem;
+        border-top: 1px solid var(--g-border);
+    }
+
+        .ng-borrar h2 {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--g-danger-text);
+            margin: 0 0 4px;
+        }
+
+        .ng-borrar p {
+            font-size: 13px;
+            color: var(--g-muted);
+            margin: 0 0 10px;
+        }
+
+    .ng-peligro {
+        color: var(--g-danger-text) !important;
+    }
+
+        .ng-peligro:hover {
+            border-color: var(--g-danger-text) !important;
+        }
+
+    .ng-vista {
+        background: #E9EEF3;
+        border-radius: 14px;
+        padding: 16px 12px 20px;
+    }
+
+        .ng-vista h2 {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--g-muted);
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            text-align: center;
+            margin: 0 0 12px;
+        }
+</style>
+
+<div class="cp-page">
+    <a class="cp-volver" asp-action="Index"><i class="bi bi-arrow-left" aria-hidden="true"></i> Datos del negocio</a>
+    <div class="cp-header">
+        <div>
+            <h1><i class="bi @(Model.EsNueva ? "bi-plus-circle" : "bi-geo-alt")" aria-hidden="true"></i> @(Model.EsNueva ? "Nueva sede" : "Editar sede")</h1>
+            <p>@(Model.EsNueva ? "Otro local o almacén del negocio. Después le agregas sus zonas y le asignas personal." : Model.Nombre)</p>
+        </div>
+        @if (!Model.EsNueva)
+        {
+            <a class="btn-g-outline" asp-action="Zonas" asp-route-id="@Model.Id"><i class="bi bi-grid-3x3-gap" aria-hidden="true"></i> Zonas de la sede</a>
+        }
+    </div>
+
+    @if (TempData["Error"] is string errorAviso)
+    {
+        <div class="cp-aviso error" role="alert">
+            <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+            <span>@errorAviso</span>
+            <button type="button" aria-label="Cerrar mensaje" onclick="this.parentElement.remove()"><i class="bi bi-x" aria-hidden="true"></i></button>
+        </div>
+    }
+
+    @if (errores.Count > 0)
+    {
+        <div class="cp-resumen" role="alert" tabindex="-1" id="resumenErrores" aria-labelledby="resumenTitulo">
+            <h2 id="resumenTitulo">Revisa estos datos antes de guardar:</h2>
+            <ul>
+                @foreach (var e in errores)
+                {
+                    <li><a href="#@e.Campo">@e.ErrorMessage</a></li>
+                }
+            </ul>
+        </div>
+    }
+
+    <div class="ng-grid">
+        <form class="cp-form-card" method="post" asp-action="@(Model.EsNueva ? "NuevaSede" : "Sede")" asp-route-id="@(Model.EsNueva ? null : Model.Id)" novalidate>
+            <p class="cp-nota">Los campos con <span class="cp-req" aria-hidden="true">*</span><span class="visually-hidden">asterisco</span> son obligatorios.</p>
+            @foreach (var c in campos)
+            {
+                var ayudaId = string.IsNullOrEmpty(c.Ayuda) ? null : c.Nombre + "-ayuda";
+                <div class="cp-campo">
+                    <label for="@c.Nombre">
+                        @c.Etiqueta
+                        @if (c.Req)
+                        {
+                            <span class="cp-req" aria-hidden="true">*</span>
+                        }
+                        else
+                        {
+                            <span class="cp-opcional">(opcional)</span>
+                        }
+                    </label>
+                    <input id="@c.Nombre" name="@c.Nombre" data-vista="@(c.Nombre == "Nombre" ? "Sede" : null)" type="@c.Tipo" value="@c.Valor" maxlength="@c.Max"
+                           placeholder="Ej.: @c.Ejemplo" autocomplete="off"
+                           required="@c.Req" aria-required="@(c.Req ? "true" : null)"
+                           aria-invalid="@(Error(c.Nombre) != null ? "true" : null)"
+                           aria-describedby="@Describe(c.Nombre, ayudaId)" />
+                    @if (ayudaId != null)
+                    {
+                        <p class="cp-ayuda" id="@ayudaId">@c.Ayuda</p>
+                    }
+                    @if (Error(c.Nombre) is string err)
+                    {
+                        <p class="cp-error" id="@(c.Nombre)-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @err</p>
+                    }
+                </div>
+            }
+            @if (Model.EsNueva)
+            {
+                <div class="ng-opcion">
+                    <input type="checkbox" id="CrearRecepcion" name="CrearRecepcion" value="true" checked="@Model.CrearRecepcion"
+                           aria-describedby="@Describe("CrearRecepcion", "CrearRecepcion-ayuda")" />
+                    <div>
+                        <label for="CrearRecepcion">Crear la zona R-01 de Recepción</label>
+                        <p id="CrearRecepcion-ayuda">Donde se deja lo que llega antes de ordenarlo. Con ella ya se pueden registrar entradas en la sede.</p>
+                        @if (Error("CrearRecepcion") is string eRec)
+                        {
+                            <p class="cp-error" id="CrearRecepcion-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @eRec</p>
+                        }
+                    </div>
+                </div>
+                <input type="hidden" name="CrearRecepcion" value="false" />
+            }
+            <div class="cp-botones">
+                <a class="btn-g-outline" asp-action="Index">Cancelar</a>
+                <button type="submit" class="btn-g-primary"><i class="bi bi-check-lg" aria-hidden="true"></i> @(Model.EsNueva ? "Crear sede" : "Guardar sede")</button>
+            </div>
+
+            @if (!Model.EsNueva)
+            {
+                <div class="ng-borrar">
+                    <h2>Eliminar la sede</h2>
+                    @if (Model.MotivoNoEliminar is string motivo)
+                    {
+                        <p>No se puede eliminar: @motivo</p>
+                    }
+                    else
+                    {
+                        <p>Para una sede creada por error. Se borran también sus zonas (están vacías).</p>
+                        <button type="button" class="btn-g-outline ng-peligro" data-bs-toggle="modal" data-bs-target="#modalEliminarSede">
+                            <i class="bi bi-trash3" aria-hidden="true"></i> Eliminar sede
+                        </button>
+                    }
+                </div>
+            }
+        </form>
+
+        <aside class="ng-vista" aria-labelledby="tituloVista">
+            <h2 id="tituloVista">Así sale en la nota</h2>
+            @await Html.PartialAsync("_VistaPreviaNota", (Model.Negocio, Model.Nombre ?? "", Model.Direccion, Model.Ciudad, Model.Telefono, "Telefono", Model.Negocio.Telefono))
+        </aside>
+    </div>
+</div>
+
+@if (!Model.EsNueva && Model.MotivoNoEliminar == null)
+{
+    <div class="modal fade cp-modal" id="modalEliminarSede" tabindex="-1" aria-labelledby="tituloEliminarSede" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="post" asp-action="EliminarSede" asp-route-id="@Model.Id">
+                    <div class="modal-body">
+                        <div class="cp-modal-icono" aria-hidden="true"><i class="bi bi-trash3"></i></div>
+                        <h2 id="tituloEliminarSede">¿Eliminar la sede @Model.Nombre?</h2>
+                        <p>Se borran la sede y sus zonas. Esta acción no se puede deshacer.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn-g-outline" data-bs-dismiss="modal" id="btnCancelarEliminarSede">Cancelar</button>
+                        <button type="submit" class="btn-g-danger">Sí, eliminar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}
+
+@await Html.PartialAsync("_ScriptVistaPrevia")
+
+@section Scripts {
+    <script>
+        document.getElementById('resumenErrores')?.focus();
+        // En una acción que no se deshace el foco inicial va a "Cancelar"
+        document.getElementById('modalEliminarSede')?.addEventListener('shown.bs.modal',
+            () => document.getElementById('btnCancelarEliminarSede').focus());
+    </script>
+}

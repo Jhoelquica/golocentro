@@ -1,0 +1,104 @@
+@using System.Globalization
+@using GestionAlmacen_Golocentro.ViewModels
+@model ReporteProductosViewModel
+@{
+    ViewData["Title"] = "Productos más vendidos";
+    var inv = CultureInfo.InvariantCulture;
+    string Soles(decimal n) => "S/ " + n.ToString("N2", inv);
+    var f = Model.Filtro;
+    var lider = Model.Filas.FirstOrDefault();
+}
+
+@await Html.PartialAsync("_EstilosReporte")
+
+<div class="cp-page rp-page">
+    <a class="cp-volver" asp-action="Index"><i class="bi bi-arrow-left" aria-hidden="true"></i> Reportes</a>
+    <div class="cp-header">
+        <div>
+            <h1><i class="bi bi-trophy" aria-hidden="true"></i> Productos más vendidos</h1>
+            <p>@f.SedeNombre · @f.Periodo</p>
+        </div>
+    </div>
+
+    @await Html.PartialAsync("_Filtro", f)
+
+    <div class="rp-kpis">
+        <div class="rp-kpi principal">
+            <div class="rp-kpi-etiqueta">Importe vendido</div>
+            <div class="rp-kpi-valor">@Soles(Model.Importe)</div>
+            <div class="rp-kpi-sub">antes de descuentos de la nota</div>
+        </div>
+        <div class="rp-kpi">
+            <div class="rp-kpi-etiqueta">Unidades</div>
+            <div class="rp-kpi-valor">@Model.Unidades.ToString("N0", inv)</div>
+            <div class="rp-kpi-sub">de @Model.Filas.Count @(Model.Filas.Count == 1 ? "producto" : "productos")</div>
+        </div>
+        <div class="rp-kpi">
+            <div class="rp-kpi-etiqueta">El que más vende</div>
+            <div class="rp-kpi-valor" style="font-size:20px">@(lider?.Nombre ?? "—")</div>
+            <div class="rp-kpi-sub">@(lider == null ? "sin ventas" : (lider.Porcentaje * 100).ToString("0", inv) + "% del importe")</div>
+        </div>
+    </div>
+
+    <section class="rp-seccion" aria-labelledby="tituloRanking">
+        <div class="rp-seccion-cab">
+            <h2 id="tituloRanking">Ranking por importe</h2>
+            <p>Solo ventas emitidas; las anuladas no cuentan</p>
+        </div>
+        @if (Model.Filas.Count == 0)
+        {
+            <div class="cp-vacio">
+                <i class="bi bi-trophy" aria-hidden="true"></i>
+                No hay productos vendidos en este periodo.
+            </div>
+        }
+        else
+        {
+            <div class="cp-tabla-wrap">
+                <table class="cp-tabla">
+                    <thead>
+                        <tr>
+                            <th scope="col" class="rp-num">#</th>
+                            <th scope="col">Producto</th>
+                            <th scope="col" class="rp-num">Cantidad</th>
+                            <th scope="col" class="rp-num">Importe</th>
+                            <th scope="col">Parte del importe</th>
+                            <th scope="col" class="rp-num">En ventas</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (var i = 0; i < Model.Filas.Count; i++)
+                        {
+                            var p = Model.Filas[i];
+                            <tr>
+                                <td class="rp-num">@(i + 1)</td>
+                                <td>
+                                    <div class="cp-nombre">@p.Nombre</div>
+                                    <div class="cp-sub">@p.Codigo</div>
+                                </td>
+                                <td class="rp-num">@p.Cantidad.ToString("N0", inv) <span class="cp-sub">@p.Unidad</span></td>
+                                <td class="rp-num">@Soles(p.Importe)</td>
+                                <td>
+                                    <span class="rp-proporcion">
+                                        <span><i style="width:@((p.Porcentaje * 100).ToString("0.#", inv))%"></i></span>
+                                        <span>@((p.Porcentaje * 100).ToString("0", inv))%</span>
+                                    </span>
+                                </td>
+                                <td class="rp-num">@p.Ventas</td>
+                            </tr>
+                        }
+                        <tr class="rp-total">
+                            <td></td>
+                            <td>Total</td>
+                            <td class="rp-num">@Model.Unidades.ToString("N0", inv)</td>
+                            <td class="rp-num">@Soles(Model.Importe)</td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="rp-nota-pie">El importe es cantidad × precio cobrado. Los descuentos se hacen a la nota completa, por eso este total puede ser un poco mayor que el del reporte de ventas.</p>
+        }
+    </section>
+</div>

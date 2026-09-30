@@ -1,5 +1,6 @@
-﻿using GestionAlmacen_Golocentro.Data;
-using GestionAlmacen_Golocentro.Models;
+using GestionAlmacen_Golocentro.Data;
+using GestionAlmacen_Golocentro.Helpers;
+using GestionAlmacen_Golocentro.Services;
 using GestionAlmacen_Golocentro.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -7,9 +8,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GestionAlmacen_Golocentro.Controllers
 {
+    // Las alertas se sincronizan solas (ver AlertasStock); aquí solo se muestran.
     [Authorize]
     public class AlertaController : Controller
     {
+        private const int DiasResueltas = 7;
         private readonly AppDbContext _context;
 
         public AlertaController(AppDbContext context)
@@ -17,169 +20,87 @@ namespace GestionAlmacen_Golocentro.Controllers
             _context = context;
         }
 
-        // GET: Alerta/Index
-        public async Task<IActionResult> Index(int? pagina, int tamanoPagina = 10)
+        public async Task<IActionResult> Index()
         {
-            string sedeIdClaim = User.FindFirst("SedeId")?.Value;
-            int? sedeId = string.IsNullOrEmpty(sedeIdClaim) ? (int?)null : int.Parse(sedeIdClaim);
+            await AlertasStock.Sincronizar(_context);
 
-            var query = _context.Alerta
-                .Include(a => a.IdProductoNavigation)
-                .Include(a => a.IdSedeNavigation)
-                .Where(a => a.Estado == "pendiente")
-                .AsQueryable();
+            var sedeId = User.SedeId();
+            var hoy = DateOnly.FromDateTime(DateTime.Today);
 
-            if (sedeId.HasValue)
-                query = query.Where(a => a.IdSede == sedeId.Value);
-
-            int total = await query.CountAsync();
-            int paginaActual = pagina ?? 1;
-            int totalPaginas = (int)Math.Ceiling(total / (double)tamanoPagina);
-
-            var alertas = await query
-                .OrderByDescending(a => a.FechaGenerada)
-                .Skip((paginaActual - 1) * tamanoPagina)
-                .Take(tamanoPagina)
-                .Select(a => new AlertaViewModel
-                {
-                    IdAlerta = a.IdAlerta,
-                    Tipo = a.Tipo,
-                    Mensaje = a.Mensaje,
-                    Fecha = a.FechaGenerada,
-                    ProductoNombre = a.IdProductoNavigation.Nombre,
-                    SedeNombre = a.IdSedeNavigation.Nombre
-                })
+            var pendientes = await _context.Alerta
+                .Where(a => a.Estado == AlertasStock.Pendiente && (sedeId == null || a.IdSede == sedeId))
+                .Select(a => new AlertaPendiente(
+                    a.Tipo,
+                    a.IdProducto,
+                    a.IdSede,
+                    a.FechaGenerada,
+                    a.IdSedeNavigation.Nombre,
+                    a.IdProductoNavigation.Codigo,
+                    a.IdProductoNavigation.Nombre,
+                    a.IdProductoNavigation.UnidadMedida,
+                    a.IdProductoNavigation.StockMinimo,
+                    a.IdProductoNavigation.FechaVencimiento,
+                    a.IdProductoNavigation.Lote))
                 .ToListAsync();
 
-            ViewBag.PaginaActual = paginaActual;
-            ViewBag.TotalPaginas = totalPaginas;
-            ViewBag.SedeNombre = sedeId.HasValue ? (await _context.Sedes.FindAsync(sedeId.Value))?.Nombre : "Todas las sedes";
-            return View(alertas);
+            // Stock y zonas de hoy de los productos con alerta
+            var ids = pendientes.Select(a => a.IdProducto).Distinct().ToList();
+            var zonas = await _context.ProductoUbicacions
+                .Where(pu => ids.Contains(pu.IdProducto) && pu.CantidadActual > 0)
+                .Select(pu => new { pu.IdProducto, pu.IdUbicacionNavigation.IdSede, pu.IdUbicacionNavigation.CodigoEstante, pu.CantidadActual })
+                .ToListAsync();
+
+            AlertaItem Item(AlertaPendiente a)
+            {
+                var enSede = zonas.Where(z => z.IdProducto == a.IdProducto && z.IdSede == a.IdSede).OrderBy(z => z.CodigoEstante).ToList();
+                var stock = enSede.Sum(z => z.CantidadActual);
+                return new AlertaItem(a.IdProducto, a.Codigo, a.Nombre, a.Unidad, a.Sede, stock, a.StockMinimo,
+                    EstadoStock.De(stock, a.StockMinimo), a.FechaVencimiento,
+                    a.FechaVencimiento is DateOnly v ? v.DayNumber - hoy.DayNumber : null, a.Lote,
+                    string.Join(", ", enSede.Select(z => $"{z.CodigoEstante} ({z.CantidadActual})")), a.FechaGenerada);
+            }
+
+            var modelo = new AlertasViewModel
+            {
+                SedeNombre = sedeId == null ? "Todas las sedes" : pendientes.FirstOrDefault()?.Sede
+                    ?? (await _context.Sedes.Where(s => s.IdSede == sedeId).Select(s => s.Nombre).FirstOrDefaultAsync()) ?? "",
+                VariasSedes = sedeId == null && await _context.Sedes.CountAsync() > 1,
+                PuedeVerKardex = User.IsInRole("duena") || User.IsInRole("encargada"),
+                // Lo agotado primero y, entre lo bajo, lo que está más lejos de su mínimo
+                Reponer = pendientes.Where(a => a.Tipo == AlertasStock.StockMinimo)
+                    .Select(a => Item(a))
+                    .OrderBy(i => i.Stock)
+                    .ThenBy(i => i.Nombre)
+                    .ToList(),
+                Vencer = pendientes.Where(a => a.Tipo == AlertasStock.Vencimiento)
+                    .Select(a => Item(a))
+                    .OrderBy(i => i.Dias)
+                    .ToList()
+            };
+
+            var desde = DateTime.Now.AddDays(-DiasResueltas);
+            modelo.Resueltas = await _context.Alerta
+                .Where(a => a.Estado == AlertasStock.Atendida && a.FechaAtendida >= desde && (sedeId == null || a.IdSede == sedeId))
+                .OrderByDescending(a => a.FechaAtendida)
+                .Take(20)
+                .Select(a => new AlertaResuelta(a.Tipo, a.Mensaje, a.FechaGenerada, a.FechaAtendida!.Value, a.IdSedeNavigation.Nombre))
+                .ToListAsync();
+
+            return View(modelo);
         }
 
+        // El layout lo pide en cada página para el globito del menú; de paso mantiene las alertas al día
         [HttpGet]
-        public IActionResult ConteoActivas()
+        public async Task<IActionResult> ConteoActivas()
         {
-            var sedeIdClaim = User.FindFirst("SedeId")?.Value;
-            int? idSede = string.IsNullOrEmpty(sedeIdClaim) ? (int?)null : int.Parse(sedeIdClaim);
-            var total = _context.Alerta.Count(a =>
-                (!idSede.HasValue || a.IdSede == idSede.Value) && a.Estado == "pendiente");
+            await AlertasStock.SincronizarSiToca(_context);
+            var sedeId = User.SedeId();
+            var total = await _context.Alerta.CountAsync(a => a.Estado == AlertasStock.Pendiente && (sedeId == null || a.IdSede == sedeId));
             return Json(new { total });
         }
 
-        // POST: Alerta/GenerarAlertas
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> GenerarAlertas()
-        {
-            string sedeIdClaim = User.FindFirst("SedeId")?.Value;
-            int? sedeId = string.IsNullOrEmpty(sedeIdClaim) ? (int?)null : int.Parse(sedeIdClaim);
-
-            var productosConUbicaciones = await _context.Productos
-                .Include(p => p.ProductoUbicacions)
-                    .ThenInclude(pu => pu.IdUbicacionNavigation)
-                .ToListAsync();
-
-            foreach (var producto in productosConUbicaciones)
-            {
-                var sedesDelProducto = producto.ProductoUbicacions
-                    .Select(pu => pu.IdUbicacionNavigation.IdSede)
-                    .Distinct();
-
-                // Stock real por sede: suma de ProductoUbicacion.CantidadActual
-                // agrupado por sede (fuente de verdad; Producto.StockActual ya no se usa aquí).
-                var stockPorSede = producto.ProductoUbicacions
-                    .GroupBy(pu => pu.IdUbicacionNavigation.IdSede)
-                    .ToDictionary(g => g.Key, g => g.Sum(pu => pu.CantidadActual));
-
-                foreach (int sedeProducto in sedesDelProducto)
-                {
-                    if (sedeId.HasValue && sedeProducto != sedeId.Value)
-                        continue;
-
-                    int stockEnSede = stockPorSede.GetValueOrDefault(sedeProducto, 0);
-
-                    // ---- Alerta por stock mínimo ----
-                    var alertaStockExistente = _context.Alerta.FirstOrDefault(a =>
-                        a.IdProducto == producto.IdProducto &&
-                        a.Tipo == "stock_minimo" &&
-                        a.Estado == "pendiente" &&
-                        a.IdSede == sedeProducto);
-
-                    if (stockEnSede <= producto.StockMinimo)
-                    {
-                        if (alertaStockExistente == null)
-                        {
-                            var alerta = new Alertum
-                            {
-                                Mensaje = $"Stock bajo: {producto.Nombre} ({stockEnSede} unidades, mínimo {producto.StockMinimo})",
-                                FechaGenerada = DateTime.Now,
-                                Tipo = "stock_minimo",
-                                IdProducto = producto.IdProducto,
-                                IdSede = sedeProducto,
-                                Estado = "pendiente"
-                            };
-                            _context.Alerta.Add(alerta);
-                        }
-                        else
-                        {
-                            // Ya existe pendiente: refrescar el mensaje con el stock actual,
-                            // sin tocar FechaGenerada ni duplicar.
-                            alertaStockExistente.Mensaje = $"Stock bajo: {producto.Nombre} ({stockEnSede} unidades, mínimo {producto.StockMinimo})";
-                        }
-                    }
-                    else if (alertaStockExistente != null)
-                    {
-                        // El stock se recuperó: la alerta pendiente ya no aplica.
-                        alertaStockExistente.Estado = "atendida";
-                        alertaStockExistente.FechaAtendida = DateTime.Now;
-                    }
-
-                    // ---- Alerta por vencimiento próximo ----
-                    var alertaVencimientoExistente = _context.Alerta.FirstOrDefault(a =>
-                        a.IdProducto == producto.IdProducto &&
-                        a.Tipo == "vencimiento" &&
-                        a.Estado == "pendiente" &&
-                        a.IdSede == sedeProducto);
-
-                    bool vencimientoProximo = false;
-                    if (producto.FechaVencimiento.HasValue)
-                    {
-                        var diasRestantes = producto.FechaVencimiento.Value.ToDateTime(TimeOnly.MinValue) - DateTime.Today;
-                        vencimientoProximo = diasRestantes.TotalDays <= 30;
-                    }
-
-                    if (vencimientoProximo)
-                    {
-                        if (alertaVencimientoExistente == null)
-                        {
-                            var alerta = new Alertum
-                            {
-                                Mensaje = $"Próximo a vencer: {producto.Nombre} (lote {producto.Lote}) – {producto.FechaVencimiento:dd/MM/yyyy}",
-                                FechaGenerada = DateTime.Now,
-                                Tipo = "vencimiento",
-                                IdProducto = producto.IdProducto,
-                                IdSede = sedeProducto,
-                                Estado = "pendiente"
-                            };
-                            _context.Alerta.Add(alerta);
-                        }
-                        else
-                        {
-                            alertaVencimientoExistente.Mensaje = $"Próximo a vencer: {producto.Nombre} (lote {producto.Lote}) – {producto.FechaVencimiento:dd/MM/yyyy}";
-                        }
-                    }
-                    else if (alertaVencimientoExistente != null)
-                    {
-                        alertaVencimientoExistente.Estado = "atendida";
-                        alertaVencimientoExistente.FechaAtendida = DateTime.Now;
-                    }
-                }
-            }
-
-            await _context.SaveChangesAsync();
-            TempData["Mensaje"] = "Alertas actualizadas correctamente.";
-            return RedirectToAction("Index");
-        }
+        private record AlertaPendiente(
+            string Tipo, int IdProducto, int IdSede, DateTime FechaGenerada, string Sede, string Codigo, string Nombre,
+            string Unidad, int StockMinimo, DateOnly? FechaVencimiento, string? Lote);
     }
 }

@@ -1,0 +1,282 @@
+@using GestionAlmacen_Golocentro.ViewModels
+@model ZonasSedeViewModel
+@{
+    ViewData["Title"] = $"Zonas de {Model.SedeNombre}";
+    string? Error(string campo) => ViewData.ModelState[campo]?.Errors.FirstOrDefault()?.ErrorMessage;
+    var nueva = Model.Nueva;
+    var hayRecepcion = Model.Zonas.Any(z => z.Recepcion);
+    var sinDibujar = Model.Zonas.Count(z => !z.Dibujada);
+}
+
+@await Html.PartialAsync("~/Views/Shared/_EstilosGestion.cshtml")
+
+<style>
+    .zn-page {
+        max-width: 1000px;
+    }
+
+    .zn-alta {
+        background: var(--g-white);
+        border: 1px solid var(--g-border);
+        border-radius: 14px;
+        padding: 14px 16px;
+        margin-bottom: 1rem;
+    }
+
+        .zn-alta h2 {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--g-navy);
+            margin: 0 0 10px;
+        }
+
+    .zn-campos {
+        display: grid;
+        grid-template-columns: 140px minmax(0, 1fr) 170px auto;
+        gap: 10px;
+        align-items: start;
+    }
+
+    @@media (max-width: 760px) {
+        .zn-campos {
+            grid-template-columns: 1fr 1fr;
+        }
+
+            .zn-campos .zn-desc {
+                grid-column: 1 / -1;
+            }
+    }
+
+    .zn-campos .cp-campo {
+        margin: 0;
+    }
+
+    .zn-campos select {
+        width: 100%;
+        min-height: 44px;
+        padding: 10px 12px;
+        border: 1px solid var(--g-input-border);
+        border-radius: 8px;
+        font-size: 15px;
+        font-family: inherit;
+        color: var(--g-text);
+        background: var(--g-white);
+    }
+
+    .zn-boton {
+        padding-top: 27px;
+    }
+
+    .zn-chip {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+        .zn-chip.recepcion {
+            background: rgba(37,99,235,0.1);
+            color: #1D4ED8;
+        }
+
+        .zn-chip.almacenaje {
+            background: var(--g-bg);
+            color: var(--g-muted);
+        }
+
+    .zn-aviso {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        max-width: 760px;
+        padding: 12px 14px;
+        margin-bottom: 1rem;
+        border-radius: 10px;
+        background: rgba(245,158,11,0.12);
+        border: 1px solid rgba(245,158,11,0.4);
+        color: #78350F;
+        font-size: 14px;
+    }
+</style>
+
+<div class="cp-page zn-page">
+    <a class="cp-volver" asp-action="Index"><i class="bi bi-arrow-left" aria-hidden="true"></i> Datos del negocio</a>
+    <div class="cp-header">
+        <div>
+            <h1><i class="bi bi-grid-3x3-gap" aria-hidden="true"></i> Zonas de @Model.SedeNombre</h1>
+            <p>@Model.Zonas.Count @(Model.Zonas.Count == 1 ? "zona" : "zonas") · donde se deja la mercadería en el piso</p>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap">
+            <a class="btn-g-outline" asp-controller="Mapa" asp-action="Index" asp-route-sede="@Model.SedeId"><i class="bi bi-map" aria-hidden="true"></i> Ver el mapa</a>
+            <a class="btn-g-primary" asp-action="Plano" asp-route-id="@Model.SedeId"><i class="bi bi-bounding-box" aria-hidden="true"></i> Dibujar en el plano</a>
+        </div>
+    </div>
+
+    @if (TempData["Exito"] is string exito)
+    {
+        <div class="cp-aviso exito" role="status">
+            <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+            <span>@exito</span>
+            <button type="button" aria-label="Cerrar mensaje" onclick="this.parentElement.remove()"><i class="bi bi-x" aria-hidden="true"></i></button>
+        </div>
+    }
+    @if (TempData["Error"] is string error)
+    {
+        <div class="cp-aviso error" role="alert">
+            <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+            <span>@error</span>
+            <button type="button" aria-label="Cerrar mensaje" onclick="this.parentElement.remove()"><i class="bi bi-x" aria-hidden="true"></i></button>
+        </div>
+    }
+
+    @if (!hayRecepcion)
+    {
+        <p class="zn-aviso" role="note">
+            <i class="bi bi-info-circle" aria-hidden="true"></i>
+            <span>Esta sede no tiene zona de <strong>Recepción</strong>. Conviene crear una (por ejemplo R-01): la entrada la sugiere para lo que llega y todavía no tiene lugar.</span>
+        </p>
+    }
+    @if (sinDibujar > 0)
+    {
+        <p class="zn-aviso" role="note">
+            <i class="bi bi-pencil-square" aria-hidden="true"></i>
+            <span>
+                @sinDibujar @(sinDibujar == 1 ? "zona no está dibujada" : "zonas no están dibujadas") en el plano. Igual se pueden usar para entradas,
+                ventas y conteos; para que se vean en el mapa, <a asp-action="Plano" asp-route-id="@Model.SedeId">dibújalas en el plano</a>.
+            </span>
+        </p>
+    }
+
+    <form class="zn-alta" method="post" asp-action="AgregarZona" asp-route-id="@Model.SedeId" novalidate>
+        <h2>Agregar zona</h2>
+        <div class="zn-campos">
+            <div class="cp-campo">
+                <label for="Codigo">Código <span class="cp-req" aria-hidden="true">*</span></label>
+                <input id="Codigo" name="Codigo" type="text" value="@nueva.Codigo" maxlength="20" autocomplete="off" autocapitalize="characters"
+                       placeholder="Ej.: A-06" required aria-required="true"
+                       aria-invalid="@(Error("Codigo") != null ? "true" : null)" aria-describedby="@(Error("Codigo") != null ? "Codigo-error" : null)" />
+            </div>
+            <div class="cp-campo zn-desc">
+                <label for="Descripcion">Descripción <span class="cp-opcional">(opcional)</span></label>
+                <input id="Descripcion" name="Descripcion" type="text" value="@nueva.Descripcion" maxlength="200" autocomplete="off"
+                       placeholder="Ej.: Cuarto 2, junto a la puerta"
+                       aria-invalid="@(Error("Descripcion") != null ? "true" : null)" aria-describedby="@(Error("Descripcion") != null ? "Descripcion-error" : null)" />
+            </div>
+            <div class="cp-campo">
+                <label for="Tipo">Tipo</label>
+                <select id="Tipo" name="Tipo">
+                    <option value="@TipoZona.Almacenaje" selected="@(nueva.Tipo == TipoZona.Almacenaje)">Almacenaje</option>
+                    <option value="@TipoZona.Recepcion" selected="@(nueva.Tipo == TipoZona.Recepcion)">Recepción</option>
+                </select>
+            </div>
+            <div class="zn-boton">
+                <button type="submit" class="btn-g-primary"><i class="bi bi-plus-lg" aria-hidden="true"></i> Agregar</button>
+            </div>
+        </div>
+        @foreach (var campo in new[] { "Codigo", "Descripcion", "Tipo" })
+        {
+            if (Error(campo) is string e)
+            {
+                <p class="cp-error" id="@(campo)-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @e</p>
+            }
+        }
+    </form>
+
+    <section class="cp-panel" aria-label="Zonas de la sede">
+        @if (Model.Zonas.Count == 0)
+        {
+            <div class="cp-vacio">
+                <i class="bi bi-grid-3x3-gap" aria-hidden="true"></i>
+                Esta sede todavía no tiene zonas. Agrega la primera arriba.
+            </div>
+        }
+        else
+        {
+            <div class="cp-tabla-wrap">
+                <table class="cp-tabla">
+                    <thead>
+                        <tr>
+                            <th scope="col">Zona</th>
+                            <th scope="col">Tipo</th>
+                            <th scope="col">Mercadería</th>
+                            <th scope="col">En el plano</th>
+                            <th scope="col"><span class="visually-hidden">Acciones</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var z in Model.Zonas)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="cp-nombre">@z.Codigo</div>
+                                    <div class="cp-sub">@(z.Descripcion ?? "Sin descripción")</div>
+                                </td>
+                                <td><span class="zn-chip @(z.Recepcion ? "recepcion" : "almacenaje")">@(z.Recepcion ? "Recepción" : "Almacenaje")</span></td>
+                                <td>
+                                    @if (z.Stock > 0)
+                                    {
+                                        <span>@z.Stock @(z.Stock == 1 ? "unidad" : "unidades") · @z.Productos @(z.Productos == 1 ? "producto" : "productos")</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="cp-mov-ninguno">Vacía</span>
+                                    }
+                                </td>
+                                <td>@(z.Dibujada ? "Dibujada" : "Sin dibujar")</td>
+                                <td>
+                                    <div class="cp-acciones">
+                                        <a class="cp-icono-btn" asp-action="Zona" asp-route-id="@z.Id" aria-label="Editar la zona @z.Codigo" title="Editar">
+                                            <i class="bi bi-pencil" aria-hidden="true"></i>
+                                        </a>
+                                        @if (z.Stock == 0 && !z.TieneHistorial)
+                                        {
+                                            <button type="button" class="cp-icono-btn peligro" data-bs-toggle="modal" data-bs-target="#modalEliminar"
+                                                    data-nombre="@z.Codigo" data-url="@Url.Action("EliminarZona", new { id = z.Id })"
+                                                    aria-label="Eliminar la zona @z.Codigo" title="Eliminar">
+                                                <i class="bi bi-trash3" aria-hidden="true"></i>
+                                            </button>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+</div>
+
+<div class="modal fade cp-modal" id="modalEliminar" tabindex="-1" aria-labelledby="modalEliminarTitulo" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="post" id="formEliminar">
+                @Html.AntiForgeryToken()
+                <div class="modal-body">
+                    <div class="cp-modal-icono" aria-hidden="true"><i class="bi bi-trash3"></i></div>
+                    <h2 id="modalEliminarTitulo">¿Eliminar esta zona?</h2>
+                    <p>Se eliminará la zona <strong id="nombreEliminar"></strong>. Está vacía y no tiene historial.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-g-outline" data-bs-dismiss="modal" id="btnCancelarEliminar">Cancelar</button>
+                    <button type="submit" class="btn-g-danger">Sí, eliminar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const modalEliminar = document.getElementById('modalEliminar');
+        modalEliminar.addEventListener('show.bs.modal', e => {
+            document.getElementById('formEliminar').action = e.relatedTarget.dataset.url;
+            document.getElementById('nombreEliminar').textContent = e.relatedTarget.dataset.nombre;
+        });
+        // En una acción que no se deshace el foco inicial va a "Cancelar"
+        modalEliminar.addEventListener('shown.bs.modal', () => document.getElementById('btnCancelarEliminar').focus());
+        document.querySelector('[aria-invalid="true"]')?.focus();
+    </script>
+}

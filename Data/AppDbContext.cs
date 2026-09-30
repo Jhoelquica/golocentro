@@ -7,14 +7,12 @@ namespace GestionAlmacen_Golocentro.Data;
 
 public partial class AppDbContext : DbContext
 {
-    public AppDbContext()
-    {
-    }
-
     public AppDbContext(DbContextOptions<AppDbContext> options)
         : base(options)
     {
     }
+
+    public virtual DbSet<AjusteInventario> AjusteInventarios { get; set; }
 
     public virtual DbSet<Alertum> Alerta { get; set; }
 
@@ -22,41 +20,92 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<Cliente> Clientes { get; set; }
 
+    public virtual DbSet<DetalleAjuste> DetalleAjustes { get; set; }
+
     public virtual DbSet<DetalleMovimiento> DetalleMovimientos { get; set; }
+
+    public virtual DbSet<DetalleTraslado> DetalleTraslados { get; set; }
 
     public virtual DbSet<Evidencium> Evidencia { get; set; }
 
     public virtual DbSet<Movimiento> Movimientos { get; set; }
 
+    public virtual DbSet<Negocio> Negocios { get; set; }
+
+    public virtual DbSet<NotaVentum> NotaVenta { get; set; }
+
+    public virtual DbSet<PlanoLinea> PlanoLineas { get; set; }
+
     public virtual DbSet<Producto> Productos { get; set; }
 
     public virtual DbSet<ProductoUbicacion> ProductoUbicacions { get; set; }
 
-    public virtual DbSet<Proveedor> Proveedores { get; set; }
+    public virtual DbSet<Proveedor> Proveedors { get; set; }
 
     public virtual DbSet<Reporte> Reportes { get; set; }
 
     public virtual DbSet<Sede> Sedes { get; set; }
 
-    public virtual DbSet<Ubicacion> Ubicaciones { get; set; }
+    public virtual DbSet<Traslado> Traslados { get; set; }
+
+    public virtual DbSet<Ubicacion> Ubicacions { get; set; }
 
     public virtual DbSet<Usuario> Usuarios { get; set; }
 
-
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<AjusteInventario>(entity =>
+        {
+            entity.HasKey(e => e.IdAjuste).HasName("ajuste_inventario_pkey");
+
+            entity.ToTable("ajuste_inventario");
+
+            entity.Property(e => e.IdAjuste)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("id_ajuste");
+            entity.Property(e => e.Fecha)
+                .HasDefaultValueSql("now()")
+                .HasColumnType("timestamp(6) without time zone")
+                .HasColumnName("fecha");
+            entity.Property(e => e.IdSede).HasColumnName("id_sede");
+            entity.Property(e => e.IdUsuario).HasColumnName("id_usuario");
+            entity.Property(e => e.Motivo)
+                .HasMaxLength(20)
+                .HasColumnName("motivo");
+            entity.Property(e => e.Observaciones)
+                .HasMaxLength(200)
+                .HasColumnName("observaciones");
+
+            entity.HasOne(d => d.IdSedeNavigation).WithMany(p => p.AjusteInventarios)
+                .HasForeignKey(d => d.IdSede)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("ajuste_inventario_id_sede_fkey");
+
+            entity.HasOne(d => d.IdUsuarioNavigation).WithMany(p => p.AjusteInventarios)
+                .HasForeignKey(d => d.IdUsuario)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("ajuste_inventario_id_usuario_fkey");
+        });
+
         modelBuilder.Entity<Alertum>(entity =>
         {
-            entity.HasKey(e => e.IdAlerta).HasName("PK__Alerta__1227953E4C300724");
+            entity.HasKey(e => e.IdAlerta).HasName("alerta_pkey");
 
-            entity.Property(e => e.IdAlerta).HasColumnName("id_alerta");
+            entity.ToTable("alerta");
+
+            entity.Property(e => e.IdAlerta)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("id_alerta");
             entity.Property(e => e.Estado)
                 .HasMaxLength(15)
-                .HasDefaultValue("pendiente")
+                .HasDefaultValueSql("'pendiente'::character varying")
                 .HasColumnName("estado");
-            entity.Property(e => e.FechaAtendida).HasColumnName("fecha_atendida");
+            entity.Property(e => e.FechaAtendida)
+                .HasColumnType("timestamp(6) without time zone")
+                .HasColumnName("fecha_atendida");
             entity.Property(e => e.FechaGenerada)
-                .HasDefaultValueSql("(sysdatetime())")
+                .HasDefaultValueSql("now()")
+                .HasColumnType("timestamp(6) without time zone")
                 .HasColumnName("fecha_generada");
             entity.Property(e => e.IdProducto).HasColumnName("id_producto");
             entity.Property(e => e.IdSede).HasColumnName("id_sede");
@@ -69,27 +118,29 @@ public partial class AppDbContext : DbContext
             entity.HasOne(d => d.IdProductoNavigation).WithMany(p => p.Alerta)
                 .HasForeignKey(d => d.IdProducto)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Alerta_Producto");
+                .HasConstraintName("alerta_id_producto_fkey");
 
             entity.HasOne(d => d.IdSedeNavigation).WithMany(p => p.Alerta)
                 .HasForeignKey(d => d.IdSede)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Alerta_Sede");
+                .HasConstraintName("alerta_id_sede_fkey");
 
             entity.HasOne(d => d.IdUsuarioAtiendeNavigation).WithMany(p => p.Alerta)
                 .HasForeignKey(d => d.IdUsuarioAtiende)
-                .HasConstraintName("FK_Alerta_Usuario");
+                .HasConstraintName("alerta_id_usuario_atiende_fkey");
         });
 
         modelBuilder.Entity<Camara>(entity =>
         {
-            entity.HasKey(e => e.IdCamara).HasName("PK__Camara__CB0FB4DB70147C2C");
+            entity.HasKey(e => e.IdCamara).HasName("camara_pkey");
 
-            entity.ToTable("Camara");
+            entity.ToTable("camara");
 
-            entity.HasIndex(e => e.Codigo, "UQ__Camara__40F9A2063111D4B6").IsUnique();
+            entity.HasIndex(e => e.Codigo, "camara_codigo_key").IsUnique();
 
-            entity.Property(e => e.IdCamara).HasColumnName("id_camara");
+            entity.Property(e => e.IdCamara)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("id_camara");
             entity.Property(e => e.Codigo)
                 .HasMaxLength(50)
                 .HasColumnName("codigo");
@@ -102,23 +153,28 @@ public partial class AppDbContext : DbContext
             entity.HasOne(d => d.IdSedeNavigation).WithMany(p => p.Camaras)
                 .HasForeignKey(d => d.IdSede)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Camara_Sede");
+                .HasConstraintName("camara_id_sede_fkey");
 
             entity.HasOne(d => d.IdUbicacionNavigation).WithMany(p => p.Camaras)
                 .HasForeignKey(d => d.IdUbicacion)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Camara_Ubicacion");
+                .HasConstraintName("camara_id_ubicacion_fkey");
         });
 
         modelBuilder.Entity<Cliente>(entity =>
         {
-            entity.HasKey(e => e.IdCliente).HasName("PK__Cliente__677F38F5FBAA93A3");
+            entity.HasKey(e => e.IdCliente).HasName("cliente_pkey");
 
-            entity.ToTable("Cliente");
+            entity.ToTable("cliente");
 
-            entity.HasIndex(e => e.RucDni, "UQ__Cliente__BAE363B0F0293B86").IsUnique();
+            entity.HasIndex(e => e.RucDni, "cliente_ruc_dni_key").IsUnique();
 
-            entity.Property(e => e.IdCliente).HasColumnName("id_cliente");
+            entity.Property(e => e.IdCliente)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("id_cliente");
+            entity.Property(e => e.Celular)
+                .HasMaxLength(15)
+                .HasColumnName("celular");
             entity.Property(e => e.Contacto)
                 .HasMaxLength(100)
                 .HasColumnName("contacto");
@@ -133,45 +189,121 @@ public partial class AppDbContext : DbContext
                 .HasColumnName("ruc_dni");
         });
 
+        modelBuilder.Entity<DetalleAjuste>(entity =>
+        {
+            entity.HasKey(e => e.IdDetalle).HasName("detalle_ajuste_pkey");
+
+            entity.ToTable("detalle_ajuste");
+
+            entity.HasIndex(e => new { e.IdAjuste, e.IdProducto, e.IdUbicacion }, "uq_detalleajuste_producto").IsUnique();
+
+            entity.Property(e => e.IdDetalle)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("id_detalle");
+            entity.Property(e => e.CantidadAnterior).HasColumnName("cantidad_anterior");
+            entity.Property(e => e.CantidadNueva).HasColumnName("cantidad_nueva");
+            entity.Property(e => e.IdAjuste).HasColumnName("id_ajuste");
+            entity.Property(e => e.IdProducto).HasColumnName("id_producto");
+            entity.Property(e => e.IdUbicacion).HasColumnName("id_ubicacion");
+
+            entity.HasOne(d => d.IdAjusteNavigation).WithMany(p => p.DetalleAjustes)
+                .HasForeignKey(d => d.IdAjuste)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("detalle_ajuste_id_ajuste_fkey");
+
+            entity.HasOne(d => d.IdProductoNavigation).WithMany(p => p.DetalleAjustes)
+                .HasForeignKey(d => d.IdProducto)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("detalle_ajuste_id_producto_fkey");
+
+            entity.HasOne(d => d.IdUbicacionNavigation).WithMany(p => p.DetalleAjustes)
+                .HasForeignKey(d => d.IdUbicacion)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("detalle_ajuste_id_ubicacion_fkey");
+        });
+
         modelBuilder.Entity<DetalleMovimiento>(entity =>
         {
-            entity.HasKey(e => e.IdDetalle).HasName("PK__DetalleM__4F1332DE728D46B2");
+            entity.HasKey(e => e.IdDetalle).HasName("detalle_movimiento_pkey");
 
-            entity.ToTable("DetalleMovimiento");
+            entity.ToTable("detalle_movimiento");
 
-            entity.Property(e => e.IdDetalle).HasColumnName("id_detalle");
+            entity.Property(e => e.IdDetalle)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("id_detalle");
             entity.Property(e => e.Cantidad).HasColumnName("cantidad");
             entity.Property(e => e.IdMovimiento).HasColumnName("id_movimiento");
             entity.Property(e => e.IdProducto).HasColumnName("id_producto");
             entity.Property(e => e.IdUbicacion).HasColumnName("id_ubicacion");
             entity.Property(e => e.PrecioUnitarioSnapshot)
-                .HasColumnType("decimal(10, 2)")
+                .HasPrecision(10, 2)
                 .HasColumnName("precio_unitario_snapshot");
             entity.Property(e => e.StockAnterior).HasColumnName("stock_anterior");
 
             entity.HasOne(d => d.IdMovimientoNavigation).WithMany(p => p.DetalleMovimientos)
                 .HasForeignKey(d => d.IdMovimiento)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_DetalleMovimiento_Movimiento");
+                .HasConstraintName("detalle_movimiento_id_movimiento_fkey");
 
             entity.HasOne(d => d.IdProductoNavigation).WithMany(p => p.DetalleMovimientos)
                 .HasForeignKey(d => d.IdProducto)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_DetalleMovimiento_Producto");
+                .HasConstraintName("detalle_movimiento_id_producto_fkey");
 
             entity.HasOne(d => d.IdUbicacionNavigation).WithMany(p => p.DetalleMovimientos)
                 .HasForeignKey(d => d.IdUbicacion)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_DetalleMovimiento_Ubicacion");
+                .HasConstraintName("detalle_movimiento_id_ubicacion_fkey");
+        });
+
+        modelBuilder.Entity<DetalleTraslado>(entity =>
+        {
+            entity.HasKey(e => e.IdDetalle).HasName("detalle_traslado_pkey");
+
+            entity.ToTable("detalle_traslado");
+
+            entity.Property(e => e.IdDetalle)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("id_detalle");
+            entity.Property(e => e.Cantidad).HasColumnName("cantidad");
+            entity.Property(e => e.IdProducto).HasColumnName("id_producto");
+            entity.Property(e => e.IdTraslado).HasColumnName("id_traslado");
+            entity.Property(e => e.IdUbicacionDestino).HasColumnName("id_ubicacion_destino");
+            entity.Property(e => e.IdUbicacionOrigen).HasColumnName("id_ubicacion_origen");
+
+            entity.HasOne(d => d.IdProductoNavigation).WithMany(p => p.DetalleTraslados)
+                .HasForeignKey(d => d.IdProducto)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("detalle_traslado_id_producto_fkey");
+
+            entity.HasOne(d => d.IdTrasladoNavigation).WithMany(p => p.DetalleTraslados)
+                .HasForeignKey(d => d.IdTraslado)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("detalle_traslado_id_traslado_fkey");
+
+            entity.HasOne(d => d.IdUbicacionDestinoNavigation).WithMany(p => p.DetalleTrasladoIdUbicacionDestinoNavigations)
+                .HasForeignKey(d => d.IdUbicacionDestino)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("detalle_traslado_destino_fkey");
+
+            entity.HasOne(d => d.IdUbicacionOrigenNavigation).WithMany(p => p.DetalleTrasladoIdUbicacionOrigenNavigations)
+                .HasForeignKey(d => d.IdUbicacionOrigen)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("detalle_traslado_origen_fkey");
         });
 
         modelBuilder.Entity<Evidencium>(entity =>
         {
-            entity.HasKey(e => e.IdEvidencia).HasName("PK__Evidenci__62875FB95B67FAF0");
+            entity.HasKey(e => e.IdEvidencia).HasName("evidencia_pkey");
 
-            entity.Property(e => e.IdEvidencia).HasColumnName("id_evidencia");
+            entity.ToTable("evidencia");
+
+            entity.Property(e => e.IdEvidencia)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("id_evidencia");
             entity.Property(e => e.Fecha)
-                .HasDefaultValueSql("(sysdatetime())")
+                .HasDefaultValueSql("now()")
+                .HasColumnType("timestamp(6) without time zone")
                 .HasColumnName("fecha");
             entity.Property(e => e.IdCamara).HasColumnName("id_camara");
             entity.Property(e => e.IdDetalle).HasColumnName("id_detalle");
@@ -185,28 +317,33 @@ public partial class AppDbContext : DbContext
 
             entity.HasOne(d => d.IdCamaraNavigation).WithMany(p => p.Evidencia)
                 .HasForeignKey(d => d.IdCamara)
-                .HasConstraintName("FK_Evidencia_Camara");
+                .HasConstraintName("evidencia_id_camara_fkey");
 
             entity.HasOne(d => d.IdDetalleNavigation).WithMany(p => p.Evidencia)
                 .HasForeignKey(d => d.IdDetalle)
-                .HasConstraintName("FK_Evidencia_DetalleMovimiento");
+                .HasConstraintName("evidencia_id_detalle_fkey");
 
             entity.HasOne(d => d.IdMovimientoNavigation).WithMany(p => p.Evidencia)
                 .HasForeignKey(d => d.IdMovimiento)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Evidencia_Movimiento");
+                .HasConstraintName("evidencia_id_movimiento_fkey");
         });
 
         modelBuilder.Entity<Movimiento>(entity =>
         {
-            entity.HasKey(e => e.IdMovimiento).HasName("PK__Movimien__2A071C24D7F6B4BB");
+            entity.HasKey(e => e.IdMovimiento).HasName("movimiento_pkey");
 
-            entity.ToTable("Movimiento");
+            entity.ToTable("movimiento");
 
-            entity.Property(e => e.IdMovimiento).HasColumnName("id_movimiento");
-            entity.Property(e => e.ComprobanteEmitido).HasColumnName("comprobante_emitido");
+            entity.Property(e => e.IdMovimiento)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("id_movimiento");
+            entity.Property(e => e.ComprobanteEmitido)
+                .HasDefaultValue(false)
+                .HasColumnName("comprobante_emitido");
             entity.Property(e => e.Fecha)
-                .HasDefaultValueSql("(sysdatetime())")
+                .HasDefaultValueSql("now()")
+                .HasColumnType("timestamp(6) without time zone")
                 .HasColumnName("fecha");
             entity.Property(e => e.IdCliente).HasColumnName("id_cliente");
             entity.Property(e => e.IdProveedor).HasColumnName("id_proveedor");
@@ -219,32 +356,148 @@ public partial class AppDbContext : DbContext
 
             entity.HasOne(d => d.IdClienteNavigation).WithMany(p => p.Movimientos)
                 .HasForeignKey(d => d.IdCliente)
-                .HasConstraintName("FK_Movimiento_Cliente");
+                .HasConstraintName("movimiento_id_cliente_fkey");
 
             entity.HasOne(d => d.IdProveedorNavigation).WithMany(p => p.Movimientos)
                 .HasForeignKey(d => d.IdProveedor)
-                .HasConstraintName("FK_Movimiento_Proveedor");
+                .HasConstraintName("movimiento_id_proveedor_fkey");
 
             entity.HasOne(d => d.IdSedeNavigation).WithMany(p => p.Movimientos)
                 .HasForeignKey(d => d.IdSede)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Movimiento_Sede");
+                .HasConstraintName("movimiento_id_sede_fkey");
 
             entity.HasOne(d => d.IdUsuarioNavigation).WithMany(p => p.Movimientos)
                 .HasForeignKey(d => d.IdUsuario)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Movimiento_Usuario");
+                .HasConstraintName("movimiento_id_usuario_fkey");
+        });
+
+        modelBuilder.Entity<Negocio>(entity =>
+        {
+            entity.HasKey(e => e.IdNegocio).HasName("negocio_pkey");
+
+            entity.ToTable("negocio");
+
+            entity.Property(e => e.IdNegocio)
+                .HasDefaultValue(1)
+                .HasColumnName("id_negocio");
+            entity.Property(e => e.Correo)
+                .HasMaxLength(100)
+                .HasColumnName("correo");
+            entity.Property(e => e.MensajeNota)
+                .HasMaxLength(120)
+                .HasColumnName("mensaje_nota");
+            entity.Property(e => e.NombreComercial)
+                .HasMaxLength(100)
+                .HasColumnName("nombre_comercial");
+            entity.Property(e => e.RazonSocial)
+                .HasMaxLength(150)
+                .HasColumnName("razon_social");
+            entity.Property(e => e.Ruc)
+                .HasMaxLength(11)
+                .HasColumnName("ruc");
+            entity.Property(e => e.Telefono)
+                .HasMaxLength(15)
+                .HasColumnName("telefono");
+        });
+
+        modelBuilder.Entity<NotaVentum>(entity =>
+        {
+            entity.HasKey(e => e.IdNota).HasName("nota_venta_pkey");
+
+            entity.ToTable("nota_venta");
+
+            entity.HasIndex(e => e.IdMovimiento, "uq_notaventa_movimiento").IsUnique();
+
+            entity.HasIndex(e => new { e.Serie, e.Numero }, "uq_notaventa_numero").IsUnique();
+
+            entity.Property(e => e.IdNota)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("id_nota");
+            entity.Property(e => e.Descuento)
+                .HasPrecision(10, 2)
+                .HasColumnName("descuento");
+            entity.Property(e => e.Estado)
+                .HasMaxLength(10)
+                .HasDefaultValueSql("'emitida'::character varying")
+                .HasColumnName("estado");
+            entity.Property(e => e.FechaAnulacion)
+                .HasColumnType("timestamp(6) without time zone")
+                .HasColumnName("fecha_anulacion");
+            entity.Property(e => e.IdMovimiento).HasColumnName("id_movimiento");
+            entity.Property(e => e.IdUsuarioAnulacion).HasColumnName("id_usuario_anulacion");
+            entity.Property(e => e.MetodoPago)
+                .HasMaxLength(15)
+                .HasColumnName("metodo_pago");
+            entity.Property(e => e.MotivoAnulacion)
+                .HasMaxLength(200)
+                .HasColumnName("motivo_anulacion");
+            entity.Property(e => e.Numero).HasColumnName("numero");
+            entity.Property(e => e.Serie)
+                .HasMaxLength(4)
+                .HasDefaultValueSql("'NV01'::character varying")
+                .HasColumnName("serie");
+            entity.Property(e => e.Subtotal)
+                .HasPrecision(10, 2)
+                .HasColumnName("subtotal");
+            entity.Property(e => e.Total)
+                .HasPrecision(10, 2)
+                .HasColumnName("total");
+
+            entity.HasOne(d => d.IdMovimientoNavigation).WithOne(p => p.NotaVentum)
+                .HasForeignKey<NotaVentum>(d => d.IdMovimiento)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("nota_venta_id_movimiento_fkey");
+
+            entity.HasOne(d => d.IdUsuarioAnulacionNavigation).WithMany(p => p.NotaVenta)
+                .HasForeignKey(d => d.IdUsuarioAnulacion)
+                .HasConstraintName("nota_venta_id_usuario_anulacion_fkey");
+        });
+
+        modelBuilder.Entity<PlanoLinea>(entity =>
+        {
+            entity.HasKey(e => e.IdLinea).HasName("plano_linea_pkey");
+
+            entity.ToTable("plano_linea");
+
+            entity.Property(e => e.IdLinea)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("id_linea");
+            entity.Property(e => e.IdSede).HasColumnName("id_sede");
+            entity.Property(e => e.Tipo)
+                .HasMaxLength(15)
+                .HasColumnName("tipo");
+            entity.Property(e => e.X1)
+                .HasPrecision(5, 1)
+                .HasColumnName("x1");
+            entity.Property(e => e.X2)
+                .HasPrecision(5, 1)
+                .HasColumnName("x2");
+            entity.Property(e => e.Y1)
+                .HasPrecision(5, 1)
+                .HasColumnName("y1");
+            entity.Property(e => e.Y2)
+                .HasPrecision(5, 1)
+                .HasColumnName("y2");
+
+            entity.HasOne(d => d.IdSedeNavigation).WithMany(p => p.PlanoLineas)
+                .HasForeignKey(d => d.IdSede)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("plano_linea_id_sede_fkey");
         });
 
         modelBuilder.Entity<Producto>(entity =>
         {
-            entity.HasKey(e => e.IdProducto).HasName("PK__Producto__FF341C0DBD0BB93D");
+            entity.HasKey(e => e.IdProducto).HasName("producto_pkey");
 
-            entity.ToTable("Producto");
+            entity.ToTable("producto");
 
-            entity.HasIndex(e => e.Codigo, "UQ__Producto__40F9A20657184105").IsUnique();
+            entity.HasIndex(e => e.Codigo, "producto_codigo_key").IsUnique();
 
-            entity.Property(e => e.IdProducto).HasColumnName("id_producto");
+            entity.Property(e => e.IdProducto)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("id_producto");
             entity.Property(e => e.Codigo)
                 .HasMaxLength(50)
                 .HasColumnName("codigo");
@@ -256,10 +509,14 @@ public partial class AppDbContext : DbContext
                 .HasMaxLength(150)
                 .HasColumnName("nombre");
             entity.Property(e => e.PrecioUnitario)
-                .HasColumnType("decimal(10, 2)")
+                .HasPrecision(10, 2)
                 .HasColumnName("precio_unitario");
-            entity.Property(e => e.StockActual).HasColumnName("stock_actual");
-            entity.Property(e => e.StockMinimo).HasColumnName("stock_minimo");
+            entity.Property(e => e.StockActual)
+                .HasDefaultValue(0)
+                .HasColumnName("stock_actual");
+            entity.Property(e => e.StockMinimo)
+                .HasDefaultValue(0)
+                .HasColumnName("stock_minimo");
             entity.Property(e => e.Tipo)
                 .HasMaxLength(50)
                 .HasColumnName("tipo");
@@ -270,40 +527,47 @@ public partial class AppDbContext : DbContext
 
         modelBuilder.Entity<ProductoUbicacion>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Producto__3213E83F5E1E686F");
+            entity.HasKey(e => e.Id).HasName("producto_ubicacion_pkey");
 
-            entity.ToTable("ProductoUbicacion");
+            entity.ToTable("producto_ubicacion");
 
-            entity.HasIndex(e => new { e.IdProducto, e.IdUbicacion }, "UQ_ProductoUbicacion").IsUnique();
+            entity.HasIndex(e => new { e.IdProducto, e.IdUbicacion }, "uq_producto_ubicacion").IsUnique();
 
-            entity.Property(e => e.Id).HasColumnName("id");
-            entity.Property(e => e.CantidadActual).HasColumnName("cantidad_actual");
+            entity.Property(e => e.Id)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("id");
+            entity.Property(e => e.CantidadActual)
+                .HasDefaultValue(0)
+                .HasColumnName("cantidad_actual");
             entity.Property(e => e.IdProducto).HasColumnName("id_producto");
             entity.Property(e => e.IdUbicacion).HasColumnName("id_ubicacion");
             entity.Property(e => e.UltimaActualizacion)
-                .HasDefaultValueSql("(sysdatetime())")
+                .HasDefaultValueSql("now()")
+                .HasColumnType("timestamp(6) without time zone")
                 .HasColumnName("ultima_actualizacion");
 
             entity.HasOne(d => d.IdProductoNavigation).WithMany(p => p.ProductoUbicacions)
                 .HasForeignKey(d => d.IdProducto)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_ProductoUbicacion_Producto");
+                .HasConstraintName("producto_ubicacion_id_producto_fkey");
 
             entity.HasOne(d => d.IdUbicacionNavigation).WithMany(p => p.ProductoUbicacions)
                 .HasForeignKey(d => d.IdUbicacion)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_ProductoUbicacion_Ubicacion");
+                .HasConstraintName("producto_ubicacion_id_ubicacion_fkey");
         });
 
         modelBuilder.Entity<Proveedor>(entity =>
         {
-            entity.HasKey(e => e.IdProveedor).HasName("PK__Proveedo__8D3DFE28DB6DC92E");
+            entity.HasKey(e => e.IdProveedor).HasName("proveedor_pkey");
 
-            entity.ToTable("Proveedor");
+            entity.ToTable("proveedor");
 
-            entity.HasIndex(e => e.Ruc, "UQ__Proveedo__C2B74E619588A6B9").IsUnique();
+            entity.HasIndex(e => e.Ruc, "proveedor_ruc_key").IsUnique();
 
-            entity.Property(e => e.IdProveedor).HasColumnName("id_proveedor");
+            entity.Property(e => e.IdProveedor)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("id_proveedor");
             entity.Property(e => e.Contacto)
                 .HasMaxLength(100)
                 .HasColumnName("contacto");
@@ -320,13 +584,16 @@ public partial class AppDbContext : DbContext
 
         modelBuilder.Entity<Reporte>(entity =>
         {
-            entity.HasKey(e => e.IdReporte).HasName("PK__Reporte__87E4F5CB5CE19525");
+            entity.HasKey(e => e.IdReporte).HasName("reporte_pkey");
 
-            entity.ToTable("Reporte");
+            entity.ToTable("reporte");
 
-            entity.Property(e => e.IdReporte).HasColumnName("id_reporte");
+            entity.Property(e => e.IdReporte)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("id_reporte");
             entity.Property(e => e.FechaGeneracion)
-                .HasDefaultValueSql("(sysdatetime())")
+                .HasDefaultValueSql("now()")
+                .HasColumnType("timestamp(6) without time zone")
                 .HasColumnName("fecha_generacion");
             entity.Property(e => e.FiltrosAplicados).HasColumnName("filtros_aplicados");
             entity.Property(e => e.IdSede).HasColumnName("id_sede");
@@ -340,46 +607,95 @@ public partial class AppDbContext : DbContext
 
             entity.HasOne(d => d.IdSedeNavigation).WithMany(p => p.Reportes)
                 .HasForeignKey(d => d.IdSede)
-                .HasConstraintName("FK_Reporte_Sede");
+                .HasConstraintName("reporte_id_sede_fkey");
 
             entity.HasOne(d => d.IdUsuarioNavigation).WithMany(p => p.Reportes)
                 .HasForeignKey(d => d.IdUsuario)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Reporte_Usuario");
+                .HasConstraintName("reporte_id_usuario_fkey");
         });
 
         modelBuilder.Entity<Sede>(entity =>
         {
-            entity.HasKey(e => e.IdSede).HasName("PK__Sede__D693504B762C7B31");
+            entity.HasKey(e => e.IdSede).HasName("sede_pkey");
 
-            entity.ToTable("Sede");
+            entity.ToTable("sede");
 
-            entity.Property(e => e.IdSede).HasColumnName("id_sede");
+            entity.Property(e => e.IdSede)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("id_sede");
             entity.Property(e => e.Ciudad)
                 .HasMaxLength(80)
-                .HasDefaultValue("Huamanga")
+                .HasDefaultValueSql("'Huamanga'::character varying")
                 .HasColumnName("ciudad");
             entity.Property(e => e.Direccion)
                 .HasMaxLength(200)
                 .HasColumnName("direccion");
             entity.Property(e => e.Estado)
                 .HasMaxLength(10)
-                .HasDefaultValue("activo")
+                .HasDefaultValueSql("'activo'::character varying")
                 .HasColumnName("estado");
             entity.Property(e => e.Nombre)
                 .HasMaxLength(100)
                 .HasColumnName("nombre");
+            entity.Property(e => e.PlanoAlto)
+                .HasPrecision(5, 1)
+                .HasColumnName("plano_alto");
+            entity.Property(e => e.PlanoAncho)
+                .HasPrecision(5, 1)
+                .HasColumnName("plano_ancho");
+            entity.Property(e => e.Telefono)
+                .HasMaxLength(15)
+                .HasColumnName("telefono");
+        });
+
+        modelBuilder.Entity<Traslado>(entity =>
+        {
+            entity.HasKey(e => e.IdTraslado).HasName("traslado_pkey");
+
+            entity.ToTable("traslado");
+
+            entity.Property(e => e.IdTraslado)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("id_traslado");
+            entity.Property(e => e.Fecha)
+                .HasDefaultValueSql("now()")
+                .HasColumnType("timestamp(6) without time zone")
+                .HasColumnName("fecha");
+            entity.Property(e => e.IdSede).HasColumnName("id_sede");
+            entity.Property(e => e.IdUsuario).HasColumnName("id_usuario");
+            entity.Property(e => e.Observaciones)
+                .HasMaxLength(200)
+                .HasColumnName("observaciones");
+
+            entity.HasOne(d => d.IdSedeNavigation).WithMany(p => p.Traslados)
+                .HasForeignKey(d => d.IdSede)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("traslado_id_sede_fkey");
+
+            entity.HasOne(d => d.IdUsuarioNavigation).WithMany(p => p.Traslados)
+                .HasForeignKey(d => d.IdUsuario)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("traslado_id_usuario_fkey");
         });
 
         modelBuilder.Entity<Ubicacion>(entity =>
         {
-            entity.HasKey(e => e.IdUbicacion).HasName("PK__Ubicacio__81BAA591335FDF8D");
+            entity.HasKey(e => e.IdUbicacion).HasName("ubicacion_pkey");
 
-            entity.ToTable("Ubicacion");
+            entity.ToTable("ubicacion");
 
-            entity.HasIndex(e => e.CodigoEstante, "UQ__Ubicacio__C20D4E361AE763BB").IsUnique();
+            entity.HasIndex(e => new { e.IdSede, e.CodigoEstante }, "uq_ubicacion_sede_codigo").IsUnique();
 
-            entity.Property(e => e.IdUbicacion).HasColumnName("id_ubicacion");
+            entity.Property(e => e.IdUbicacion)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("id_ubicacion");
+            entity.Property(e => e.Alto)
+                .HasPrecision(5, 1)
+                .HasColumnName("alto");
+            entity.Property(e => e.Ancho)
+                .HasPrecision(5, 1)
+                .HasColumnName("ancho");
             entity.Property(e => e.Capacidad).HasColumnName("capacidad");
             entity.Property(e => e.CodigoEstante)
                 .HasMaxLength(20)
@@ -388,32 +704,48 @@ public partial class AppDbContext : DbContext
                 .HasMaxLength(200)
                 .HasColumnName("descripcion");
             entity.Property(e => e.IdSede).HasColumnName("id_sede");
+            entity.Property(e => e.PosX)
+                .HasPrecision(5, 1)
+                .HasColumnName("pos_x");
+            entity.Property(e => e.PosY)
+                .HasPrecision(5, 1)
+                .HasColumnName("pos_y");
+            entity.Property(e => e.Tipo)
+                .HasMaxLength(15)
+                .HasDefaultValueSql("'almacenaje'::character varying")
+                .HasColumnName("tipo");
 
             entity.HasOne(d => d.IdSedeNavigation).WithMany(p => p.Ubicacions)
                 .HasForeignKey(d => d.IdSede)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Ubicacion_Sede");
+                .HasConstraintName("ubicacion_id_sede_fkey");
         });
 
         modelBuilder.Entity<Usuario>(entity =>
         {
-            entity.HasKey(e => e.IdUsuario).HasName("PK__Usuario__4E3E04AD7D620393");
+            entity.HasKey(e => e.IdUsuario).HasName("usuario_pkey");
 
-            entity.ToTable("Usuario");
+            entity.ToTable("usuario");
 
-            entity.HasIndex(e => e.Usuario1, "UQ__Usuario__9AFF8FC662AB68B8").IsUnique();
+            entity.HasIndex(e => e.Usuario1, "usuario_usuario_key").IsUnique();
 
-            entity.Property(e => e.IdUsuario).HasColumnName("id_usuario");
+            entity.Property(e => e.IdUsuario)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("id_usuario");
             entity.Property(e => e.Contrasena)
                 .HasMaxLength(255)
                 .HasColumnName("contrasena");
             entity.Property(e => e.Estado)
                 .HasMaxLength(10)
-                .HasDefaultValue("activo")
+                .HasDefaultValueSql("'activo'::character varying")
                 .HasColumnName("estado");
             entity.Property(e => e.FechaCreacion)
-                .HasDefaultValueSql("(sysdatetime())")
+                .HasDefaultValueSql("now()")
+                .HasColumnType("timestamp(6) without time zone")
                 .HasColumnName("fecha_creacion");
+            entity.Property(e => e.FotoUrl)
+                .HasMaxLength(255)
+                .HasColumnName("foto_url");
             entity.Property(e => e.IdSede).HasColumnName("id_sede");
             entity.Property(e => e.Nombre)
                 .HasMaxLength(100)
@@ -427,7 +759,7 @@ public partial class AppDbContext : DbContext
 
             entity.HasOne(d => d.IdSedeNavigation).WithMany(p => p.Usuarios)
                 .HasForeignKey(d => d.IdSede)
-                .HasConstraintName("FK_Usuario_Sede");
+                .HasConstraintName("usuario_id_sede_fkey");
         });
 
         OnModelCreatingPartial(modelBuilder);

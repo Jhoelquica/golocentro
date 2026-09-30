@@ -1,0 +1,770 @@
+@using GestionAlmacen_Golocentro.ViewModels
+@model PlanoEditorViewModel
+@{
+    ViewData["Title"] = $"Plano de {Model.SedeNombre}";
+}
+
+@await Html.PartialAsync("~/Views/Shared/_EstilosGestion.cshtml")
+
+<style>
+    .pl-page {
+        max-width: 1280px;
+    }
+
+    .pl-grid {
+        display: grid;
+        grid-template-columns: 300px minmax(0, 1fr);
+        gap: 16px;
+        align-items: start;
+    }
+
+    @@media (max-width: 900px) {
+        .pl-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .pl-lado {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .pl-caja {
+        background: var(--g-white);
+        border: 1px solid var(--g-border);
+        border-radius: 14px;
+        padding: 12px 14px;
+    }
+
+        .pl-caja h2 {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--g-navy);
+            margin: 0 0 8px;
+        }
+
+        .pl-caja p {
+            font-size: 13px;
+            color: var(--g-muted);
+            margin: 0 0 8px;
+        }
+
+    .pl-campos {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+
+    .pl-campo label {
+        display: block;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--g-muted);
+        margin-bottom: 3px;
+    }
+
+    .pl-campo input,
+    .pl-campo select {
+        width: 100%;
+        height: 40px;
+        padding: 0 8px;
+        border: 1px solid var(--g-input-border);
+        border-radius: 8px;
+        font-size: 15px;
+        font-family: inherit;
+        color: var(--g-text);
+        background: var(--g-white);
+    }
+
+        .pl-campo input:focus,
+        .pl-campo select:focus {
+            outline: none;
+            border-color: var(--g-teal);
+            box-shadow: 0 0 0 3px rgba(4,120,87,0.25);
+        }
+
+    .pl-lista {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+        .pl-lista li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+    .pl-boton {
+        min-height: 36px;
+        padding: 6px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--g-input-border);
+        background: var(--g-white);
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--g-navy);
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+        .pl-boton:hover {
+            border-color: var(--g-teal);
+            color: var(--g-teal);
+        }
+
+        .pl-boton.peligro {
+            color: var(--g-danger-text);
+        }
+
+            .pl-boton.peligro:hover {
+                border-color: var(--g-danger-text);
+            }
+
+        .pl-boton:focus-visible {
+            outline: 2px solid var(--g-teal);
+            outline-offset: 2px;
+        }
+
+    .pl-botones {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 8px;
+    }
+
+    .pl-problemas {
+        border-color: rgba(220,38,38,0.35);
+        background: rgba(220,38,38,0.05);
+    }
+
+        .pl-problemas h2 {
+            color: var(--g-danger-text);
+        }
+
+        .pl-problemas li {
+            font-size: 13px;
+            color: var(--g-danger-text);
+        }
+
+    .pl-lienzo {
+        background: var(--g-white);
+        border: 1px solid var(--g-border);
+        border-radius: 14px;
+        padding: 12px;
+    }
+
+    #plano {
+        display: block;
+        width: 100%;
+        height: auto;
+        touch-action: none;
+        user-select: none;
+    }
+
+        #plano:focus-visible {
+            outline: none;
+        }
+
+    .pl-zona rect.pl-cuerpo {
+        fill: rgba(4,120,87,0.12);
+        stroke: #047857;
+        stroke-width: 1.5;
+        cursor: move;
+    }
+
+    .pl-zona.recepcion rect.pl-cuerpo {
+        fill: rgba(37,99,235,0.1);
+        stroke: #1D4ED8;
+    }
+
+    .pl-zona.mala rect.pl-cuerpo {
+        fill: rgba(220,38,38,0.14);
+        stroke: #DC2626;
+    }
+
+    .pl-zona.sel rect.pl-cuerpo {
+        stroke-width: 3.5;
+    }
+
+    .pl-zona:focus {
+        outline: none;
+    }
+
+        .pl-zona:focus rect.pl-cuerpo {
+            stroke: #0F172A;
+            stroke-width: 3.5;
+        }
+
+    .pl-zona text {
+        font: 600 12px 'Inter', sans-serif;
+        fill: #334155;
+        pointer-events: none;
+    }
+
+    .pl-asa {
+        fill: #FFFFFF;
+        stroke: #047857;
+        stroke-width: 2;
+        cursor: nwse-resize;
+    }
+
+    .pl-linea {
+        cursor: move;
+    }
+
+        .pl-linea:focus {
+            outline: none;
+        }
+
+    .pl-toque {
+        stroke: transparent;
+        stroke-width: 16;
+    }
+
+    .pl-linea.pasillo .pl-trazo {
+        stroke: #94A3B8;
+        stroke-width: 2;
+        stroke-dasharray: 2 6;
+        stroke-linecap: round;
+    }
+
+    .pl-linea.division .pl-trazo {
+        stroke: #64748B;
+        stroke-width: 2.5;
+        stroke-dasharray: 10 6;
+    }
+
+    .pl-linea.entrada .pl-trazo {
+        stroke: #D97706;
+        stroke-width: 6;
+    }
+
+    .pl-linea.sel .pl-trazo,
+    .pl-linea:focus .pl-trazo {
+        stroke: #047857;
+    }
+
+    .pl-extremo {
+        fill: #FFFFFF;
+        stroke: #047857;
+        stroke-width: 2;
+        cursor: grab;
+    }
+
+    .pl-leyenda {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 16px;
+        margin-top: 10px;
+        font-size: 13px;
+        color: var(--g-muted);
+    }
+
+        .pl-leyenda i {
+            display: inline-block;
+            width: 22px;
+            height: 0;
+            vertical-align: middle;
+            margin-right: 6px;
+            border-top: 3px solid;
+        }
+</style>
+
+<div class="cp-page pl-page">
+    <a class="cp-volver" asp-action="Zonas" asp-route-id="@Model.SedeId"><i class="bi bi-arrow-left" aria-hidden="true"></i> Zonas de @Model.SedeNombre</a>
+    <div class="cp-header">
+        <div>
+            <h1><i class="bi bi-bounding-box" aria-hidden="true"></i> Plano de @Model.SedeNombre</h1>
+            <p>Arrastra las zonas para ubicarlas y su esquina para cambiarles el tamaño. Con el teclado: flechas para mover, Mayúsculas + flechas para el tamaño.</p>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap">
+            <a class="btn-g-outline" asp-controller="Mapa" asp-action="Index" asp-route-sede="@Model.SedeId"><i class="bi bi-map" aria-hidden="true"></i> Ver en el mapa</a>
+            <button type="submit" form="formPlano" class="btn-g-primary" id="btnGuardar"><i class="bi bi-check-lg" aria-hidden="true"></i> Guardar plano</button>
+        </div>
+    </div>
+
+    @if (TempData["Exito"] is string exito)
+    {
+        <div class="cp-aviso exito" role="status">
+            <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+            <span>@exito</span>
+            <button type="button" aria-label="Cerrar mensaje" onclick="this.parentElement.remove()"><i class="bi bi-x" aria-hidden="true"></i></button>
+        </div>
+    }
+    @if (TempData["Error"] is string error)
+    {
+        <div class="cp-aviso error" role="alert">
+            <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+            <span>@error</span>
+            <button type="button" aria-label="Cerrar mensaje" onclick="this.parentElement.remove()"><i class="bi bi-x" aria-hidden="true"></i></button>
+        </div>
+    }
+
+    <form method="post" asp-action="Plano" asp-route-id="@Model.SedeId" id="formPlano">
+        <input type="hidden" name="datos" id="datos" />
+    </form>
+
+    <div class="pl-grid">
+        <div class="pl-lado">
+            <section class="pl-caja pl-problemas" id="cajaProblemas" hidden aria-labelledby="tituloProblemas">
+                <h2 id="tituloProblemas"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i> Corrige antes de guardar</h2>
+                <ul class="pl-lista" id="problemas" role="status"></ul>
+            </section>
+
+            <section class="pl-caja" aria-labelledby="tituloSel">
+                <h2 id="tituloSel">Seleccionado</h2>
+                <p id="panelNada">Toca una zona o una línea del plano para editarla.</p>
+
+                <div id="panelZona" hidden>
+                    <p><strong id="zCodigo"></strong> <span id="zDesc"></span></p>
+                    <div class="pl-campos">
+                        <div class="pl-campo"><label for="zX">Desde la izquierda</label><input id="zX" type="number" step="0.5" min="0" inputmode="decimal" /></div>
+                        <div class="pl-campo"><label for="zY">Desde arriba</label><input id="zY" type="number" step="0.5" min="0" inputmode="decimal" /></div>
+                        <div class="pl-campo"><label for="zAncho">Ancho</label><input id="zAncho" type="number" step="0.5" min="0.5" inputmode="decimal" /></div>
+                        <div class="pl-campo"><label for="zAlto">Alto</label><input id="zAlto" type="number" step="0.5" min="0.5" inputmode="decimal" /></div>
+                    </div>
+                    <div class="pl-botones">
+                        <button type="button" class="pl-boton peligro" id="btnQuitar"><i class="bi bi-eraser" aria-hidden="true"></i> Quitar del plano</button>
+                    </div>
+                </div>
+
+                <div id="panelLinea" hidden>
+                    <div class="pl-campo" style="margin-bottom:8px">
+                        <label for="lTipo">Tipo de línea</label>
+                        <select id="lTipo">
+                            <option value="entrada">Entrada (puerta)</option>
+                            <option value="division">División entre cuartos</option>
+                            <option value="pasillo">Pasillo</option>
+                        </select>
+                    </div>
+                    <div class="pl-campos">
+                        <div class="pl-campo"><label for="lX1">Inicio: izquierda</label><input id="lX1" type="number" step="0.5" min="0" inputmode="decimal" /></div>
+                        <div class="pl-campo"><label for="lY1">Inicio: arriba</label><input id="lY1" type="number" step="0.5" min="0" inputmode="decimal" /></div>
+                        <div class="pl-campo"><label for="lX2">Fin: izquierda</label><input id="lX2" type="number" step="0.5" min="0" inputmode="decimal" /></div>
+                        <div class="pl-campo"><label for="lY2">Fin: arriba</label><input id="lY2" type="number" step="0.5" min="0" inputmode="decimal" /></div>
+                    </div>
+                    <div class="pl-botones">
+                        <button type="button" class="pl-boton peligro" id="btnEliminarLinea"><i class="bi bi-trash3" aria-hidden="true"></i> Eliminar línea</button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="pl-caja" aria-labelledby="tituloSinDibujar">
+                <h2 id="tituloSinDibujar">Zonas sin dibujar</h2>
+                <ul class="pl-lista" id="sinDibujar"></ul>
+                <p id="todasDibujadas" hidden>Todas las zonas están en el plano.</p>
+            </section>
+
+            <section class="pl-caja" aria-labelledby="tituloLineas">
+                <h2 id="tituloLineas">Agregar línea</h2>
+                <p>Para ubicarse: la puerta, la división entre cuartos y los pasillos.</p>
+                <div class="pl-botones">
+                    <button type="button" class="pl-boton" data-linea-nueva="entrada"><i class="bi bi-door-open" aria-hidden="true"></i> Entrada</button>
+                    <button type="button" class="pl-boton" data-linea-nueva="division"><i class="bi bi-distribute-horizontal" aria-hidden="true"></i> División</button>
+                    <button type="button" class="pl-boton" data-linea-nueva="pasillo"><i class="bi bi-three-dots" aria-hidden="true"></i> Pasillo</button>
+                </div>
+            </section>
+
+            <section class="pl-caja" aria-labelledby="tituloTamano">
+                <h2 id="tituloTamano">Tamaño del plano</h2>
+                <p>En cuadritos; usa la medida que te acomode (por ejemplo, 1 cuadrito = 1 metro).</p>
+                <div class="pl-campos">
+                    <div class="pl-campo"><label for="pAncho">Ancho</label><input id="pAncho" type="number" step="0.5" inputmode="decimal" /></div>
+                    <div class="pl-campo"><label for="pAlto">Alto</label><input id="pAlto" type="number" step="0.5" inputmode="decimal" /></div>
+                </div>
+            </section>
+        </div>
+
+        <section class="pl-lienzo" aria-label="Plano editable">
+            <svg id="plano" role="group" aria-label="Plano de @Model.SedeNombre. Cada zona y cada línea se puede elegir con Tab."></svg>
+            <div class="pl-leyenda" aria-hidden="true">
+                <span><i style="border-color:#047857"></i>Zona</span>
+                <span><i style="border-color:#1D4ED8"></i>Recepción</span>
+                <span><i style="border-color:#DC2626"></i>Encimada o fuera del plano</span>
+                <span><i style="border-color:#D97706"></i>Entrada</span>
+                <span><i style="border-color:#64748B; border-top-style:dashed"></i>División</span>
+                <span><i style="border-color:#94A3B8; border-top-style:dotted"></i>Pasillo</span>
+            </div>
+        </section>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const S = 20;        // unidades del SVG por cuadrito (igual que el mapa)
+        const PASO = 0.5;    // se ajusta a medio cuadrito
+        const MIN_PLANO = @Json.Serialize(PlanoEditorViewModel.TamanoMinimo), MAX_PLANO = @Json.Serialize(PlanoEditorViewModel.TamanoMaximo);
+        const estado = {
+            ancho: @Json.Serialize(Model.Ancho),
+            alto: @Json.Serialize(Model.Alto),
+            zonas: @Json.Serialize(Model.Zonas),
+            lineas: @Json.Serialize(Model.Lineas)
+        };
+        const NOMBRE_LINEA = { entrada: 'Entrada', division: 'División', pasillo: 'Pasillo' };
+
+        const svg = document.getElementById('plano');
+        const [zX, zY, zAncho, zAlto, lTipo, lX1, lY1, lX2, lY2, pAncho, pAlto] =
+            ['zX', 'zY', 'zAncho', 'zAlto', 'lTipo', 'lX1', 'lY1', 'lX2', 'lY2', 'pAncho', 'pAlto'].map(id => document.getElementById(id));
+        const NS = 'http://www.w3.org/2000/svg';
+        let sel = null;        // { tipo: 'zona', id } | { tipo: 'linea', i }
+        let arrastre = null;
+        let cambios = false;
+
+        const redondear = v => Math.round(v / PASO) * PASO;
+        const limitar = (v, min, max) => Math.min(Math.max(v, min), max);
+        const zonaPorId = id => estado.zonas.find(z => z.id === id);
+        const dibujada = z => z.x !== null && z.x !== undefined;
+
+        function nodo(etiqueta, atributos, padre) {
+            const e = document.createElementNS(NS, etiqueta);
+            for (const [k, v] of Object.entries(atributos)) e.setAttribute(k, v);
+            padre?.append(e);
+            return e;
+        }
+
+        function seCruzan(a, b) {
+            return a.x < b.x + b.ancho && b.x < a.x + a.ancho && a.y < b.y + b.alto && b.y < a.y + a.alto;
+        }
+
+        // Mismas reglas que el servidor
+        function problemas() {
+            const lista = [];
+            const dib = estado.zonas.filter(dibujada);
+            for (const z of dib)
+                if (z.x < 0 || z.y < 0 || z.ancho < PASO || z.alto < PASO || z.x + z.ancho > estado.ancho || z.y + z.alto > estado.alto)
+                    lista.push({ ids: [z.id], texto: `La zona ${z.codigo} se sale del plano.` });
+            for (let i = 0; i < dib.length; i++)
+                for (let j = i + 1; j < dib.length; j++)
+                    if (seCruzan(dib[i], dib[j]))
+                        lista.push({ ids: [dib[i].id, dib[j].id], texto: `Las zonas ${dib[i].codigo} y ${dib[j].codigo} están encimadas.` });
+            estado.lineas.forEach(l => {
+                const fuera = [l.x1, l.x2].some(x => x < 0 || x > estado.ancho) || [l.y1, l.y2].some(y => y < 0 || y > estado.alto);
+                if (fuera) lista.push({ ids: [], texto: `Una línea de ${NOMBRE_LINEA[l.tipo].toLowerCase()} se sale del plano.` });
+                else if (l.x1 === l.x2 && l.y1 === l.y2) lista.push({ ids: [], texto: 'Una línea no tiene largo.' });
+            });
+            return lista;
+        }
+
+        // ===== Dibujo =====
+        function dibujar() {
+            const enfocado = document.activeElement?.closest?.('[data-zona], [data-linea]');
+            const claveFoco = enfocado ? (enfocado.dataset.zona ? 'z' + enfocado.dataset.zona : 'l' + enfocado.dataset.linea) : null;
+            const W = estado.ancho * S, H = estado.alto * S;
+            svg.setAttribute('viewBox', `-10 -10 ${W + 20} ${H + 20}`);
+            svg.replaceChildren();
+
+            const fondo = nodo('g', { 'aria-hidden': 'true' }, svg);
+            nodo('rect', { x: 0, y: 0, width: W, height: H, fill: '#FFFFFF' }, fondo);
+            for (let x = 1; x < estado.ancho; x++)
+                nodo('line', { x1: x * S, y1: 0, x2: x * S, y2: H, stroke: x % 5 ? '#EEF2F6' : '#D5DDE6', 'stroke-width': 1 }, fondo);
+            for (let y = 1; y < estado.alto; y++)
+                nodo('line', { x1: 0, y1: y * S, x2: W, y2: y * S, stroke: y % 5 ? '#EEF2F6' : '#D5DDE6', 'stroke-width': 1 }, fondo);
+            nodo('rect', { x: 0, y: 0, width: W, height: H, fill: 'none', stroke: '#334155', 'stroke-width': 4 }, fondo);
+
+            estado.lineas.forEach((l, i) => {
+                const elegida = sel?.tipo === 'linea' && sel.i === i;
+                const g = nodo('g', {
+                    class: `pl-linea ${l.tipo}${elegida ? ' sel' : ''}`, 'data-linea': i, tabindex: 0, role: 'button',
+                    'aria-label': `${NOMBRE_LINEA[l.tipo]} de (${l.x1}, ${l.y1}) a (${l.x2}, ${l.y2}). Flechas para mover.`
+                }, svg);
+                const coords = { x1: l.x1 * S, y1: l.y1 * S, x2: l.x2 * S, y2: l.y2 * S };
+                nodo('line', { ...coords, class: 'pl-toque' }, g);
+                nodo('line', { ...coords, class: 'pl-trazo' }, g);
+                if (elegida) {
+                    nodo('circle', { cx: coords.x1, cy: coords.y1, r: 7, class: 'pl-extremo', 'data-extremo': 1 }, g);
+                    nodo('circle', { cx: coords.x2, cy: coords.y2, r: 7, class: 'pl-extremo', 'data-extremo': 2 }, g);
+                }
+            });
+
+            const malas = new Set(problemas().flatMap(p => p.ids));
+            for (const z of estado.zonas.filter(dibujada)) {
+                const elegida = sel?.tipo === 'zona' && sel.id === z.id;
+                const x = z.x * S, y = z.y * S, w = z.ancho * S, h = z.alto * S;
+                const g = nodo('g', {
+                    class: `pl-zona${z.recepcion ? ' recepcion' : ''}${malas.has(z.id) ? ' mala' : ''}${elegida ? ' sel' : ''}`,
+                    'data-zona': z.id, tabindex: 0, role: 'button',
+                    'aria-label': `Zona ${z.codigo}: a ${z.x} desde la izquierda y ${z.y} desde arriba, de ${z.ancho} por ${z.alto}.` +
+                        (malas.has(z.id) ? ' Encimada o fuera del plano.' : '') + ' Flechas para mover, Mayúsculas y flechas para el tamaño.'
+                }, svg);
+                nodo('rect', { x: x + 1, y: y + 1, width: Math.max(w - 2, 1), height: Math.max(h - 2, 1), rx: 3, class: 'pl-cuerpo' }, g);
+                const texto = nodo('text', { x: x + w / 2, y: y + h / 2, 'text-anchor': 'middle', 'dominant-baseline': 'central' }, g);
+                texto.textContent = z.codigo;
+                if (elegida)
+                    nodo('rect', { x: x + w - 7, y: y + h - 7, width: 12, height: 12, rx: 2, class: 'pl-asa', 'data-accion': 'tamano' }, g);
+            }
+
+            // Solo se devuelve el foco si era lo seleccionado (si no, le quitaría la selección a otro elemento)
+            const claveSel = sel ? (sel.tipo === 'zona' ? 'z' + sel.id : 'l' + sel.i) : null;
+            if (claveFoco && claveFoco === claveSel) {
+                const selector = claveFoco[0] === 'z' ? `[data-zona="${claveFoco.slice(1)}"]` : `[data-linea="${claveFoco.slice(1)}"]`;
+                svg.querySelector(selector)?.focus();
+            }
+            actualizarPanel();
+        }
+
+        // ===== Panel lateral =====
+        const campoValor = (input, valor) => { if (document.activeElement !== input) input.value = valor ?? ''; };
+
+        function actualizarPanel() {
+            const zona = sel?.tipo === 'zona' ? zonaPorId(sel.id) : null;
+            const linea = sel?.tipo === 'linea' ? estado.lineas[sel.i] : null;
+            document.getElementById('panelNada').hidden = !!(zona || linea);
+            document.getElementById('panelZona').hidden = !zona;
+            document.getElementById('panelLinea').hidden = !linea;
+            if (zona) {
+                document.getElementById('zCodigo').textContent = `Zona ${zona.codigo}`;
+                document.getElementById('zDesc').textContent = zona.descripcion ? `· ${zona.descripcion}` : '';
+                campoValor(zX, zona.x); campoValor(zY, zona.y); campoValor(zAncho, zona.ancho); campoValor(zAlto, zona.alto);
+            }
+            if (linea) {
+                campoValor(lTipo, linea.tipo);
+                campoValor(lX1, linea.x1); campoValor(lY1, linea.y1); campoValor(lX2, linea.x2); campoValor(lY2, linea.y2);
+            }
+
+            const sinDibujar = estado.zonas.filter(z => !dibujada(z));
+            const lista = document.getElementById('sinDibujar');
+            lista.replaceChildren(...sinDibujar.map(z => {
+                const li = document.createElement('li');
+                const nombre = document.createElement('span');
+                nombre.textContent = z.codigo + (z.descripcion ? ` · ${z.descripcion}` : '');
+                const boton = document.createElement('button');
+                boton.type = 'button';
+                boton.className = 'pl-boton';
+                boton.innerHTML = '<i class="bi bi-plus-square" aria-hidden="true"></i> Colocar';
+                boton.setAttribute('aria-label', `Colocar la zona ${z.codigo} en el plano`);
+                boton.addEventListener('click', () => colocar(z));
+                li.append(nombre, boton);
+                return li;
+            }));
+            document.getElementById('todasDibujadas').hidden = sinDibujar.length > 0;
+
+            const lista2 = problemas();
+            document.getElementById('cajaProblemas').hidden = lista2.length === 0;
+            document.getElementById('problemas').replaceChildren(...lista2.map(p => {
+                const li = document.createElement('li');
+                li.textContent = p.texto;
+                return li;
+            }));
+            campoValor(pAncho, estado.ancho);
+            campoValor(pAlto, estado.alto);
+        }
+
+        function seleccionar(nuevo) {
+            sel = nuevo;
+            dibujar();
+        }
+
+        function marcarCambio() {
+            cambios = true;
+            dibujar();
+        }
+
+        // Coloca la zona en el primer hueco libre de 3 x 2 (o arriba a la izquierda si no hay)
+        function colocar(z) {
+            const w = Math.min(3, estado.ancho), h = Math.min(2, estado.alto);
+            let lugar = null;
+            for (let y = 0; y + h <= estado.alto && !lugar; y++)
+                for (let x = 0; x + w <= estado.ancho && !lugar; x++) {
+                    const prueba = { x, y, ancho: w, alto: h };
+                    if (!estado.zonas.some(o => o !== z && dibujada(o) && seCruzan(o, prueba))) lugar = prueba;
+                }
+            Object.assign(z, lugar ?? { x: 0, y: 0, ancho: w, alto: h });
+            sel = { tipo: 'zona', id: z.id };
+            marcarCambio();
+            svg.querySelector(`[data-zona="${z.id}"]`)?.focus();
+        }
+
+        // ===== Arrastrar con mouse, dedo o lápiz =====
+        function punto(e) {
+            const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(svg.getScreenCTM().inverse());
+            return { x: p.x / S, y: p.y / S };
+        }
+
+        svg.addEventListener('pointerdown', e => {
+            const p = punto(e);
+            const gZona = e.target.closest('[data-zona]');
+            const gLinea = e.target.closest('[data-linea]');
+            if (gZona) {
+                const z = zonaPorId(Number(gZona.dataset.zona));
+                arrastre = e.target.dataset.accion === 'tamano'
+                    ? { modo: 'tamano', z }
+                    : { modo: 'mover', z, dx: p.x - z.x, dy: p.y - z.y };
+                sel = { tipo: 'zona', id: z.id };
+            } else if (gLinea) {
+                const i = Number(gLinea.dataset.linea);
+                const l = estado.lineas[i];
+                arrastre = e.target.dataset.extremo
+                    ? { modo: 'extremo', l, extremo: e.target.dataset.extremo }
+                    : { modo: 'linea', l, inicio: p, original: { ...l } };
+                sel = { tipo: 'linea', i };
+            } else {
+                arrastre = null;
+                seleccionar(null);
+                return;
+            }
+            svg.setPointerCapture(e.pointerId);
+            e.preventDefault();
+            dibujar();
+        });
+
+        svg.addEventListener('pointermove', e => {
+            if (!arrastre) return;
+            const p = punto(e);
+            const a = arrastre;
+            if (a.modo === 'mover') {
+                a.z.x = limitar(redondear(p.x - a.dx), 0, Math.max(0, estado.ancho - a.z.ancho));
+                a.z.y = limitar(redondear(p.y - a.dy), 0, Math.max(0, estado.alto - a.z.alto));
+            } else if (a.modo === 'tamano') {
+                a.z.ancho = limitar(redondear(p.x - a.z.x), PASO, estado.ancho - a.z.x);
+                a.z.alto = limitar(redondear(p.y - a.z.y), PASO, estado.alto - a.z.y);
+            } else if (a.modo === 'extremo') {
+                a.l['x' + a.extremo] = limitar(redondear(p.x), 0, estado.ancho);
+                a.l['y' + a.extremo] = limitar(redondear(p.y), 0, estado.alto);
+            } else {
+                const o = a.original;
+                const dx = limitar(redondear(p.x - a.inicio.x), -Math.min(o.x1, o.x2), estado.ancho - Math.max(o.x1, o.x2));
+                const dy = limitar(redondear(p.y - a.inicio.y), -Math.min(o.y1, o.y2), estado.alto - Math.max(o.y1, o.y2));
+                Object.assign(a.l, { x1: o.x1 + dx, y1: o.y1 + dy, x2: o.x2 + dx, y2: o.y2 + dy });
+            }
+            marcarCambio();
+        });
+
+        const soltar = () => { arrastre = null; };
+        svg.addEventListener('pointerup', soltar);
+        svg.addEventListener('pointercancel', soltar);
+
+        // ===== Teclado: Tab para elegir, flechas para mover, Mayúsculas + flechas para el tamaño =====
+        const FLECHAS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+        svg.addEventListener('focusin', e => {
+            const g = e.target.closest('[data-zona], [data-linea]');
+            if (!g) return;
+            const nuevo = g.dataset.zona ? { tipo: 'zona', id: Number(g.dataset.zona) } : { tipo: 'linea', i: Number(g.dataset.linea) };
+            if (JSON.stringify(nuevo) !== JSON.stringify(sel)) {
+                sel = nuevo;
+                g.classList.add('sel');
+                actualizarPanel();
+            }
+        });
+        svg.addEventListener('keydown', e => {
+            const flecha = FLECHAS[e.key];
+            if (!flecha || !sel) return;
+            e.preventDefault();
+            const [dx, dy] = flecha.map(v => v * PASO);
+            if (sel.tipo === 'zona') {
+                const z = zonaPorId(sel.id);
+                if (e.shiftKey) {
+                    z.ancho = limitar(z.ancho + dx, PASO, estado.ancho - z.x);
+                    z.alto = limitar(z.alto + dy, PASO, estado.alto - z.y);
+                } else {
+                    z.x = limitar(z.x + dx, 0, Math.max(0, estado.ancho - z.ancho));
+                    z.y = limitar(z.y + dy, 0, Math.max(0, estado.alto - z.alto));
+                }
+            } else {
+                const l = estado.lineas[sel.i];
+                if (Math.min(l.x1, l.x2) + dx < 0 || Math.max(l.x1, l.x2) + dx > estado.ancho
+                    || Math.min(l.y1, l.y2) + dy < 0 || Math.max(l.y1, l.y2) + dy > estado.alto) return;
+                Object.assign(l, { x1: l.x1 + dx, x2: l.x2 + dx, y1: l.y1 + dy, y2: l.y2 + dy });
+            }
+            marcarCambio();
+        });
+
+        // ===== Campos del panel =====
+        function numero(input) {
+            const v = parseFloat(input.value);
+            return isNaN(v) ? null : redondear(v);
+        }
+        [['zX', 'x'], ['zY', 'y'], ['zAncho', 'ancho'], ['zAlto', 'alto']].forEach(([id, prop]) =>
+            document.getElementById(id).addEventListener('change', e => {
+                const z = sel?.tipo === 'zona' ? zonaPorId(sel.id) : null;
+                const v = numero(e.target);
+                if (!z || v === null) return;
+                z[prop] = prop === 'ancho' || prop === 'alto' ? Math.max(PASO, v) : Math.max(0, v);
+                e.target.value = z[prop];
+                marcarCambio();
+            }));
+        [['lX1', 'x1'], ['lY1', 'y1'], ['lX2', 'x2'], ['lY2', 'y2']].forEach(([id, prop]) =>
+            document.getElementById(id).addEventListener('change', e => {
+                const l = sel?.tipo === 'linea' ? estado.lineas[sel.i] : null;
+                const v = numero(e.target);
+                if (!l || v === null) return;
+                l[prop] = Math.max(0, v);
+                e.target.value = l[prop];
+                marcarCambio();
+            }));
+        lTipo.addEventListener('change', () => {
+            if (sel?.tipo !== 'linea') return;
+            estado.lineas[sel.i].tipo = lTipo.value;
+            marcarCambio();
+        });
+        document.getElementById('btnQuitar').addEventListener('click', () => {
+            const z = zonaPorId(sel.id);
+            Object.assign(z, { x: null, y: null, ancho: null, alto: null });
+            sel = null;
+            marcarCambio();
+        });
+        document.getElementById('btnEliminarLinea').addEventListener('click', () => {
+            estado.lineas.splice(sel.i, 1);
+            sel = null;
+            marcarCambio();
+        });
+        document.querySelectorAll('[data-linea-nueva]').forEach(b => b.addEventListener('click', () => {
+            const tipo = b.dataset.lineaNueva;
+            const cx = redondear(estado.ancho / 2), cy = redondear(estado.alto / 2);
+            // La entrada va sobre la pared de arriba; lo demás, al centro
+            const l = tipo === 'entrada'
+                ? { tipo, x1: 1, y1: 0, x2: 3, y2: 0 }
+                : { tipo, x1: Math.max(0, cx - 3), y1: cy, x2: Math.min(estado.ancho, cx + 3), y2: cy };
+            estado.lineas.push(l);
+            sel = { tipo: 'linea', i: estado.lineas.length - 1 };
+            marcarCambio();
+            svg.querySelector(`[data-linea="${sel.i}"]`)?.focus();
+        }));
+        [['pAncho', 'ancho'], ['pAlto', 'alto']].forEach(([id, prop]) =>
+            document.getElementById(id).addEventListener('change', e => {
+                const v = numero(e.target);
+                if (v === null) return;
+                estado[prop] = limitar(v, MIN_PLANO, MAX_PLANO);
+                e.target.value = estado[prop];
+                marcarCambio();
+            }));
+
+        // ===== Guardar =====
+        document.getElementById('formPlano').addEventListener('submit', e => {
+            const lista = problemas();
+            if (lista.length) {
+                e.preventDefault();
+                document.getElementById('cajaProblemas').hidden = false;
+                document.getElementById('cajaProblemas').scrollIntoView({ block: 'nearest' });
+                return;
+            }
+            document.getElementById('datos').value = JSON.stringify({
+                ancho: estado.ancho,
+                alto: estado.alto,
+                zonas: estado.zonas.map(z => ({ id: z.id, codigo: z.codigo, x: z.x ?? null, y: z.y ?? null, ancho: z.ancho ?? null, alto: z.alto ?? null })),
+                lineas: estado.lineas
+            });
+            cambios = false;
+            const btn = document.getElementById('btnGuardar');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="cp-spinner" aria-hidden="true"></span> Guardando…';
+        });
+        window.addEventListener('beforeunload', e => {
+            if (!cambios) return;
+            e.preventDefault();
+            e.returnValue = '';
+        });
+
+        pAncho.min = MIN_PLANO; pAncho.max = MAX_PLANO; pAlto.min = MIN_PLANO; pAlto.max = MAX_PLANO;
+        dibujar();
+    </script>
+}

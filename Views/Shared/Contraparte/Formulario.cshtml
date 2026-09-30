@@ -1,0 +1,151 @@
+@using GestionAlmacen_Golocentro.ViewModels
+@model ContraparteFormViewModel
+@{
+    var t = Model.Tipo;
+    var esNuevo = Model.Id == null;
+    ViewData["Title"] = (esNuevo ? "Nuevo " : "Editar ") + t.Singular;
+
+    string? Error(string campo) => ViewData.ModelState[campo]?.Errors.FirstOrDefault()?.ErrorMessage;
+    string? Describe(string campo, string? extra = null)
+    {
+        var ids = new[] { extra, Error(campo) != null ? campo + "-error" : null }.Where(x => x != null);
+        var valor = string.Join(" ", ids);
+        return valor.Length == 0 ? null : valor;
+    }
+
+    var errores = ViewData.ModelState
+        .Where(kv => kv.Value!.Errors.Count > 0)
+        .SelectMany(kv => kv.Value!.Errors.Select(e => (Campo: string.IsNullOrEmpty(kv.Key) ? "Nombre" : kv.Key, e.ErrorMessage)))
+        .ToList();
+}
+
+@await Html.PartialAsync("~/Views/Shared/_EstilosGestion.cshtml")
+
+
+<div class="cp-page">
+
+    <a class="cp-volver" asp-controller="@t.Controlador" asp-action="Index">
+        <i class="bi bi-arrow-left" aria-hidden="true"></i> Volver a @t.Plural.ToLowerInvariant()
+    </a>
+
+    <div class="cp-header">
+        <div>
+            <h1><i class="bi @t.Icono" aria-hidden="true"></i> @(esNuevo ? "Nuevo " + t.Singular : "Editar " + t.Singular)</h1>
+            @if (!esNuevo)
+            {
+                <p>@Model.Nombre</p>
+            }
+        </div>
+    </div>
+
+    @if (errores.Count > 0)
+    {
+        <div class="cp-resumen" role="alert" tabindex="-1" id="resumenErrores" aria-labelledby="resumenTitulo">
+            <h2 id="resumenTitulo">Revisa estos datos antes de guardar:</h2>
+            <ul>
+                @foreach (var e in errores)
+                {
+                    <li><a href="#@e.Campo">@e.ErrorMessage</a></li>
+                }
+            </ul>
+        </div>
+    }
+
+    <form class="cp-form-card" method="post" novalidate id="formContraparte"
+          asp-controller="@t.Controlador" asp-action="@(esNuevo ? "Crear" : "Editar")" asp-route-id="@Model.Id">
+        @Html.AntiForgeryToken()
+
+        <p class="cp-nota">Los campos con <span class="cp-req" aria-hidden="true">*</span><span class="visually-hidden">asterisco</span> son obligatorios.</p>
+
+        <div class="cp-campo">
+            <label for="Nombre">Nombre o razón social <span class="cp-req" aria-hidden="true">*</span></label>
+            <input id="Nombre" name="Nombre" type="text" value="@Model.Nombre" maxlength="150"
+                   autocomplete="organization" required aria-required="true"
+                   aria-invalid="@(Error("Nombre") != null ? "true" : null)"
+                   aria-describedby="@Describe("Nombre")" />
+            @if (Error("Nombre") is string errNombre)
+            {
+                <p class="cp-error" id="Nombre-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @errNombre</p>
+            }
+        </div>
+
+        <div class="cp-campo">
+            <label for="Documento">@t.DocEtiqueta <span class="cp-req" aria-hidden="true">*</span></label>
+            <input id="Documento" name="Documento" type="text" value="@Model.Documento"
+                   inputmode="numeric" maxlength="@t.DocMaxLength" autocomplete="off" spellcheck="false"
+                   required aria-required="true"
+                   aria-invalid="@(Error("Documento") != null ? "true" : null)"
+                   aria-describedby="@Describe("Documento", "Documento-ayuda")" />
+            <p class="cp-ayuda" id="Documento-ayuda">@t.DocAyuda</p>
+            @if (Error("Documento") is string errDoc)
+            {
+                <p class="cp-error" id="Documento-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @errDoc</p>
+            }
+        </div>
+
+        @if (t.TieneCelular)
+        {
+            <div class="cp-campo">
+                <label for="Celular">Celular <span class="cp-opcional">(opcional)</span></label>
+                <input id="Celular" name="Celular" type="tel" value="@Model.Celular" maxlength="9"
+                       inputmode="numeric" autocomplete="tel-national"
+                       aria-invalid="@(Error("Celular") != null ? "true" : null)"
+                       aria-describedby="@Describe("Celular", "Celular-ayuda")" />
+                <p class="cp-ayuda" id="Celular-ayuda">9 dígitos, empieza con 9. Sirve para enviarle la nota de venta por WhatsApp.</p>
+                @if (Error("Celular") is string errCelular)
+                {
+                    <p class="cp-error" id="Celular-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @errCelular</p>
+                }
+            </div>
+        }
+
+        <div class="cp-campo">
+            <label for="Contacto">Contacto <span class="cp-opcional">(opcional)</span></label>
+            <input id="Contacto" name="Contacto" type="text" value="@Model.Contacto" maxlength="100"
+                   aria-invalid="@(Error("Contacto") != null ? "true" : null)"
+                   aria-describedby="@Describe("Contacto", "Contacto-ayuda")" />
+            <p class="cp-ayuda" id="Contacto-ayuda">Persona, teléfono o correo.</p>
+            @if (Error("Contacto") is string errContacto)
+            {
+                <p class="cp-error" id="Contacto-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @errContacto</p>
+            }
+        </div>
+
+        <div class="cp-campo">
+            <label for="Direccion">Dirección <span class="cp-opcional">(opcional)</span></label>
+            <textarea id="Direccion" name="Direccion" rows="2" maxlength="200" autocomplete="street-address"
+                      aria-invalid="@(Error("Direccion") != null ? "true" : null)"
+                      aria-describedby="@Describe("Direccion")">@Model.Direccion</textarea>
+            @if (Error("Direccion") is string errDireccion)
+            {
+                <p class="cp-error" id="Direccion-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @errDireccion</p>
+            }
+        </div>
+
+        <div class="cp-botones">
+            <a class="btn-g-outline" asp-controller="@t.Controlador" asp-action="Index">Cancelar</a>
+            <button type="submit" class="btn-g-primary" id="btnGuardar">
+                <i class="bi bi-check-lg" aria-hidden="true"></i> @(esNuevo ? "Registrar " + t.Singular : "Guardar cambios")
+            </button>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <script>
+        document.getElementById('resumenErrores')?.focus();
+
+        const btnGuardar = document.getElementById('btnGuardar');
+        const contenidoGuardar = btnGuardar.innerHTML;
+        document.getElementById('formContraparte').addEventListener('submit', function () {
+            btnGuardar.disabled = true;
+            btnGuardar.setAttribute('aria-busy', 'true');
+            btnGuardar.innerHTML = '<span class="cp-spinner" aria-hidden="true"></span> Guardando…';
+        });
+        window.addEventListener('pageshow', function () {
+            btnGuardar.disabled = false;
+            btnGuardar.removeAttribute('aria-busy');
+            btnGuardar.innerHTML = contenidoGuardar;
+        });
+    </script>
+}
