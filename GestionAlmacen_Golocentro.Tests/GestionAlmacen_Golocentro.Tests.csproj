@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Mismo destino que el sistema: en GitHub Actions se compila y prueba con el SDK de .NET 8 -->
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+    <!-- La misma versión de Entity Framework que usa el sistema (le llega por EF Core Tools, que no pasa a este proyecto) -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="8.0.26" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- IFormFile, ClaimsPrincipal y demás tipos de ASP.NET Core que usa el sistema -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="..\GestionAlmacen_Golocentro.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>
