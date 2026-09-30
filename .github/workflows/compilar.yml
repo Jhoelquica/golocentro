@@ -1,0 +1,31 @@
+# Compila el sistema con el SDK de .NET 8, el mismo que se instala en el servidor.
+# En la PC se usa un SDK más nuevo, que acepta cosas que el de .NET 8 rechaza (sobre todo en las vistas Razor):
+# así se ve el error aquí y no a mitad de un despliegue.
+name: Compilar con .NET 8
+
+on:
+  push:
+    branches: [main, despliegue]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  compilar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Usar el SDK 8 aunque el equipo tenga otros más nuevos
+        run: echo '{"sdk":{"version":"8.0.100","rollForward":"latestFeature"}}' > global.json
+
+      - name: Publicar (Release)
+        run: |
+          dotnet --version
+          dotnet publish GestionAlmacen_Golocentro.csproj -c Release -o publish --nologo
+
+      - name: Revisar sintaxis de los scripts del servidor
+        run: for f in deploy/*.sh; do bash -n "$f"; done

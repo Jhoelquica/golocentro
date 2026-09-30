@@ -13,6 +13,60 @@ Guía para instalar Golocentro en un servidor pequeño con **Ubuntu 22.04 o 24.0
 
 ---
 
+## Forma rápida: clonar el repositorio y correr los scripts de `deploy/`
+
+Los scripts hacen los pasos de esta guía y guardan un registro de cada uno en `~/evidencias` del servidor (sirve de evidencia).
+
+Sirven también en un **servidor compartido**:
+- no actualizan todo el sistema;
+- no cambian la hora del servidor, porque la hora de Perú va solo en el servicio de Golocentro (`TZ`) y en su conexión a la base;
+- no tocan el firewall;
+- no tocan las otras webs de Nginx.
+
+**Antes de empezar se necesitan dos cosas:**
+- **El dominio** apuntando a la IP pública del servidor. Con DuckDNS: se entra a duckdns.org, se crea el subdominio (por ejemplo `golocentro`) y en *current ip* se pone la IP del servidor.
+- **La copia de la base** (`golocentro.sql`). La saca la dueña del sistema en su PC y la envía por privado; **no está en el repositorio porque tiene las cuentas y los datos del negocio**. Te pedirá la contraseña de su PostgreSQL local:
+  ```powershell
+  & "C:\Program Files\PostgreSQL\18\bin\pg_dump.exe" -h localhost -U postgres --no-owner --no-privileges -d golocentro -f "$env:USERPROFILE\golocentro.sql"
+  ```
+
+**En el servidor:**
+
+```bash
+git clone https://github.com/Jhoelquica/golocentro.git
+cd golocentro/deploy
+nano config.sh          # revisar DOMINIO (y el puerto interno si 5080 ya está ocupado)
+```
+
+Luego se corren en orden:
+
+| Comando | Qué hace |
+|---|---|
+| `bash 00-diagnostico.sh` | Revisa el servidor sin cambiar nada |
+| `sudo bash 01-preparar-servidor.sh` | Instala .NET 8 SDK, PostgreSQL y Nginx (solo lo que falte) y crea las carpetas |
+| `sudo bash 02-base-de-datos.sh /ruta/golocentro.sql` | Crea la base y carga la copia; pide una contraseña nueva para la base y al final borra la copia |
+| `sudo bash 03-instalar-app.sh` | Compila el sistema y lo instala como servicio |
+| `sudo bash 04-nginx-https.sh` | Publica el sistema con el dominio y pone HTTPS (pide un correo para Let's Encrypt) |
+| `sudo bash 05-respaldos.sh` | Copia de seguridad diaria |
+| `sudo bash 06-arranque-real.sh` | Borra el historial de prueba (pide escribir BORRAR) |
+| `bash 07-verificacion.sh` | Comprueba que todo funcione y junta los registros en `~/evidencias-golocentro-FECHA.tar.gz` |
+
+Si algún paso falla, el registro de ese paso queda en `~/evidencias/`.
+
+**Para actualizar** a una versión nueva:
+
+```bash
+cd golocentro
+git pull
+sudo bash deploy/03-instalar-app.sh
+```
+
+Si la versión nueva trae un script en `Database/`, se corre antes.
+
+Lo que sigue es la guía paso a paso, por si se hace a mano.
+
+---
+
 ## 1. Preparar el servidor (una sola vez)
 
 ```bash
