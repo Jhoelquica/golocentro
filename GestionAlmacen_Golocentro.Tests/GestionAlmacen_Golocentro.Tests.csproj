@@ -11,6 +11,7 @@
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="Testcontainers.PostgreSql" Version="4.15.0" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
     <!-- La misma versión de Entity Framework que usa el sistema (le llega por EF Core Tools, que no pasa a este proyecto) -->
@@ -21,6 +22,11 @@
     <!-- IFormFile, ClaimsPrincipal y demás tipos de ASP.NET Core que usa el sistema -->
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="..\GestionAlmacen_Golocentro.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- El esquema real de la base (solo estructura): las pruebas de integración lo cargan en un PostgreSQL desechable -->
+    <None Include="..\Database\esquema.sql" Link="Database\esquema.sql" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
