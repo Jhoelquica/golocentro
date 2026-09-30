@@ -1,5 +1,5 @@
 # Datos del despliegue. Es lo único que se cambia de un servidor a otro.
-DOMINIO="sistema.golocentro.com"      # dirección con la que se entra al sistema
+DOMINIO="golocentro.duckdns.org"      # dirección con la que se entra al sistema (DuckDNS, gratis)
 PUERTO_APP=5080                       # puerto interno del sistema (solo lo ve Nginx)
 BD="golocentro"                       # base de datos
 USUARIO_BD="golocentro_app"           # usuario de la base de datos (su contraseña la escribe la persona al instalar)

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Paso 1: instalar lo que el sistema necesita (.NET 8, PostgreSQL, Nginx) y crear sus carpetas.
+# Paso 1: instalar lo que el sistema necesita (.NET 8 SDK para compilarlo, PostgreSQL, Nginx) y crear sus carpetas.
 # Es un servidor compartido: no actualiza todo el sistema, no cambia la hora ni el firewall,
 # y lo que ya está instalado se deja como está.
 source "$(dirname "$0")/comun.sh"
@@ -10,11 +10,11 @@ export DEBIAN_FRONTEND=noninteractive
 paso "Lista de paquetes"
 apt-get update -q
 
-paso ".NET 8 (runtime de ASP.NET Core)"
-if dotnet --list-runtimes 2>/dev/null | grep -q "Microsoft.AspNetCore.App 8\."; then
+paso ".NET 8 SDK (compila el sistema desde el repositorio; trae el runtime de ASP.NET Core)"
+if dotnet --list-sdks 2>/dev/null | grep -q "^8\."; then
     ok "Ya estaba instalado"
 else
-    if ! apt-cache show aspnetcore-runtime-8.0 >/dev/null 2>&1; then
+    if ! apt-cache show dotnet-sdk-8.0 >/dev/null 2>&1; then
         # Debian o Ubuntu sin el paquete: repositorio oficial de Microsoft
         . /etc/os-release
         wget -q "https://packages.microsoft.com/config/$ID/$VERSION_ID/packages-microsoft-prod.deb" -O /tmp/packages-microsoft-prod.deb
@@ -22,8 +22,9 @@ else
         rm -f /tmp/packages-microsoft-prod.deb
         apt-get update -q
     fi
-    apt-get install -y -q aspnetcore-runtime-8.0
+    apt-get install -y -q dotnet-sdk-8.0
 fi
+dotnet --list-sdks
 dotnet --list-runtimes
 
 paso "PostgreSQL"
@@ -48,8 +49,8 @@ else
 fi
 nginx -v 2>&1 || true
 
-paso "Herramientas (rsync, curl)"
-apt-get install -y -q rsync curl
+paso "Herramientas (git, rsync, curl)"
+apt-get install -y -q git rsync curl
 
 paso "Carpetas del sistema"
 mkdir -p "$DIR_APP" "$DIR_LLAVES" "$DIR_CONFIG" "$DIR_RESPALDOS"

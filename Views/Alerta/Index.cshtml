@@ -13,7 +13,7 @@
     string Desde(DateTime f) => f.Date == DateTime.Today ? "desde hoy" : $"desde el {f:dd/MM}";
     string TextoVence(AlertaItem a) => a.Dias switch
     {
-        < 0 => $"Venció el {a.Vencimiento:dd/MM/yyyy}",
+        int d when d < 0 => $"Venció el {a.Vencimiento:dd/MM/yyyy}",
         0 => "Vence hoy",
         1 => "Vence mañana",
         int d => $"Vence en {d} días ({a.Vencimiento:dd/MM})",

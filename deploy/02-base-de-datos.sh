@@ -1,13 +1,21 @@
 #!/usr/bin/env bash
-# Paso 2: crear la base de datos del sistema, cargar la copia que viene de la PC (/tmp/golocentro.sql)
+# Paso 2: crear la base de datos del sistema, cargar la copia que envía la dueña del sistema
+# (archivo golocentro.sql, hecho con pg_dump; NO está en el repositorio porque tiene cuentas y datos)
 # y guardar la conexión en /etc/golocentro/golocentro.env (solo la lee el administrador).
 # La contraseña la escribe la persona: no se muestra, no queda en el registro ni en el historial.
+#   sudo bash 02-base-de-datos.sh /ruta/a/golocentro.sql
 source "$(dirname "$0")/comun.sh"
 requiere_root
 iniciar_registro "02-base-de-datos"
-COPIA="/tmp/golocentro.sql"
+ORIGINAL="${1:-/tmp/golocentro.sql}"
+COPIA="$(mktemp /tmp/golocentro-XXXXXX.sql)"
+trap 'rm -f "$COPIA"' EXIT
 
-[ -f "$COPIA" ] || falla "No está $COPIA (la copia de la base que se sube desde la PC)"
+[ -f "$ORIGINAL" ] || falla "No está $ORIGINAL (la copia de la base). Uso: sudo bash $0 /ruta/a/golocentro.sql"
+# La copia viene de PostgreSQL 18: se quitan las líneas que las versiones anteriores no entienden
+grep -vE '^(\\restrict|\\unrestrict|SET transaction_timeout|COMMENT ON SCHEMA public)' "$ORIGINAL" > "$COPIA"
+chmod 644 "$COPIA"
+ok "Copia lista: $(wc -l < "$COPIA") líneas"
 
 paso "Comprobar que no exista ya una base $BD"
 if [ "$(sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='$BD'")" = "1" ]; then
@@ -65,8 +73,8 @@ unset CLAVE
 ls -l "$DIR_CONFIG/golocentro.env"
 ok "Conexión guardada (solo la puede leer el administrador)"
 
-paso "Borrar la copia subida"
-rm -f "$COPIA"
-ok "Copia eliminada de /tmp"
+paso "Borrar la copia (tiene cuentas y datos del negocio)"
+rm -f "$COPIA" "$ORIGINAL"
+ok "Copia eliminada del servidor: ya está dentro de la base"
 
 terminar

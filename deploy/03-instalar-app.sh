@@ -1,13 +1,23 @@
 #!/usr/bin/env bash
-# Paso 3: copiar el sistema publicado (/tmp/golocentro-nuevo) y dejarlo como servicio que arranca solo.
-# También sirve para actualizar: las fotos subidas y las llaves de sesión no se tocan.
+# Paso 3: compilar el sistema desde este repositorio y dejarlo como servicio que arranca solo.
+# También sirve para actualizar (git pull y volver a correrlo): las fotos subidas y las llaves de sesión no se tocan.
 source "$(dirname "$0")/comun.sh"
 requiere_root
 iniciar_registro "03-instalar-app"
-NUEVO="/tmp/golocentro-nuevo"
+REPO="$(cd "$AQUI/.." && pwd)"
+NUEVO="$(mktemp -d /tmp/golocentro-nuevo-XXXXXX)"
+trap 'rm -rf "$NUEVO"' EXIT
 
-[ -f "$NUEVO/GestionAlmacen_Golocentro.dll" ] || falla "No está la versión publicada en $NUEVO"
 [ -f "$DIR_CONFIG/golocentro.env" ] || falla "Falta $DIR_CONFIG/golocentro.env (paso 2)"
+
+paso "Versión que se instala"
+git -C "$REPO" log -1 --format='Commit %h · %ad · %s' --date=format:'%d/%m/%Y %H:%M' || true
+
+paso "Compilar (dotnet publish, Release)"
+chown "$USUARIO_REAL": "$NUEVO"
+sudo -u "$USUARIO_REAL" -H env DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1     dotnet publish "$REPO/GestionAlmacen_Golocentro.csproj" -c Release -o "$NUEVO" --nologo
+[ -f "$NUEVO/GestionAlmacen_Golocentro.dll" ] || falla "La compilación no generó el sistema"
+ok "Compilado"
 
 paso "Copiar la versión nueva"
 rsync -a --delete --exclude 'wwwroot/evidencias/' --exclude 'wwwroot/uploads/' "$NUEVO/" "$DIR_APP/"
@@ -63,5 +73,4 @@ fi
 paso "Memoria que usa el sistema"
 ps -o pid,rss,cmd -C dotnet | awk 'NR==1 {print; next} {printf "%s %.0f MB %s\n", $1, $2/1024, $3" "$4}'
 
-rm -rf "$NUEVO"
 terminar

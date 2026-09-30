@@ -30,3 +30,8 @@ paso "Respaldos"
 ls -lh "$DIR_RESPALDOS" 2>/dev/null || aviso "Sin permiso para ver $DIR_RESPALDOS (normal sin sudo)"
 
 terminar
+
+# Todos los registros en un solo archivo, para enviarlo y armar el informe
+PAQUETE="$CASA/evidencias-golocentro-$(date +%F).tar.gz"
+tar -czf "$PAQUETE" -C "$CASA" evidencias
+echo "Registros de todos los pasos en: $PAQUETE (enviar este archivo para el informe)"

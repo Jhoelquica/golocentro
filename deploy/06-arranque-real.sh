@@ -4,7 +4,7 @@
 source "$(dirname "$0")/comun.sh"
 requiere_root
 iniciar_registro "06-arranque-real"
-SCRIPT="$AQUI/2026-09-28_arranque_real.sql"
+SCRIPT="$AQUI/../Database/2026-09-28_arranque_real.sql"
 
 [ -f "$SCRIPT" ] || falla "No está $SCRIPT"
 
