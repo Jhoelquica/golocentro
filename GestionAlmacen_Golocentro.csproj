@@ -36,4 +36,17 @@
     <Content Update="wwwroot/evidencias/**;wwwroot/uploads/**" CopyToPublishDirectory="Never" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- El proyecto de pruebas vive dentro de esta carpeta: sus archivos no son parte del sistema -->
+    <Compile Remove="GestionAlmacen_Golocentro.Tests\**" />
+    <Content Remove="GestionAlmacen_Golocentro.Tests\**" />
+    <None Remove="GestionAlmacen_Golocentro.Tests\**" />
+    <EmbeddedResource Remove="GestionAlmacen_Golocentro.Tests\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Las pruebas pueden usar lo que es internal (p. ej. la validación del plano) -->
+    <InternalsVisibleTo Include="GestionAlmacen_Golocentro.Tests" />
+  </ItemGroup>
+
 </Project>

@@ -414,9 +414,10 @@ namespace GestionAlmacen_Golocentro.Controllers
             };
         }
 
-        // Mismas reglas que el editor en el navegador: dentro del plano, en pasos de medio cuadrito y sin zonas encimadas
+        // Mismas reglas que el editor en el navegador: dentro del plano, en pasos de medio cuadrito y sin zonas encimadas.
+        // internal (no private) solo para que el proyecto de pruebas la pueda llamar.
         [NonAction]
-        private static List<string> ValidarPlano(PlanoGuardado plano, List<Ubicacion> zonasSede)
+        internal static List<string> ValidarPlano(PlanoGuardado plano, List<Ubicacion> zonasSede)
         {
             var errores = new List<string>();
             static bool MedioPaso(decimal v) => v * 2 == decimal.Truncate(v * 2);

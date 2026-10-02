@@ -27,5 +27,19 @@ jobs:
           dotnet --version
           dotnet publish GestionAlmacen_Golocentro.csproj -c Release -o publish --nologo
 
+      - name: Pruebas automatizadas (xUnit)
+        run: >
+          dotnet test GestionAlmacen_Golocentro.Tests/GestionAlmacen_Golocentro.Tests.csproj
+          --logger "console;verbosity=normal"
+          --logger "trx;LogFileName=resultados.trx"
+          --results-directory resultados
+
+      - name: Guardar el resultado de las pruebas
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultados-pruebas
+          path: resultados/*.trx
+
       - name: Revisar sintaxis de los scripts del servidor
         run: for f in deploy/*.sh; do bash -n "$f"; done
