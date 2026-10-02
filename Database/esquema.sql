@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 3ULrwedkIpm9Id5pUvcGbJt7bmmfNu3rT3GU2YXhCfD7gYzB47xC3tZbGBK9Haf
+\restrict aPhPUXAH00EcozepgNbDDEPgPVzuRI4HdU2CbJPrplH0tjlCIqWvLKAC7u7O0qC
 
 -- Dumped from database version 18.6
 -- Dumped by pg_dump version 18.6
@@ -867,6 +867,13 @@ ALTER TABLE ONLY public.usuario
 
 
 --
+-- Name: detalle_movimiento_id_movimiento_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX detalle_movimiento_id_movimiento_idx ON public.detalle_movimiento USING btree (id_movimiento);
+
+
+--
 -- Name: ajuste_inventario ajuste_inventario_id_sede_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1150,5 +1157,5 @@ ALTER TABLE ONLY public.usuario
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 3ULrwedkIpm9Id5pUvcGbJt7bmmfNu3rT3GU2YXhCfD7gYzB47xC3tZbGBK9Haf
+\unrestrict aPhPUXAH00EcozepgNbDDEPgPVzuRI4HdU2CbJPrplH0tjlCIqWvLKAC7u7O0qC
 
