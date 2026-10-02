@@ -26,6 +26,7 @@ switch (paso)
         await VolumenPaso.EjecutarAsync(bd);
         break;
     case "medir":
+        await Medicion.QuitarIndiceAsync(bd);
         Console.WriteLine($"## Volumen: {Volumen.Medicion}");
         Console.WriteLine(await Generador.GenerarAsync(bd, Volumen.Medicion));
         Console.WriteLine($"Huella md5 de los datos: {await VolumenPaso.HuellaAsync(bd)} (la misma del paso c)");
@@ -34,6 +35,7 @@ switch (paso)
         break;
     case "indice":
         // Paso e: antes y después del índice, sobre los mismos datos y en la misma base
+        await Medicion.QuitarIndiceAsync(bd);
         Console.WriteLine($"## Volumen: {Volumen.Medicion}");
         Console.WriteLine(await Generador.GenerarAsync(bd, Volumen.Medicion));
         Console.WriteLine($"Huella md5 de los datos: {await VolumenPaso.HuellaAsync(bd)} (la misma del paso c)");

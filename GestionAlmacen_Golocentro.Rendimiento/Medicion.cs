@@ -106,6 +106,20 @@ public static class Medicion
         return string.Join(Environment.NewLine, lineas);
     }
 
+    // Database/esquema.sql trae el índice desde el 02/10/2026 (se volvió a sacar de golocentro_pg tras correr el
+    // script). Para medir el estado anterior al paso e, se quita en la base desechable antes de medir.
+    public static async Task QuitarIndiceAsync(BaseDesechable bd)
+    {
+        await using var c = await bd.AbrirAsync();
+        await using var cmd = new NpgsqlCommand("SELECT count(*) FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'detalle_movimiento_id_movimiento_idx'", c);
+        var estaba = (long)(await cmd.ExecuteScalarAsync())! > 0;
+        cmd.CommandText = "DROP INDEX IF EXISTS public.detalle_movimiento_id_movimiento_idx";
+        await cmd.ExecuteNonQueryAsync();
+        Console.WriteLine(estaba
+            ? "Se quitó detalle_movimiento_id_movimiento_idx (viene en esquema.sql) para medir sin el índice del paso e."
+            : "La base no trae detalle_movimiento_id_movimiento_idx: se mide tal cual.");
+    }
+
     public static void Comparar(List<Resultado> antes, List<Resultado> despues)
     {
         Console.WriteLine("## Comparación antes / después del índice (mismos datos, misma base)");
