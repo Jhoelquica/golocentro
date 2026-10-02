@@ -13,6 +13,7 @@ public static class Medicion
     public const int Corridas = 5;
     public const int UmbralMs = 200;
     public const long TablaGrande = 10_000;
+    public const string ScriptIndice = "2026-10-02_indice_detalle_movimiento.sql";
 
     public sealed record Resultado(string Pantalla, string Accion, bool Principal, double Calentamiento, double[] Tiempos,
         int Consultas, double SqlMediana, string? ConsultaPrincipal, string? Explain, double? EjecucionExplainMs, List<string> SeqScansGrandes)
@@ -21,7 +22,8 @@ public static class Medicion
         public double Maximo => Tiempos.Max();
     }
 
-    public static async Task<List<Resultado>> MedirAsync(BaseDesechable bd, string etiqueta)
+    // explicarTambien: pantallas que llevan EXPLAIN aunque no cumplan la regla (para comparar con una medición anterior)
+    public static async Task<List<Resultado>> MedirAsync(BaseDesechable bd, string etiqueta, IReadOnlySet<string>? explicarTambien = null)
     {
         var filasPorTabla = (await Generador.ContarFilasAsync(bd)).ToDictionary(x => x.Tabla, x => x.Filas);
         var pantallas = Pantallas.Todas(await AuditoriaN1.ProductoConMasMovimientosAsync(bd));
@@ -47,7 +49,7 @@ public static class Medicion
             var seqGrandes = new List<string>();
             var principal = ultimo!.Comandos.Where(c => c.EsLectura).OrderByDescending(c => c.Duracion).FirstOrDefault();
             var mediana = tiempos.OrderBy(t => t).ElementAt(Corridas / 2);
-            if ((p.Principal || mediana > UmbralMs) && principal != null)
+            if ((p.Principal || mediana > UmbralMs || explicarTambien?.Contains(p.Nombre) == true) && principal != null)
             {
                 sql = principal.Texto;
                 try
@@ -71,7 +73,7 @@ public static class Medicion
                 sqlTotales.OrderBy(t => t).ElementAt(Corridas / 2), sql, explain, ejecucion, seqGrandes));
         }
 
-        Imprimir(resultados, etiqueta, filasPorTabla);
+        Imprimir(resultados, etiqueta, filasPorTabla, explicarTambien);
         return resultados;
     }
 
@@ -104,7 +106,21 @@ public static class Medicion
         return string.Join(Environment.NewLine, lineas);
     }
 
-    private static void Imprimir(List<Resultado> rs, string etiqueta, Dictionary<string, long> filas)
+    public static void Comparar(List<Resultado> antes, List<Resultado> despues)
+    {
+        Console.WriteLine("## Comparación antes / después del índice (mismos datos, misma base)");
+        Console.WriteLine("| Pantalla | Mediana antes (ms) | Mediana después (ms) | Máximo antes (ms) | Máximo después (ms) | EXPLAIN antes (ms) | EXPLAIN después (ms) | Seq Scan grandes antes | Seq Scan grandes después |");
+        Console.WriteLine("|---|---:|---:|---:|---:|---:|---:|---|---|");
+        foreach (var a in antes)
+        {
+            var d = despues.Single(x => x.Pantalla == a.Pantalla);
+            static string Seq(Resultado r) => r.Explain == null ? "(sin EXPLAIN)" : r.SeqScansGrandes.Count == 0 ? "ninguno" : string.Join(", ", r.SeqScansGrandes);
+            Console.WriteLine($"| {a.Pantalla} | {a.Mediana:0.0} | {d.Mediana:0.0} | {a.Maximo:0.0} | {d.Maximo:0.0} | " +
+                              $"{a.EjecucionExplainMs:0.000} | {d.EjecucionExplainMs:0.000} | {Seq(a)} | {Seq(d)} |");
+        }
+    }
+
+    private static void Imprimir(List<Resultado> rs, string etiqueta, Dictionary<string, long> filas, IReadOnlySet<string>? explicarTambien)
     {
         Console.WriteLine($"## Tiempos ({etiqueta}) · 1 corrida de calentamiento + {Corridas} medidas · la dueña (2 sedes)");
         Console.WriteLine("| Pantalla | Acción | Calentamiento (ms) | 5 corridas (ms) | Mediana (ms) | Máximo (ms) | Consultas | SQL por carga, mediana (ms) | > 200 ms |");
@@ -114,7 +130,8 @@ public static class Medicion
                               $"{r.Mediana:0.0} | {r.Maximo:0.0} | {r.Consultas} | {r.SqlMediana:0.0} | {(r.Mediana > UmbralMs ? "**SÍ (mediana)**" : r.Maximo > UmbralMs ? "solo el máximo" : "no")} |");
 
         Console.WriteLine();
-        Console.WriteLine($"## Consulta principal (la más lenta de la última corrida) de las pantallas principales y de las que pasan de {UmbralMs} ms, con EXPLAIN (ANALYZE, BUFFERS)");
+        Console.WriteLine($"## Consulta principal (la más lenta de la última corrida) de las pantallas principales, de las que pasan de {UmbralMs} ms" +
+                          (explicarTambien is { Count: > 0 } ? " y de las que tuvieron EXPLAIN en la medición anterior" : "") + ", con EXPLAIN (ANALYZE, BUFFERS)");
         Console.WriteLine($"Tablas grandes (más de {TablaGrande:N0} filas): {string.Join(", ", filas.Where(f => f.Value > TablaGrande).Select(f => $"{f.Key} ({f.Value:N0})"))}");
         Console.WriteLine("| Pantalla | Ejecución de la consulta principal en EXPLAIN (ms) | Seq Scan sobre tablas grandes |");
         Console.WriteLine("|---|---:|---|");

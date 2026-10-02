@@ -18,6 +18,7 @@ dotnet run -c Release --project GestionAlmacen_Golocentro.Rendimiento -- inventa
 | `auditoria` | Cuenta las consultas SQL de cada pantalla de lista o reporte con dos volúmenes de datos (el segundo 10 veces mayor). Si el número crece con los datos, hay N+1 |
 | `volumen` | Genera el volumen de medición dos veces y compara una huella md5 para comprobar que es reproducible: 2,000 productos, 50,000 movimientos y 150,000 detalles en 2 sedes, más notas, stock, traslados, conteos y alertas |
 | `medir` | Con ese volumen, mide cada pantalla (ver detalle abajo) |
+| `indice` | En una sola base y con los mismos datos: mide todo (como `medir`), corre `Database/2026-10-02_indice_detalle_movimiento.sql`, vuelve a medir y compara antes y después. El EXPLAIN se saca de las mismas pantallas en las dos mediciones |
 
 Qué hace `medir` en cada pantalla:
 - Mide con `Stopwatch` 1 corrida de calentamiento y 5 medidas, y da la mediana y el máximo.
