@@ -1,2 +1,4 @@
 # Los scripts del servidor deben quedar con saltos de línea de Linux
 *.sh text eol=lf
+# Librerías del navegador: se guardan tal cual vienen, sin convertir saltos de línea
+wwwroot/lib/** -text
