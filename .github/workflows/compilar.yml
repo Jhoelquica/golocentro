@@ -19,6 +19,20 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      # Aquí se trabaja sobre una copia nueva del repositorio, igual que en el servidor: si una vista carga
+      # un archivo que no está en Git (por ejemplo algo de wwwroot/lib ignorado), el sistema se vería roto
+      # y ni la compilación ni las pruebas lo notarían.
+      - name: Revisar que existan los archivos que cargan las vistas
+        run: |
+          faltan=0
+          referencias=$( (grep -rhoE '~/[A-Za-z0-9_./-]+\.(css|js|webp|png|jpg|jpeg|svg|ico|woff2?)' Views || true; \
+                          grep -rhoE "url\(['\"]?/[A-Za-z0-9_./-]+\.(webp|png|jpg|jpeg|svg)" Views | sed -E "s#url\(['\"]?/#~/#" || true) | sort -u)
+          for r in $referencias; do
+            archivo="wwwroot/${r#\~/}"
+            if [ -f "$archivo" ]; then echo "ok    $archivo"; else echo "::error::Falta $archivo (lo carga una vista y no está en el repositorio)"; faltan=1; fi
+          done
+          exit $faltan
+
       - name: Usar el SDK 8 aunque el equipo tenga otros más nuevos
         run: echo '{"sdk":{"version":"8.0.100","rollForward":"latestFeature"}}' > global.json
 

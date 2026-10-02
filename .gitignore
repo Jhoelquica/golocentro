@@ -27,8 +27,23 @@ _ReSharper.*
 ## Ignorar dependencias de cliente
 node_modules/
 bower_components/
-lib/
-wwwroot/lib/
+/lib/
+
+## Librerías del navegador (Bootstrap, jQuery, validación): solo se versionan los archivos que cargan
+## las vistas y sus licencias. Sin ellos, una copia nueva del repositorio (por ejemplo, el servidor)
+## mostraría el sistema sin estilos ni validación. Si una vista empieza a usar otro archivo de lib/,
+## hay que agregarlo aquí (GitHub Actions avisa si falta).
+wwwroot/lib/**
+!wwwroot/lib/**/
+!wwwroot/lib/bootstrap/dist/css/bootstrap.min.css
+!wwwroot/lib/bootstrap/dist/js/bootstrap.bundle.min.js
+!wwwroot/lib/bootstrap/LICENSE
+!wwwroot/lib/jquery/dist/jquery.min.js
+!wwwroot/lib/jquery/LICENSE.txt
+!wwwroot/lib/jquery-validation/dist/jquery.validate.min.js
+!wwwroot/lib/jquery-validation/LICENSE.md
+!wwwroot/lib/jquery-validation-unobtrusive/jquery.validate.unobtrusive.min.js
+!wwwroot/lib/jquery-validation-unobtrusive/LICENSE.txt
 
 ## Ignorar configuraciones sensibles
 appsettings.json
