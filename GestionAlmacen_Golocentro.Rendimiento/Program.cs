@@ -25,8 +25,15 @@ switch (paso)
     case "volumen":
         await VolumenPaso.EjecutarAsync(bd);
         break;
+    case "medir":
+        Console.WriteLine($"## Volumen: {Volumen.Medicion}");
+        Console.WriteLine(await Generador.GenerarAsync(bd, Volumen.Medicion));
+        Console.WriteLine($"Huella md5 de los datos: {await VolumenPaso.HuellaAsync(bd)} (la misma del paso c)");
+        Console.WriteLine();
+        await Medicion.MedirAsync(bd, "sin cambios");
+        break;
     default:
-        Console.WriteLine("Uso: dotnet run -c Release -- inventario | auditoria | volumen");
+        Console.WriteLine("Uso: dotnet run -c Release -- inventario | auditoria | volumen | medir");
         return 1;
 }
 Console.WriteLine();
