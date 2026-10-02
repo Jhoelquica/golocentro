@@ -42,6 +42,11 @@
     <Content Remove="GestionAlmacen_Golocentro.Tests\**" />
     <None Remove="GestionAlmacen_Golocentro.Tests\**" />
     <EmbeddedResource Remove="GestionAlmacen_Golocentro.Tests\**" />
+    <!-- Herramienta de medición de rendimiento (apartado 2.3): tampoco es parte del sistema -->
+    <Compile Remove="GestionAlmacen_Golocentro.Rendimiento\**" />
+    <Content Remove="GestionAlmacen_Golocentro.Rendimiento\**" />
+    <None Remove="GestionAlmacen_Golocentro.Rendimiento\**" />
+    <EmbeddedResource Remove="GestionAlmacen_Golocentro.Rendimiento\**" />
   </ItemGroup>
 
   <ItemGroup>
