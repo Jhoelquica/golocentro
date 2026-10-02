@@ -22,8 +22,11 @@ switch (paso)
     case "auditoria":
         await AuditoriaN1.EjecutarAsync(bd);
         break;
+    case "volumen":
+        await VolumenPaso.EjecutarAsync(bd);
+        break;
     default:
-        Console.WriteLine("Uso: dotnet run -c Release -- inventario | auditoria");
+        Console.WriteLine("Uso: dotnet run -c Release -- inventario | auditoria | volumen");
         return 1;
 }
 Console.WriteLine();

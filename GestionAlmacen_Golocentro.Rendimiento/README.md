@@ -16,6 +16,7 @@ dotnet run -c Release --project GestionAlmacen_Golocentro.Rendimiento -- inventa
 |---|---|
 | `inventario` | Tablas, índices (de la base y del modelo de EF) y claves foráneas, marcando cuáles no tienen índice |
 | `auditoria` | Cuenta las consultas SQL de cada pantalla de lista o reporte con dos volúmenes de datos (el segundo 10 veces mayor). Si el número crece con los datos, hay N+1 |
+| `volumen` | Genera el volumen de medición dos veces y compara una huella md5 para comprobar que es reproducible: 2,000 productos, 50,000 movimientos y 150,000 detalles en 2 sedes, más notas, stock, traslados, conteos y alertas |
 
 Los datos de prueba los arma `Generador.cs`:
 - son inventados y se cargan con `COPY`;
