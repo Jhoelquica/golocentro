@@ -15,3 +15,9 @@ dotnet run -c Release --project GestionAlmacen_Golocentro.Rendimiento -- inventa
 | Paso | Qué hace |
 |---|---|
 | `inventario` | Tablas, índices (de la base y del modelo de EF) y claves foráneas, marcando cuáles no tienen índice |
+| `auditoria` | Cuenta las consultas SQL de cada pantalla de lista o reporte con dos volúmenes de datos (el segundo 10 veces mayor). Si el número crece con los datos, hay N+1 |
+
+Los datos de prueba los arma `Generador.cs`:
+- son inventados y se cargan con `COPY`;
+- son reproducibles: misma semilla (`20261002`) y mismo volumen dan los mismos datos;
+- las fechas se cuentan hacia atrás desde el día en que se corre.

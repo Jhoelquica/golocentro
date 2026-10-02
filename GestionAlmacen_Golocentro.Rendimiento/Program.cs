@@ -19,8 +19,11 @@ switch (paso)
     case "inventario":
         await Inventario.EjecutarAsync(bd);
         break;
+    case "auditoria":
+        await AuditoriaN1.EjecutarAsync(bd);
+        break;
     default:
-        Console.WriteLine("Uso: dotnet run -c Release -- inventario");
+        Console.WriteLine("Uso: dotnet run -c Release -- inventario | auditoria");
         return 1;
 }
 Console.WriteLine();
