@@ -35,8 +35,7 @@
             @foreach (var r in rangos)
             {
                 var activo = r.Desde == Model.Desde && r.Hasta == Model.Hasta;
-                <a asp-action="@Model.Accion" asp-route-desde="@Iso(r.Desde)" asp-route-hasta="@Iso(r.Hasta)"
-                   asp-route-sede="@(Model.PuedeElegirSede ? Model.SedeId : null)" asp-all-route-data="extra"
+                <a asp-action="@Model.Accion" asp-all-route-data="@Model.RutaPeriodo(r.Desde, r.Hasta, extra)"
                    aria-current="@(activo ? "true" : null)">@r.Texto</a>
             }
         </nav>

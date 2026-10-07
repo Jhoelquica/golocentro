@@ -18,6 +18,20 @@ namespace GestionAlmacen_Golocentro.ViewModels
         public string Periodo => Desde == Hasta
             ? Desde.ToString("dd/MM/yyyy")
             : $"{Desde:dd/MM/yyyy} al {Hasta:dd/MM/yyyy}";
+
+        // Valores de la dirección para ver este mismo reporte en otro periodo: las fechas, la sede elegida y los
+        // filtros propios del reporte (p. ej. el producto del kardex). Van todos juntos porque en un enlace
+        // asp-all-route-data reemplaza a los asp-route-* sueltos: así los botones Hoy, Ayer, etc. salían sin fechas.
+        public Dictionary<string, string> RutaPeriodo(DateOnly desde, DateOnly hasta, IDictionary<string, string>? extra = null)
+        {
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            var ruta = extra == null ? new Dictionary<string, string>() : new Dictionary<string, string>(extra);
+            ruta["desde"] = desde.ToString("yyyy-MM-dd", inv);
+            ruta["hasta"] = hasta.ToString("yyyy-MM-dd", inv);
+            if (PuedeElegirSede && SedeId != null)
+                ruta["sede"] = SedeId.Value.ToString(inv);
+            return ruta;
+        }
     }
 
     public class ReporteIndexViewModel
