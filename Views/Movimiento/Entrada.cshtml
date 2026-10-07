@@ -656,6 +656,8 @@
                     }
                 });
                 modalProveedor.addEventListener('shown.bs.modal', () => document.getElementById('provNombre').focus());
+                // Al cerrar (guardado, X o Cancelar) el foco vuelve a la lista de proveedores, no al inicio de la página
+                modalProveedor.addEventListener('hidden.bs.modal', () => selectProveedor.focus());
             }
 
             // ===== Estado inicial (también al volver con errores del servidor) =====

@@ -671,6 +671,10 @@
                 const nombre = document.getElementById('cliNombre');
                 (nombre.value ? document.getElementById('cliDoc') : nombre).focus();
             });
+            // Si se cerró sin elegir (X o Cancelar), el foco vuelve al botón que lo abrió, no al inicio de la página
+            modalCliente.addEventListener('hidden.bs.modal', () => {
+                if (!clienteConDatos) document.getElementById('btnNuevoCliente').focus();
+            });
 
             // ===== Registrar =====
             form.addEventListener('submit', e => {

@@ -435,9 +435,12 @@
             .g-topbar { transition: box-shadow 0.2s ease; }
             .g-topbar.con-sombra { box-shadow: 0 6px 20px rgba(15,23,42,0.08); }
 
-            /* Cada página aparece con un desvanecido corto */
+            /* Cada página aparece con un desvanecido corto. "backwards" y no "both": si la animación
+               queda aplicada al terminar, el navegador le deja un transform a la página y los modales
+               que van dentro (Nuevo cliente, Nuevo proveedor) quedan debajo del fondo oscuro y no
+               responden a clics (UAT 06/10, T03 y T06). */
             @@media (prefers-reduced-motion: no-preference) {
-                .g-main > * { animation: g-entrar 0.26s ease-out both; }
+                .g-main > * { animation: g-entrar 0.26s ease-out backwards; }
             }
             @@keyframes g-entrar {
                 from { opacity: 0; transform: translateY(6px); }
