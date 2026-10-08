@@ -8,6 +8,9 @@ namespace GestionAlmacen_Golocentro.ViewModels
     {
         public int ProductoId { get; set; }
         public int UbicacionId { get; set; }
+
+        // Vacía = unidad base; si no, la presentación en que llegó (caja, bolsa...). La cantidad va en esa presentación.
+        public string? Presentacion { get; set; }
         public int Cantidad { get; set; }
 
         // Vencimiento y lote de esta mercadería (opcionales)
@@ -26,7 +29,7 @@ namespace GestionAlmacen_Golocentro.ViewModels
         public EntradaDatos Datos { get; set; } = new();
     }
 
-    public record ProductoEntrada(int Id, string Nombre, string Codigo, string Unidad);
+    public record ProductoEntrada(int Id, string Nombre, string Codigo, string Unidad, List<PresentacionVenta> Presentaciones);
 
     public record ZonaEntrada(int Id, string Codigo, string? Descripcion, bool Recepcion, string Sede);
 
@@ -86,7 +89,7 @@ namespace GestionAlmacen_Golocentro.ViewModels
 
     // ===== Detalle de una entrada (o salida antigua) =====
     public record LineaDetalleMovimiento(string Producto, string Codigo, string Unidad, string Zona, int Cantidad, int StockAnterior, int StockDespues,
-        DateOnly? Vence = null, string? Lote = null);
+        DateOnly? Vence = null, string? Lote = null, string? Presentacion = null, int Factor = 1);
 
     public class MovimientoDetalleViewModel
     {
