@@ -32,6 +32,34 @@ namespace GestionAlmacen_Golocentro.ViewModels
                 ruta["sede"] = SedeId.Value.ToString(inv);
             return ruta;
         }
+
+        // Periodo con el que se compara (reporte comparativo, UAT 06/10), con la misma sede:
+        //  - lo que va de un mes (01–07/10) contra los mismos días del mes anterior (01–07/09);
+        //  - meses completos contra los meses completos anteriores (septiembre contra agosto);
+        //  - desde el 1 de enero y más de un mes, contra las mismas fechas del año pasado;
+        //  - cualquier otro rango contra los mismos días justo antes (15–20/09 contra 09–14/09).
+        public FiltroReporte PeriodoAnterior()
+        {
+            DateOnly desde, hasta;
+            var finDeMes = Hasta.AddDays(1).Day == 1;
+            var meses = (Hasta.Year * 12 + Hasta.Month) - (Desde.Year * 12 + Desde.Month) + 1;
+            if (Desde.Day == 1 && Desde.Month == 1 && Hasta.Year == Desde.Year && Hasta.Month > 1)
+                (desde, hasta) = (Desde.AddYears(-1), Hasta.AddYears(-1));
+            else if (Desde.Day == 1 && finDeMes)
+                (desde, hasta) = (Desde.AddMonths(-meses), Desde.AddDays(-1));
+            else if (Desde.Day == 1)
+                (desde, hasta) = (Desde.AddMonths(-meses), Hasta.AddMonths(-meses));
+            else
+            {
+                var dias = Hasta.DayNumber - Desde.DayNumber + 1;
+                (desde, hasta) = (Desde.AddDays(-dias), Desde.AddDays(-1));
+            }
+            return new FiltroReporte
+            {
+                Accion = Accion, ConFechas = ConFechas, Desde = desde, Hasta = hasta,
+                SedeId = SedeId, SedeNombre = SedeNombre, PuedeElegirSede = PuedeElegirSede, Sedes = Sedes
+            };
+        }
     }
 
     public class ReporteIndexViewModel
@@ -50,6 +78,10 @@ namespace GestionAlmacen_Golocentro.ViewModels
         string MetodoPago, decimal Subtotal, decimal Descuento, decimal Total, bool Anulada);
 
     public record VentaPorPeriodo(string Etiqueta, string EtiquetaLarga, int Ventas, decimal Total);
+
+    // Gráfico de barras compartido (_GraficoBarras): los periodos, la descripción para lectores de pantalla y los
+    // textos de su tabla ("por mes" / "Mes")
+    public record GraficoPeriodos(List<VentaPorPeriodo> Periodos, string Descripcion, string TituloTabla, string EtiquetaColumna);
 
     public record TotalPorVendedor(string Vendedor, int Ventas, decimal Total);
 
@@ -167,5 +199,29 @@ namespace GestionAlmacen_Golocentro.ViewModels
         public int Bajos { get; set; }
         public int Unidades { get; set; }
         public decimal Valor { get; set; }
+    }
+
+    // ---- Comparativo (UAT 06/10): el periodo contra el anterior, ventas por mes, productos y sedes ----
+    public record Comparado(decimal Actual, decimal Anterior)
+    {
+        // null si antes no hubo nada con qué comparar
+        public decimal? Variacion => Anterior == 0 ? null : (Actual - Anterior) / Anterior;
+    }
+
+    public record IndicadorComparado(string Nombre, Comparado Valor, bool EsMoneda);
+
+    public record ProductoComparado(int Puesto, int? PuestoAnterior, string Codigo, string Nombre, string Unidad,
+        Comparado Cantidad, Comparado Importe);
+
+    public record SedeComparada(string Sede, Comparado Total, int Ventas, decimal Ticket, int Unidades);
+
+    public class ReporteComparativoViewModel
+    {
+        public FiltroReporte Filtro { get; set; } = new();
+        public FiltroReporte Anterior { get; set; } = new();
+        public List<IndicadorComparado> Indicadores { get; set; } = new();
+        public List<VentaPorPeriodo> PorMes { get; set; } = new();
+        public List<ProductoComparado> Productos { get; set; } = new();
+        public List<SedeComparada> Sedes { get; set; } = new();
     }
 }

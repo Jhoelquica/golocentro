@@ -1,0 +1,230 @@
+@using System.Globalization
+@using GestionAlmacen_Golocentro.ViewModels
+@model GraficoPeriodos
+@{
+    // Gráfico de barras de ventas por periodo (día o mes) con su tabla. Lo usan el reporte de ventas y el comparativo.
+    var inv = CultureInfo.InvariantCulture;
+    string Soles(decimal n) => "S/ " + n.ToString("N2", inv);
+    // Eje del gráfico: tope "redondo" (1, 2, 2.5 o 5 × 10^n) y 4 divisiones
+    var maximo = Model.Periodos.Count == 0 ? 0 : Model.Periodos.Max(p => p.Total);
+    decimal tope = 10;
+    if (maximo > 0)
+    {
+        var potencia = (decimal)Math.Pow(10, Math.Floor(Math.Log10((double)maximo)));
+        var fraccion = maximo / potencia;
+        tope = (fraccion <= 1 ? 1 : fraccion <= 2 ? 2 : fraccion <= 2.5m ? 2.5m : fraccion <= 5 ? 5 : 10) * potencia;
+    }
+    var marcas = Enumerable.Range(0, 5).Select(i => tope * i / 4).ToList();
+    string Marca(decimal v) => v.ToString(v % 1 == 0 ? "N0" : "N2", inv);
+    // Etiquetas del eje X: unas 8 como máximo, siempre la primera y la última; la que cae pegada a la última
+    // se omite para que no se encimen (con 12 meses quedaban "set. 26oct. 26")
+    var n = Model.Periodos.Count;
+    var paso = Math.Max(1, (int)Math.Ceiling(n / 8.0));
+    bool ConEtiqueta(int i) => i == n - 1 || (i % paso == 0 && n - 1 - i >= paso);
+}
+
+<style>
+    .rp-grafico {
+        margin: 0;
+        padding: 12px 1.25rem 16px;
+    }
+
+    .rp-area {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 8px;
+        height: 220px;
+    }
+
+    .rp-eje-y {
+        position: relative;
+        width: 64px;
+        font-size: 12px;
+        color: var(--g-muted);
+        font-variant-numeric: tabular-nums;
+    }
+
+        .rp-eje-y span {
+            position: absolute;
+            right: 0;
+            transform: translateY(50%);
+            white-space: nowrap;
+        }
+
+    .rp-plot {
+        position: relative;
+        border-bottom: 1px solid #CBD5E1;
+    }
+
+    .rp-linea {
+        position: absolute;
+        left: 0;
+        right: 0;
+        border-top: 1px solid #EEF2F6;
+    }
+
+    .rp-columnas {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        gap: 2px;
+    }
+
+    .rp-col {
+        position: relative;
+        flex: 1;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        min-width: 0;
+    }
+
+    .rp-dato {
+        width: min(24px, 100%);
+        background: var(--g-teal);
+        border-radius: 4px 4px 0 0;
+    }
+
+    .rp-col:hover .rp-dato {
+        background: #065F46;
+    }
+
+    .rp-col::after {
+        content: attr(data-tip);
+        position: absolute;
+        top: -6px;
+        left: 50%;
+        transform: translate(-50%, -100%);
+        padding: 6px 10px;
+        border-radius: 8px;
+        background: var(--g-navy);
+        color: #FFFFFF;
+        font-size: 12px;
+        font-weight: 500;
+        white-space: nowrap;
+        pointer-events: none;
+        /* Oculto con display (no opacity): invisible también ocuparía espacio y movería la página */
+        display: none;
+        z-index: 2;
+    }
+
+    .rp-col.inicio::after {
+        left: 0;
+        transform: translate(0, -100%);
+    }
+
+    .rp-col.fin::after {
+        left: auto;
+        right: 0;
+        transform: translate(0, -100%);
+    }
+
+    .rp-col:hover::after {
+        display: block;
+    }
+
+    .rp-eje-x {
+        display: flex;
+        gap: 2px;
+        margin-left: 72px;
+        margin-top: 6px;
+        font-size: 12px;
+        color: var(--g-muted);
+    }
+
+        .rp-eje-x span {
+            flex: 1;
+            min-width: 0;
+            text-align: center;
+            white-space: nowrap;
+            overflow: visible;
+        }
+
+            /* Los extremos se alinean al borde para no salirse del gráfico */
+            .rp-eje-x span:first-child {
+                text-align: left;
+            }
+
+            .rp-eje-x span:last-child {
+                text-align: right;
+            }
+
+    .rp-detalle-dias summary {
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--g-teal);
+        padding: 0 1.25rem 12px;
+    }
+
+        .rp-detalle-dias summary:focus-visible {
+            outline: 2px solid var(--g-teal);
+            outline-offset: 2px;
+        }
+
+    .rp-detalle-dias .cp-tabla-wrap {
+        margin-top: 0;
+    }
+
+</style>
+
+<figure class="rp-grafico">
+    <div class="rp-area" role="img" aria-label="@Model.Descripcion">
+        <div class="rp-eje-y" aria-hidden="true">
+            @foreach (var m in marcas)
+            {
+                <span style="bottom:@((m / tope * 100).ToString("0.##", inv))%">@Marca(m)</span>
+            }
+        </div>
+        <div class="rp-plot" aria-hidden="true">
+            @foreach (var m in marcas.Skip(1))
+            {
+                <div class="rp-linea" style="bottom:@((m / tope * 100).ToString("0.##", inv))%"></div>
+            }
+            <div class="rp-columnas">
+                @for (var i = 0; i < n; i++)
+                {
+                    var p = Model.Periodos[i];
+                    // El globo se alinea al borde cercano para no salirse del gráfico
+                    var clase = i < n / 3.0 ? "inicio" : i >= n * 2 / 3.0 ? "fin" : null;
+                    <div class="rp-col @clase" data-tip="@p.EtiquetaLarga · @Soles(p.Total) · @p.Ventas @(p.Ventas == 1 ? "venta" : "ventas")">
+                        @if (p.Total > 0)
+                        {
+                            <span class="rp-dato" style="height:@((p.Total / tope * 100).ToString("0.##", inv))%"></span>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="rp-eje-x" aria-hidden="true">
+        @for (var i = 0; i < n; i++)
+        {
+            <span>@(ConEtiqueta(i) ? Model.Periodos[i].Etiqueta : "")</span>
+        }
+    </div>
+</figure>
+<details class="rp-detalle-dias rp-no-imprimir">
+    <summary>Ver la tabla @Model.TituloTabla</summary>
+    <div class="cp-tabla-wrap">
+        <table class="cp-tabla">
+            <thead>
+                <tr>
+                    <th scope="col">@Model.EtiquetaColumna</th>
+                    <th scope="col" class="rp-num">Ventas</th>
+                    <th scope="col" class="rp-num">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in Model.Periodos)
+                {
+                    <tr>
+                        <td>@p.EtiquetaLarga</td>
+                        <td class="rp-num">@p.Ventas</td>
+                        <td class="rp-num">@Soles(p.Total)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</details>
