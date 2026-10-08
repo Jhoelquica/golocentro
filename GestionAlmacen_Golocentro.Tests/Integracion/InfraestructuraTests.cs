@@ -26,15 +26,16 @@ public class InfraestructuraTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task El_esquema_trae_las_20_tablas_del_sistema()
+    public async Task El_esquema_trae_las_21_tablas_del_sistema()
     {
         await using var db = _base.NuevoContexto();
         var tablas = await db.Database
             .SqlQueryRaw<string>("SELECT table_name AS \"Value\" FROM information_schema.tables WHERE table_schema = 'public' ORDER BY 1")
             .ToListAsync();
 
-        Assert.Equal(20, tablas.Count);
+        Assert.Equal(21, tablas.Count);
         Assert.Contains("producto_ubicacion", tablas);
+        Assert.Contains("producto_presentacion", tablas);
         Assert.Contains("nota_venta", tablas);
         Assert.Contains("alerta", tablas);
     }
@@ -47,8 +48,10 @@ public class InfraestructuraTests : IAsyncLifetime
             .SqlQueryRaw<string>("SELECT conname AS \"Value\" FROM pg_constraint WHERE contype = 'c' AND connamespace = 'public'::regnamespace")
             .ToListAsync();
 
-        Assert.Equal(31, checks.Count);
+        Assert.Equal(35, checks.Count);
         Assert.Contains("chk_productoubicacion_cantidad", checks);
+        Assert.Contains("chk_detallemovimiento_factor", checks);
+        Assert.Contains("chk_productopresentacion_factor", checks);
         Assert.Contains("chk_usuario_rol", checks);
         Assert.Contains("chk_notaventa_anulacion", checks);
     }

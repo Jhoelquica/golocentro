@@ -19,6 +19,14 @@ public partial class DetalleMovimiento
 
     public int IdUbicacion { get; set; }
 
+    public DateOnly? FechaVencimiento { get; set; }
+
+    public string? Lote { get; set; }
+
+    public string? Presentacion { get; set; }
+
+    public int Factor { get; set; }
+
     public virtual ICollection<Evidencium> Evidencia { get; set; } = new List<Evidencium>();
 
     public virtual Movimiento IdMovimientoNavigation { get; set; } = null!;

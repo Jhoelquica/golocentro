@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict aPhPUXAH00EcozepgNbDDEPgPVzuRI4HdU2CbJPrplH0tjlCIqWvLKAC7u7O0qC
+\restrict StSH9HfYE2FYx3D9tCfauTGfvuLVNUINXzG7RWUf2daiXCFXcgnRkcle7oIcV0S
 
 -- Dumped from database version 18.6
 -- Dumped by pg_dump version 18.6
@@ -182,7 +182,12 @@ CREATE TABLE public.detalle_movimiento (
     precio_unitario_snapshot numeric(10,2) NOT NULL,
     stock_anterior integer NOT NULL,
     id_ubicacion integer NOT NULL,
+    fecha_vencimiento date,
+    lote character varying(50),
+    presentacion character varying(30),
+    factor integer DEFAULT 1 NOT NULL,
     CONSTRAINT chk_detallemovimiento_cantidad CHECK ((cantidad > 0)),
+    CONSTRAINT chk_detallemovimiento_factor CHECK (((factor >= 1) AND ((cantidad % factor) = 0))),
     CONSTRAINT chk_detallemovimiento_precio CHECK ((precio_unitario_snapshot >= (0)::numeric)),
     CONSTRAINT chk_detallemovimiento_stockanterior CHECK ((stock_anterior >= 0))
 );
@@ -416,6 +421,36 @@ ALTER TABLE public.producto ALTER COLUMN id_producto ADD GENERATED ALWAYS AS IDE
 
 
 --
+-- Name: producto_presentacion; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.producto_presentacion (
+    id_presentacion integer NOT NULL,
+    id_producto integer NOT NULL,
+    nombre character varying(30) NOT NULL,
+    factor integer NOT NULL,
+    precio numeric(10,2) NOT NULL,
+    CONSTRAINT chk_productopresentacion_factor CHECK ((factor > 1)),
+    CONSTRAINT chk_productopresentacion_nombre CHECK ((length(TRIM(BOTH FROM nombre)) > 0)),
+    CONSTRAINT chk_productopresentacion_precio CHECK ((precio >= (0)::numeric))
+);
+
+
+--
+-- Name: producto_presentacion_id_presentacion_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.producto_presentacion ALTER COLUMN id_presentacion ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.producto_presentacion_id_presentacion_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
 -- Name: producto_ubicacion; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -452,7 +487,8 @@ CREATE TABLE public.proveedor (
     nombre character varying(150) NOT NULL,
     ruc character varying(20) NOT NULL,
     contacto character varying(100),
-    direccion character varying(200)
+    direccion character varying(200),
+    celular character varying(15)
 );
 
 
@@ -755,6 +791,14 @@ ALTER TABLE ONLY public.producto
 
 
 --
+-- Name: producto_presentacion producto_presentacion_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.producto_presentacion
+    ADD CONSTRAINT producto_presentacion_pkey PRIMARY KEY (id_presentacion);
+
+
+--
 -- Name: producto_ubicacion producto_ubicacion_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -840,6 +884,14 @@ ALTER TABLE ONLY public.nota_venta
 
 ALTER TABLE ONLY public.producto_ubicacion
     ADD CONSTRAINT uq_producto_ubicacion UNIQUE (id_producto, id_ubicacion);
+
+
+--
+-- Name: producto_presentacion uq_productopresentacion_nombre; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.producto_presentacion
+    ADD CONSTRAINT uq_productopresentacion_nombre UNIQUE (id_producto, nombre);
 
 
 --
@@ -1090,6 +1142,14 @@ ALTER TABLE ONLY public.plano_linea
 
 
 --
+-- Name: producto_presentacion producto_presentacion_id_producto_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.producto_presentacion
+    ADD CONSTRAINT producto_presentacion_id_producto_fkey FOREIGN KEY (id_producto) REFERENCES public.producto(id_producto) ON DELETE CASCADE;
+
+
+--
 -- Name: producto_ubicacion producto_ubicacion_id_producto_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1157,5 +1217,5 @@ ALTER TABLE ONLY public.usuario
 -- PostgreSQL database dump complete
 --
 
-\unrestrict aPhPUXAH00EcozepgNbDDEPgPVzuRI4HdU2CbJPrplH0tjlCIqWvLKAC7u7O0qC
+\unrestrict StSH9HfYE2FYx3D9tCfauTGfvuLVNUINXzG7RWUf2daiXCFXcgnRkcle7oIcV0S
 

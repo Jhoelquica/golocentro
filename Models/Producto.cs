@@ -33,5 +33,7 @@ public partial class Producto
 
     public virtual ICollection<DetalleTraslado> DetalleTraslados { get; set; } = new List<DetalleTraslado>();
 
+    public virtual ICollection<ProductoPresentacion> ProductoPresentacions { get; set; } = new List<ProductoPresentacion>();
+
     public virtual ICollection<ProductoUbicacion> ProductoUbicacions { get; set; } = new List<ProductoUbicacion>();
 }
