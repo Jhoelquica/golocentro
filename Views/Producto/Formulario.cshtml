@@ -89,6 +89,57 @@
             margin-top: 2px;
         }
 
+    /* Presentaciones: una fila por presentación (nombre, cuántas unidades base trae, precio) */
+    .pf-pres-lista {
+        list-style: none;
+        margin: 0 0 10px;
+        padding: 0;
+    }
+
+    .pf-pres {
+        display: grid;
+        grid-template-columns: minmax(120px, 1.2fr) minmax(130px, 1fr) minmax(120px, 1fr) auto;
+        gap: 0 12px;
+        align-items: start;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--g-border);
+    }
+
+        .pf-pres .cp-campo {
+            margin-bottom: 0;
+        }
+
+        .pf-pres .pf-quitar {
+            margin-top: 30px;
+        }
+
+    .pf-trae {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+        .pf-trae input {
+            min-width: 0;
+        }
+
+        .pf-trae span {
+            font-size: 14px;
+            color: var(--g-muted);
+            white-space: nowrap;
+        }
+
+    @@media (max-width: 640px) {
+        .pf-pres {
+            grid-template-columns: 1fr 1fr;
+            gap: 10px 12px;
+        }
+
+            .pf-pres .pf-quitar {
+                margin-top: 0;
+            }
+    }
+
     .btn-g-outline .cp-spinner {
         border-color: rgba(51,65,85,0.3);
         border-top-color: var(--g-navy);
@@ -199,7 +250,7 @@
             </div>
 
             <div class="cp-campo" style="max-width:calc(50% - 8px); min-width:220px">
-                <label for="UnidadMedida">Unidad de medida <span class="cp-req" aria-hidden="true">*</span></label>
+                <label for="UnidadMedida">Unidad base <span class="cp-req" aria-hidden="true">*</span></label>
                 <input id="UnidadMedida" name="UnidadMedida" type="text" value="@Model.UnidadMedida" maxlength="20" list="listaUnidades"
                        required aria-required="true" autocomplete="off"
                        aria-invalid="@(Error("UnidadMedida") != null ? "true" : null)"
@@ -210,7 +261,7 @@
                         <option value="@u"></option>
                     }
                 </datalist>
-                <p class="cp-ayuda" id="UnidadMedida-ayuda">Por ejemplo: unidad, caja, bolsa, paquete.</p>
+                <p class="cp-ayuda" id="UnidadMedida-ayuda">La más chica que vendes: tira, pack, unidad, kg. El stock se cuenta en esta unidad.</p>
                 @if (Error("UnidadMedida") is string eUnidad)
                 {
                     <p class="cp-error" id="UnidadMedida-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @eUnidad</p>
@@ -231,7 +282,7 @@
                                aria-invalid="@(Error("PrecioUnitario") != null ? "true" : null)"
                                aria-describedby="@Describe("PrecioUnitario", "PrecioUnitario-ayuda")" />
                     </div>
-                    <p class="cp-ayuda" id="PrecioUnitario-ayuda">En soles, por unidad de medida.</p>
+                    <p class="cp-ayuda" id="PrecioUnitario-ayuda">En soles, por unidad base.</p>
                     @if (Error("PrecioUnitario") is string ePrecio)
                     {
                         <p class="cp-error" id="PrecioUnitario-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @ePrecio</p>
@@ -251,6 +302,68 @@
                     }
                 </div>
             </div>
+        </fieldset>
+
+        <fieldset class="pf-bloque" aria-describedby="presentaciones-ayuda">
+            <legend>Presentaciones <span class="cp-opcional">(opcional)</span></legend>
+            <p class="cp-ayuda" id="presentaciones-ayuda" style="margin:-4px 0 4px">
+                Si también lo vendes o compras en bolsa, caja o pack: escribe cuántas unidades base trae y su precio.
+                Ejemplo: bolsa que trae 8 tiras a S/ 7.00.
+            </p>
+            <ul class="pf-pres-lista" id="listaPresentaciones">
+                @for (var i = 0; i < Model.Presentaciones.Count; i++)
+                {
+                    var f = Model.Presentaciones[i];
+                    var pre = $"Presentaciones[{i}]";
+                    <li class="pf-pres">
+                        <input type="hidden" name="@(pre).Id" value="@f.Id" data-campo="Id" />
+                        <div class="cp-campo">
+                            <label for="@(pre).Nombre">Nombre</label>
+                            <input id="@(pre).Nombre" name="@(pre).Nombre" type="text" value="@f.Nombre" maxlength="30" autocomplete="off" data-campo="Nombre"
+                                   placeholder="bolsa, caja, pack" aria-invalid="@(Error(pre + ".Nombre") != null ? "true" : null)"
+                                   aria-describedby="@(Error(pre + ".Nombre") != null ? pre + ".Nombre-error" : null)" />
+                            @if (Error(pre + ".Nombre") is string eN)
+                            {
+                                <p class="cp-error" id="@(pre).Nombre-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @eN</p>
+                            }
+                        </div>
+                        <div class="cp-campo">
+                            <label for="@(pre).Factor">Trae</label>
+                            <div class="pf-trae">
+                                <input id="@(pre).Factor" name="@(pre).Factor" type="number" min="2" step="1" inputmode="numeric" value="@f.Factor" data-campo="Factor"
+                                       aria-invalid="@(Error(pre + ".Factor") != null ? "true" : null)"
+                                       aria-describedby="@(Error(pre + ".Factor") != null ? pre + ".Factor-error" : null)" />
+                                <span data-unidad-base></span>
+                            </div>
+                            @if (Error(pre + ".Factor") is string eF)
+                            {
+                                <p class="cp-error" id="@(pre).Factor-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @eF</p>
+                            }
+                        </div>
+                        <div class="cp-campo">
+                            <label for="@(pre).Precio">Precio</label>
+                            <div class="pf-moneda">
+                                <span aria-hidden="true">S/</span>
+                                <input id="@(pre).Precio" name="@(pre).Precio" type="number" min="0" step="0.01" inputmode="decimal" data-campo="Precio"
+                                       value="@f.Precio?.ToString("0.00", CultureInfo.InvariantCulture)"
+                                       aria-invalid="@(Error(pre + ".Precio") != null ? "true" : null)"
+                                       aria-describedby="@(Error(pre + ".Precio") != null ? pre + ".Precio-error" : null)" />
+                            </div>
+                            @if (Error(pre + ".Precio") is string eP)
+                            {
+                                <p class="cp-error" id="@(pre).Precio-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @eP</p>
+                            }
+                        </div>
+                        <button type="button" class="cp-icono-btn peligro pf-quitar" data-accion="quitar-presentacion"
+                                aria-label="Quitar la presentación @f.Nombre" title="Quitar">
+                            <i class="bi bi-trash3" aria-hidden="true"></i>
+                        </button>
+                    </li>
+                }
+            </ul>
+            <button type="button" class="btn-g-outline" id="btnAgregarPresentacion">
+                <i class="bi bi-plus-lg" aria-hidden="true"></i> Agregar presentación
+            </button>
         </fieldset>
 
         <fieldset class="pf-bloque">
@@ -308,6 +421,68 @@
         if (!document.getElementById('resumenErrores') && @(esNuevo ? "true" : "false")) {
             document.getElementById('Nombre').focus();
         }
+
+        // ===== Presentaciones =====
+        const listaPresentaciones = document.getElementById('listaPresentaciones');
+        const inputUnidad = document.getElementById('UnidadMedida');
+        let filasNuevas = 0;
+        // Renombra las filas en orden (Presentaciones[0], [1]...) para que el model binding arme la lista
+        function numerarPresentaciones() {
+            [...listaPresentaciones.children].forEach((li, i) =>
+                li.querySelectorAll('[data-campo]').forEach(c => {
+                    c.name = `Presentaciones[${i}].${c.dataset.campo}`;
+                    if (c.type === 'hidden') return;
+                    const label = li.querySelector(`label[for="${CSS.escape(c.id)}"]`);
+                    c.id = c.name;
+                    if (label) label.htmlFor = c.id;
+                }));
+        }
+        function mostrarUnidadBase() {
+            const unidad = inputUnidad.value.trim() || 'unidades base';
+            listaPresentaciones.querySelectorAll('[data-unidad-base]').forEach(s => s.textContent = unidad);
+        }
+        document.getElementById('btnAgregarPresentacion').addEventListener('click', () => {
+            const n = ++filasNuevas;
+            const li = document.createElement('li');
+            li.className = 'pf-pres';
+            li.innerHTML = `
+                <input type="hidden" data-campo="Id" />
+                <div class="cp-campo">
+                    <label for="presNueva${n}Nombre">Nombre</label>
+                    <input id="presNueva${n}Nombre" type="text" maxlength="30" autocomplete="off" data-campo="Nombre" placeholder="bolsa, caja, pack" />
+                </div>
+                <div class="cp-campo">
+                    <label for="presNueva${n}Factor">Trae</label>
+                    <div class="pf-trae">
+                        <input id="presNueva${n}Factor" type="number" min="2" step="1" inputmode="numeric" data-campo="Factor" />
+                        <span data-unidad-base></span>
+                    </div>
+                </div>
+                <div class="cp-campo">
+                    <label for="presNueva${n}Precio">Precio</label>
+                    <div class="pf-moneda"><span aria-hidden="true">S/</span>
+                        <input id="presNueva${n}Precio" type="number" min="0" step="0.01" inputmode="decimal" data-campo="Precio" />
+                    </div>
+                </div>
+                <button type="button" class="cp-icono-btn peligro pf-quitar" data-accion="quitar-presentacion" aria-label="Quitar esta presentación" title="Quitar">
+                    <i class="bi bi-trash3" aria-hidden="true"></i>
+                </button>`;
+            listaPresentaciones.append(li);
+            numerarPresentaciones();
+            mostrarUnidadBase();
+            li.querySelector('[data-campo="Nombre"]').focus();
+        });
+        listaPresentaciones.addEventListener('click', e => {
+            const boton = e.target.closest('[data-accion="quitar-presentacion"]');
+            if (!boton) return;
+            const li = boton.closest('li');
+            const siguiente = li.nextElementSibling ?? li.previousElementSibling;
+            li.remove();
+            numerarPresentaciones();
+            (siguiente?.querySelector('[data-campo="Nombre"]') ?? document.getElementById('btnAgregarPresentacion')).focus();
+        });
+        inputUnidad.addEventListener('input', mostrarUnidadBase);
+        mostrarUnidadBase();
 
         const form = document.getElementById('formProducto');
         const botones = [...form.querySelectorAll('button[type=submit]')];

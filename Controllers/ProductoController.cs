@@ -133,7 +133,12 @@ namespace GestionAlmacen_Golocentro.Controllers
                 PrecioUnitario = p.PrecioUnitario,
                 StockMinimo = p.StockMinimo,
                 FechaVencimiento = p.FechaVencimiento,
-                Lote = p.Lote
+                Lote = p.Lote,
+                Presentaciones = await _context.ProductoPresentacions
+                    .Where(pp => pp.IdProducto == id)
+                    .OrderBy(pp => pp.Factor)
+                    .Select(pp => new PresentacionFormViewModel { Id = pp.IdPresentacion, Nombre = pp.Nombre, Factor = pp.Factor, Precio = pp.Precio })
+                    .ToListAsync()
             });
         }
 
@@ -142,7 +147,7 @@ namespace GestionAlmacen_Golocentro.Controllers
         [Authorize(Roles = "duena,encargada")]
         public async Task<IActionResult> Editar(int id, ProductoFormViewModel model)
         {
-            var producto = await _context.Productos.FindAsync(id);
+            var producto = await _context.Productos.Include(p => p.ProductoPresentacions).FirstOrDefaultAsync(p => p.IdProducto == id);
             if (producto == null)
                 return NotFound();
 
@@ -281,6 +286,14 @@ namespace GestionAlmacen_Golocentro.Controllers
             model.Tipo = model.Tipo?.Trim();
             model.UnidadMedida = model.UnidadMedida?.Trim();
             model.Lote = string.IsNullOrWhiteSpace(model.Lote) ? null : model.Lote.Trim();
+            model.Presentaciones = model.Presentaciones
+                .Where(f => !Presentaciones.EstaVacia(new Presentaciones.Fila(f.Nombre, f.Factor, f.Precio)))
+                .ToList();
+            foreach (var f in model.Presentaciones)
+                f.Nombre = f.Nombre?.Trim();
+            var filas = model.Presentaciones.Select(f => new Presentaciones.Fila(f.Nombre, f.Factor, f.Precio)).ToList();
+            foreach (var (i, campo, mensaje) in Presentaciones.Validar(model.UnidadMedida, filas))
+                ModelState.AddModelError($"Presentaciones[{i}].{campo}", mensaje);
 
             // precio_unitario es numeric(10,2): con más decimales la BD redondearía sin avisar
             if (model.PrecioUnitario is decimal precio && decimal.Round(precio, 2) != precio)
@@ -306,11 +319,35 @@ namespace GestionAlmacen_Golocentro.Controllers
             producto.UnidadMedida = model.UnidadMedida!;
             producto.PrecioUnitario = model.PrecioUnitario!.Value;
             producto.StockMinimo = model.StockMinimo!.Value;
+            SincronizarPresentaciones(model.Presentaciones, producto);
             // Si el vencimiento sale de las entradas, no se pisa con lo del formulario
             if (!conVencimiento)
                 return;
             producto.FechaVencimiento = model.FechaVencimiento;
             producto.Lote = model.Lote;
+        }
+
+        // Las presentaciones del formulario reemplazan a las del producto: se actualizan las que siguen (por Id),
+        // se agregan las nuevas y se quitan las que ya no están. Las ventas pasadas no cambian: guardan su presentación.
+        [NonAction]
+        private static void SincronizarPresentaciones(List<PresentacionFormViewModel> filas, Producto producto)
+        {
+            var quedan = filas.Where(f => f.Id != null).Select(f => f.Id!.Value).ToHashSet();
+            foreach (var quitada in producto.ProductoPresentacions.Where(pp => !quedan.Contains(pp.IdPresentacion)).ToList())
+                producto.ProductoPresentacions.Remove(quitada);
+
+            foreach (var f in filas)
+            {
+                var pp = f.Id is int id ? producto.ProductoPresentacions.FirstOrDefault(x => x.IdPresentacion == id) : null;
+                if (pp == null)
+                {
+                    pp = new ProductoPresentacion();
+                    producto.ProductoPresentacions.Add(pp);
+                }
+                pp.Nombre = f.Nombre!;
+                pp.Factor = f.Factor!.Value;
+                pp.Precio = f.Precio!.Value;
+            }
         }
 
         // Si otro usuario registró el mismo código entre la validación y el guardado

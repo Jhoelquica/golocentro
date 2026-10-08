@@ -45,7 +45,7 @@ namespace GestionAlmacen_Golocentro.ViewModels
         [StringLength(50, ErrorMessage = "El tipo no puede pasar de 50 caracteres.")]
         public string? Tipo { get; set; }
 
-        [Required(ErrorMessage = "Ingresa la unidad de medida.")]
+        [Required(ErrorMessage = "Ingresa la unidad base (tira, pack, unidad...).")]
         [StringLength(20, ErrorMessage = "La unidad no puede pasar de 20 caracteres.")]
         public string? UnidadMedida { get; set; }
 
@@ -66,6 +66,9 @@ namespace GestionAlmacen_Golocentro.ViewModels
         [BindNever, ValidateNever]
         public bool VencimientoPorEntradas { get; set; }
 
+        // Presentaciones más grandes que la unidad base (bolsa = 8 tiras, caja = 12 packs), cada una con su precio
+        public List<PresentacionFormViewModel> Presentaciones { get; set; } = new();
+
         // "conteo" o "entrada" cuando se abre en otra pestaña desde esas pantallas
         public string? Desde { get; set; }
 
@@ -74,5 +77,14 @@ namespace GestionAlmacen_Golocentro.ViewModels
 
         [BindNever, ValidateNever]
         public List<string> UnidadesExistentes { get; set; } = new();
+    }
+
+    // Una fila de presentación del formulario de producto. Id vacío = nueva.
+    public class PresentacionFormViewModel
+    {
+        public int? Id { get; set; }
+        public string? Nombre { get; set; }
+        public int? Factor { get; set; }
+        public decimal? Precio { get; set; }
     }
 }
