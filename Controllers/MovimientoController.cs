@@ -394,7 +394,7 @@ namespace GestionAlmacen_Golocentro.Controllers
 
             datos.Proveedores = await _context.Proveedores
                 .OrderBy(p => p.Nombre)
-                .Select(p => new ProveedorOpcion(p.IdProveedor, p.Nombre))
+                .Select(p => new ProveedorOpcion(p.IdProveedor, p.Nombre, p.Celular))
                 .ToListAsync();
 
             // Crear productos y proveedores es de dueña y encargada

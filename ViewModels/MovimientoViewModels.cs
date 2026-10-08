@@ -29,7 +29,7 @@ namespace GestionAlmacen_Golocentro.ViewModels
     // Dónde está hoy cada producto (para sugerir recibirlo ahí)
     public record StockZonaEntrada(int ProductoId, int ZonaId, int Cantidad);
 
-    public record ProveedorOpcion(int Id, string Nombre);
+    public record ProveedorOpcion(int Id, string Nombre, string? Celular);
 
     public class EntradaDatos
     {

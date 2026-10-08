@@ -18,8 +18,10 @@ namespace GestionAlmacen_Golocentro.ViewModels
         public string MovimientoSingular { get; init; } = "";
         public string MovimientoPlural { get; init; } = "";
 
-        // Solo los clientes tienen celular (para enviarles la nota de venta por WhatsApp)
+        // Celular: a los clientes se les envía la nota de venta por WhatsApp; a los proveedores se les escribe o
+        // se les llama desde la lista y desde Entradas (UAT 06/10)
         public bool TieneCelular { get; init; }
+        public string CelularAyuda { get; init; } = "";
 
         public static readonly ContraparteTipo Cliente = new()
         {
@@ -32,7 +34,8 @@ namespace GestionAlmacen_Golocentro.ViewModels
             Icono = "bi-people",
             MovimientoSingular = "venta",
             MovimientoPlural = "ventas",
-            TieneCelular = true
+            TieneCelular = true,
+            CelularAyuda = "9 dígitos, empieza con 9. Sirve para enviarle la nota de venta por WhatsApp."
         };
 
         public static readonly ContraparteTipo Proveedor = new()
@@ -45,7 +48,9 @@ namespace GestionAlmacen_Golocentro.ViewModels
             DocMaxLength = 11,
             Icono = "bi-truck",
             MovimientoSingular = "entrada",
-            MovimientoPlural = "entradas"
+            MovimientoPlural = "entradas",
+            TieneCelular = true,
+            CelularAyuda = "9 dígitos, empieza con 9. Sirve para escribirle por WhatsApp o llamarle desde la lista de proveedores y desde Entradas."
         };
     }
 

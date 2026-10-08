@@ -71,6 +71,18 @@
             min-width: 0;
         }
 
+    /* Contacto del proveedor elegido (si tiene celular) */
+    .en-contacto {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+    }
+
+        .en-contacto a {
+            flex: 1;
+            justify-content: center;
+        }
+
     .vn-card .cp-campo select {
         width: 100%;
         min-height: 44px;
@@ -171,7 +183,7 @@
                                     <option value="">Elige el proveedor</option>
                                     @foreach (var p in d.Proveedores)
                                     {
-                                        <option value="@p.Id" selected="@(Model.ProveedorId == p.Id)">@p.Nombre</option>
+                                        <option value="@p.Id" selected="@(Model.ProveedorId == p.Id)" data-celular="@p.Celular">@p.Nombre</option>
                                     }
                                 </select>
                                 @if (d.PuedeCrear)
@@ -180,6 +192,14 @@
                                         <i class="bi bi-plus-lg" aria-hidden="true"></i>
                                     </button>
                                 }
+                            </div>
+                            <div class="en-contacto" id="contactoProveedor" hidden>
+                                <a class="btn-g-outline" id="waProveedor" target="_blank" rel="noopener">
+                                    <i class="bi bi-whatsapp" aria-hidden="true"></i> WhatsApp
+                                </a>
+                                <a class="btn-g-outline" id="telProveedor">
+                                    <i class="bi bi-telephone" aria-hidden="true"></i> Llamar
+                                </a>
                             </div>
                             @if (Error("ProveedorId") is string eProv)
                             {
@@ -237,10 +257,17 @@
                                     <div class="cp-ayuda" id="provRuc-ayuda">11 dígitos, solo números.</div>
                                     <div class="cp-error" id="provRuc-error"></div>
                                 </div>
-                                <div class="cp-campo mb-0">
+                                <div class="cp-campo">
                                     <label for="provContacto">Contacto <span class="cp-opcional">(opcional)</span></label>
                                     <input type="text" id="provContacto" name="Contacto" maxlength="100" autocomplete="off" data-campo="Contacto" />
                                     <div class="cp-error" id="provContacto-error"></div>
+                                </div>
+                                <div class="cp-campo mb-0">
+                                    <label for="provCelular">Celular <span class="cp-opcional">(opcional, para escribirle o llamarle)</span></label>
+                                    <input type="tel" id="provCelular" name="Celular" maxlength="9" inputmode="numeric" autocomplete="off"
+                                           data-campo="Celular" data-ayuda="provCelular-ayuda" aria-describedby="provCelular-ayuda" />
+                                    <div class="cp-ayuda" id="provCelular-ayuda">9 dígitos, empieza con 9.</div>
+                                    <div class="cp-error" id="provCelular-error"></div>
                                 </div>
                             </div>
                             <div class="modal-footer">
@@ -550,10 +577,26 @@
                 btnRegistrar.disabled = true;
                 btnRegistrar.innerHTML = '<span class="cp-spinner" aria-hidden="true"></span> Registrando entrada…';
             });
+            // WhatsApp y Llamar del proveedor elegido, si tiene celular
+            const contactoProveedor = document.getElementById('contactoProveedor');
+            function mostrarContactoProveedor() {
+                const opcion = selectProveedor.selectedOptions[0];
+                const celular = opcion?.dataset.celular;
+                contactoProveedor.hidden = !celular;
+                if (!celular) return;
+                const waProveedor = document.getElementById('waProveedor');
+                const telProveedor = document.getElementById('telProveedor');
+                waProveedor.href = 'https://wa.me/51' + celular;
+                waProveedor.setAttribute('aria-label', `Escribir por WhatsApp a ${opcion.text} (se abre en otra pestaña)`);
+                telProveedor.href = 'tel:+51' + celular;
+                telProveedor.setAttribute('aria-label', `Llamar a ${opcion.text}`);
+            }
             selectProveedor.addEventListener('change', () => {
                 selectProveedor.setAttribute('aria-invalid', 'false');
                 if (motivo.textContent === 'Elige el proveedor.') motivo.textContent = '';
+                mostrarContactoProveedor();
             });
+            mostrarContactoProveedor();
             window.addEventListener('pageshow', e => {
                 if (!e.persisted) return;
                 btnRegistrar.disabled = false;
@@ -640,7 +683,9 @@
                         const respuesta = await fetch('@Url.Action("CrearRapido", "Proveedor")', { method: 'POST', body: datos });
                         const resultado = await respuesta.json();
                         if (resultado.success) {
-                            selectProveedor.add(new Option(resultado.nombre, resultado.id, true, true));
+                            const opcion = new Option(resultado.nombre, resultado.id, true, true);
+                            if (resultado.celular) opcion.dataset.celular = resultado.celular;
+                            selectProveedor.add(opcion);
                             selectProveedor.dispatchEvent(new Event('change'));
                             bootstrap.Modal.getInstance(modalProveedor).hide();
                             anunciar(`Proveedor ${resultado.nombre} registrado y elegido.`);
