@@ -14,7 +14,8 @@ namespace GestionAlmacen_Golocentro.ViewModels
         string Estado,
         DateOnly? Vencimiento,
         int? DiasParaVencer,
-        List<StockZonaItem> Zonas)
+        List<StockZonaItem> Zonas,
+        string? EnPresentaciones = null)   // "2 cajas y 6 unidades" si el producto tiene presentaciones
     {
         // Vencido o vence en 30 días o menos, y todavía hay stock que se puede perder
         public bool PorVencer => Stock > 0 && DiasParaVencer is int dias && dias <= StockConsultaViewModel.DiasAvisoVencimiento;

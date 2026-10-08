@@ -27,6 +27,9 @@ namespace GestionAlmacen_Golocentro.ViewModels
         public int Total { get; set; }
         public bool PuedeEditar { get; set; }
         public List<ProductoFila> Filas { get; set; } = new();
+
+        // Presentaciones (bolsa, caja...) de los productos de la página, con su precio
+        public Dictionary<int, List<PresentacionVenta>> Presentaciones { get; set; } = new();
     }
 
     public class ProductoFormViewModel

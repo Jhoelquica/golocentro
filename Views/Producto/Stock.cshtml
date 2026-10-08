@@ -455,6 +455,10 @@
 
                     <div class="st-cantidad">
                         <div class="st-numero">@p.Stock.ToString("N0", inv) <small>@p.Unidad</small></div>
+                        @if (p.EnPresentaciones != null)
+                        {
+                            <div class="cp-sub">= @p.EnPresentaciones</div>
+                        }
                         @if (p.Minimo > 0)
                         {
                             <div class="st-medidor @(p.Estado == EstadoStock.Bajo ? "bajo" : null)" aria-hidden="true">

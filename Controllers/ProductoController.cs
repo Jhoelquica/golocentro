@@ -61,8 +61,18 @@ namespace GestionAlmacen_Golocentro.Controllers
                         || p.Alerta.Any()))
                 .ToListAsync();
 
+            var ids = filas.Select(f => f.Id).ToList();
+            var presentaciones = (await _context.ProductoPresentacions
+                    .Where(pp => ids.Contains(pp.IdProducto))
+                    .OrderBy(pp => pp.Factor)
+                    .Select(pp => new { pp.IdProducto, pp.Nombre, pp.Factor, pp.Precio })
+                    .ToListAsync())
+                .GroupBy(pp => pp.IdProducto)
+                .ToDictionary(g => g.Key, g => g.Select(pp => new PresentacionVenta(pp.Nombre, pp.Factor, pp.Precio)).ToList());
+
             return View(new ProductoListaViewModel
             {
+                Presentaciones = presentaciones,
                 Busqueda = q,
                 Tipo = tipo,
                 Tipos = await _context.Productos.Select(p => p.Tipo).Distinct().OrderBy(t => t).ToListAsync(),
@@ -221,6 +231,11 @@ namespace GestionAlmacen_Golocentro.Controllers
                     .Select(z => new StockZonaItem(z.IdUbicacion, z.CodigoEstante, z.Sede, z.CantidadActual))
                     .ToList());
 
+            var presentaciones = (await _context.ProductoPresentacions
+                    .Select(pp => new { pp.IdProducto, pp.Nombre, pp.Factor })
+                    .ToListAsync())
+                .ToLookup(pp => pp.IdProducto, pp => (pp.Nombre, pp.Factor));
+
             var hoy = DateOnly.FromDateTime(DateTime.Today);
             var productos = (await _context.Productos
                     .OrderBy(p => p.Nombre)
@@ -230,9 +245,13 @@ namespace GestionAlmacen_Golocentro.Controllers
                 {
                     var enZonas = zonas.GetValueOrDefault(p.IdProducto) ?? new();
                     var stock = enZonas.Sum(z => z.Cantidad);
+                    // Con presentaciones, el stock también se ve como "2 cajas y 6 unidades"
+                    var enPresentaciones = presentaciones[p.IdProducto].Any(x => stock >= x.Factor)
+                        ? Presentaciones.Describir(stock, p.UnidadMedida, presentaciones[p.IdProducto])
+                        : null;
                     return new StockProductoItem(p.IdProducto, p.Codigo, p.Nombre, p.Tipo, p.UnidadMedida, stock, p.StockMinimo,
                         EstadoStock.De(stock, p.StockMinimo), p.FechaVencimiento,
-                        p.FechaVencimiento is DateOnly vence ? vence.DayNumber - hoy.DayNumber : null, enZonas);
+                        p.FechaVencimiento is DateOnly vence ? vence.DayNumber - hoy.DayNumber : null, enZonas, enPresentaciones);
                 })
                 .ToList();
 

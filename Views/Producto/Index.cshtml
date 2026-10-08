@@ -192,6 +192,13 @@
                                 <td class="pr-num">
                                     @Soles(p.Precio)
                                     <div class="cp-sub">por @p.UnidadMedida</div>
+                                    @if (Model.Presentaciones.TryGetValue(p.Id, out var presentaciones))
+                                    {
+                                        foreach (var pr in presentaciones)
+                                        {
+                                            <div class="cp-sub">@Soles(pr.Precio) por @pr.Nombre de @pr.Factor</div>
+                                        }
+                                    }
                                 </td>
                                 <td>
                                     <div class="pr-num">@p.Stock</div>
