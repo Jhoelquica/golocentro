@@ -40,7 +40,7 @@ namespace GestionAlmacen_Golocentro.Controllers
                 .Skip((pagina - 1) * TamanoPagina)
                 .Take(TamanoPagina)
                 .Select(p => new ContraparteFila(
-                    p.IdProveedor, p.Nombre, p.Ruc, p.Contacto, p.Direccion, null,
+                    p.IdProveedor, p.Nombre, p.Ruc, p.Contacto, p.Direccion, p.Celular,
                     p.Movimientos.Count,
                     p.Movimientos.Max(m => (DateTime?)m.Fecha)))
                 .ToListAsync();
@@ -88,7 +88,7 @@ namespace GestionAlmacen_Golocentro.Controllers
                 Copiar(model, proveedor);
                 _context.Proveedores.Add(proveedor);
                 if (await GuardarAsync())
-                    return Json(new { success = true, id = proveedor.IdProveedor, nombre = proveedor.Nombre });
+                    return Json(new { success = true, id = proveedor.IdProveedor, nombre = proveedor.Nombre, celular = proveedor.Celular });
             }
 
             var errores = ModelState
@@ -109,7 +109,8 @@ namespace GestionAlmacen_Golocentro.Controllers
                 Nombre = proveedor.Nombre,
                 Documento = proveedor.Ruc,
                 Contacto = proveedor.Contacto,
-                Direccion = proveedor.Direccion
+                Direccion = proveedor.Direccion,
+                Celular = proveedor.Celular
             });
         }
 
@@ -196,6 +197,7 @@ namespace GestionAlmacen_Golocentro.Controllers
             proveedor.Ruc = model.Documento!;
             proveedor.Contacto = string.IsNullOrWhiteSpace(model.Contacto) ? null : model.Contacto.Trim();
             proveedor.Direccion = string.IsNullOrWhiteSpace(model.Direccion) ? null : model.Direccion.Trim();
+            proveedor.Celular = string.IsNullOrWhiteSpace(model.Celular) ? null : model.Celular.Trim();
         }
 
         // Si otro usuario registró el mismo RUC entre la validación y el guardado

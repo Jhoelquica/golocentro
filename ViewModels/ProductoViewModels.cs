@@ -27,6 +27,9 @@ namespace GestionAlmacen_Golocentro.ViewModels
         public int Total { get; set; }
         public bool PuedeEditar { get; set; }
         public List<ProductoFila> Filas { get; set; } = new();
+
+        // Presentaciones (bolsa, caja...) de los productos de la página, con su precio
+        public Dictionary<int, List<PresentacionVenta>> Presentaciones { get; set; } = new();
     }
 
     public class ProductoFormViewModel
@@ -45,7 +48,7 @@ namespace GestionAlmacen_Golocentro.ViewModels
         [StringLength(50, ErrorMessage = "El tipo no puede pasar de 50 caracteres.")]
         public string? Tipo { get; set; }
 
-        [Required(ErrorMessage = "Ingresa la unidad de medida.")]
+        [Required(ErrorMessage = "Ingresa la unidad base (tira, pack, unidad...).")]
         [StringLength(20, ErrorMessage = "La unidad no puede pasar de 20 caracteres.")]
         public string? UnidadMedida { get; set; }
 
@@ -62,6 +65,13 @@ namespace GestionAlmacen_Golocentro.ViewModels
         [StringLength(50, ErrorMessage = "El lote no puede pasar de 50 caracteres.")]
         public string? Lote { get; set; }
 
+        // El vencimiento sale de las entradas (el más próximo de lo que queda en stock): se muestra sin editar
+        [BindNever, ValidateNever]
+        public bool VencimientoPorEntradas { get; set; }
+
+        // Presentaciones más grandes que la unidad base (bolsa = 8 tiras, caja = 12 packs), cada una con su precio
+        public List<PresentacionFormViewModel> Presentaciones { get; set; } = new();
+
         // "conteo" o "entrada" cuando se abre en otra pestaña desde esas pantallas
         public string? Desde { get; set; }
 
@@ -70,5 +80,14 @@ namespace GestionAlmacen_Golocentro.ViewModels
 
         [BindNever, ValidateNever]
         public List<string> UnidadesExistentes { get; set; } = new();
+    }
+
+    // Una fila de presentación del formulario de producto. Id vacío = nueva.
+    public class PresentacionFormViewModel
+    {
+        public int? Id { get; set; }
+        public string? Nombre { get; set; }
+        public int? Factor { get; set; }
+        public decimal? Precio { get; set; }
     }
 }

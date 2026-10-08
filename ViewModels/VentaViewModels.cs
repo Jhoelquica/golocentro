@@ -37,7 +37,11 @@ namespace GestionAlmacen_Golocentro.ViewModels
 
     public record ZonaVenta(int Id, string Codigo, int Cantidad);
 
-    public record ProductoVenta(int Id, string Nombre, string Codigo, string Unidad, decimal Precio, List<ZonaVenta> Zonas);
+    // Bolsa, caja o pack del producto: cuántas unidades base trae y su precio
+    public record PresentacionVenta(string Nombre, int Factor, decimal Precio);
+
+    public record ProductoVenta(int Id, string Nombre, string Codigo, string Unidad, decimal Precio, List<ZonaVenta> Zonas,
+        List<PresentacionVenta> Presentaciones);
 
     public record ClienteVenta(int Id, string Nombre, string RucDni, string? Celular);
 
@@ -45,9 +49,12 @@ namespace GestionAlmacen_Golocentro.ViewModels
     {
         public int ProductoId { get; set; }
         public int UbicacionId { get; set; }
+
+        // Vacía = unidad base; si no, el nombre de la presentación (bolsa, caja...). Cantidad y precio van en esa presentación.
+        public string? Presentacion { get; set; }
         public int Cantidad { get; set; }
 
-        // Precio cobrado; si viene vacío se usa el precio de lista del producto
+        // Precio cobrado; si viene vacío se usa el precio de lista (de la presentación o del producto)
         public decimal? Precio { get; set; }
     }
 

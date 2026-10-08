@@ -38,6 +38,8 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<Producto> Productos { get; set; }
 
+    public virtual DbSet<ProductoPresentacion> ProductoPresentacions { get; set; }
+
     public virtual DbSet<ProductoUbicacion> ProductoUbicacions { get; set; }
 
     public virtual DbSet<Proveedor> Proveedors { get; set; }
@@ -228,16 +230,28 @@ public partial class AppDbContext : DbContext
 
             entity.ToTable("detalle_movimiento");
 
+            entity.HasIndex(e => e.IdMovimiento, "detalle_movimiento_id_movimiento_idx");
+
             entity.Property(e => e.IdDetalle)
                 .UseIdentityAlwaysColumn()
                 .HasColumnName("id_detalle");
             entity.Property(e => e.Cantidad).HasColumnName("cantidad");
+            entity.Property(e => e.Factor)
+                .HasDefaultValue(1)
+                .HasColumnName("factor");
+            entity.Property(e => e.FechaVencimiento).HasColumnName("fecha_vencimiento");
             entity.Property(e => e.IdMovimiento).HasColumnName("id_movimiento");
             entity.Property(e => e.IdProducto).HasColumnName("id_producto");
             entity.Property(e => e.IdUbicacion).HasColumnName("id_ubicacion");
+            entity.Property(e => e.Lote)
+                .HasMaxLength(50)
+                .HasColumnName("lote");
             entity.Property(e => e.PrecioUnitarioSnapshot)
                 .HasPrecision(10, 2)
                 .HasColumnName("precio_unitario_snapshot");
+            entity.Property(e => e.Presentacion)
+                .HasMaxLength(30)
+                .HasColumnName("presentacion");
             entity.Property(e => e.StockAnterior).HasColumnName("stock_anterior");
 
             entity.HasOne(d => d.IdMovimientoNavigation).WithMany(p => p.DetalleMovimientos)
@@ -525,6 +539,31 @@ public partial class AppDbContext : DbContext
                 .HasColumnName("unidad_medida");
         });
 
+        modelBuilder.Entity<ProductoPresentacion>(entity =>
+        {
+            entity.HasKey(e => e.IdPresentacion).HasName("producto_presentacion_pkey");
+
+            entity.ToTable("producto_presentacion");
+
+            entity.HasIndex(e => new { e.IdProducto, e.Nombre }, "uq_productopresentacion_nombre").IsUnique();
+
+            entity.Property(e => e.IdPresentacion)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("id_presentacion");
+            entity.Property(e => e.Factor).HasColumnName("factor");
+            entity.Property(e => e.IdProducto).HasColumnName("id_producto");
+            entity.Property(e => e.Nombre)
+                .HasMaxLength(30)
+                .HasColumnName("nombre");
+            entity.Property(e => e.Precio)
+                .HasPrecision(10, 2)
+                .HasColumnName("precio");
+
+            entity.HasOne(d => d.IdProductoNavigation).WithMany(p => p.ProductoPresentacions)
+                .HasForeignKey(d => d.IdProducto)
+                .HasConstraintName("producto_presentacion_id_producto_fkey");
+        });
+
         modelBuilder.Entity<ProductoUbicacion>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("producto_ubicacion_pkey");
@@ -568,6 +607,9 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.IdProveedor)
                 .UseIdentityAlwaysColumn()
                 .HasColumnName("id_proveedor");
+            entity.Property(e => e.Celular)
+                .HasMaxLength(15)
+                .HasColumnName("celular");
             entity.Property(e => e.Contacto)
                 .HasMaxLength(100)
                 .HasColumnName("contacto");

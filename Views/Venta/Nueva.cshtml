@@ -175,9 +175,9 @@
             </div>
         </form>
 
-        <div class="modal fade" id="modalCliente" tabindex="-1" aria-labelledby="tituloModalCliente" aria-hidden="true">
+        <div class="modal fade cp-modal-form" id="modalCliente" tabindex="-1" aria-labelledby="tituloModalCliente" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content" style="border:none;border-radius:14px">
+                <div class="modal-content">
                     <form id="formCliente" novalidate>
                         <div class="modal-header">
                             <h2 class="modal-title fs-5" id="tituloModalCliente"><i class="bi bi-person-plus" aria-hidden="true"></i> Nuevo cliente</h2>
@@ -250,15 +250,41 @@
             const precioDe = li => parseFloat(campo(li, 'Precio').value);
             const zonaDe = li => Number(campo(li, 'UbicacionId').value);
 
+            // ===== Presentaciones (bolsa, caja, pack): el stock va en unidades base =====
+            function plural(u) {
+                if (u.length <= 2 || /[. ]/.test(u)) return u;
+                const ultima = u.at(-1).toLowerCase();
+                if ('aeiouáéíóú'.includes(ultima)) return u + 's';
+                if (ultima === 'z') return u.slice(0, -1) + 'ces';
+                if ('dlnr'.includes(ultima)) return u + 'es';
+                return u + 's';
+            }
+            const cantidadTexto = (n, u) => `${n.toLocaleString('es-PE')} ${n === 1 ? u : plural(u)}`;
+            // "2 bolsas y 3 tiras" con la presentación más grande del producto (igual que en el servidor)
+            function describir(p, n) {
+                const mayor = p.presentaciones.reduce((m, x) => !m || x.factor > m.factor ? x : m, null);
+                if (!mayor || n < mayor.factor) return cantidadTexto(n, p.unidad);
+                const enteras = Math.floor(n / mayor.factor), sueltas = n % mayor.factor;
+                return sueltas === 0 ? cantidadTexto(enteras, mayor.nombre)
+                    : `${cantidadTexto(enteras, mayor.nombre)} y ${cantidadTexto(sueltas, p.unidad)}`;
+            }
+            // Presentación elegida en la fila: { nombre, factor, precio }; la unidad base va con nombre vacío y factor 1
+            function presentacionDe(li) {
+                const p = productoPorId.get(Number(li.dataset.producto));
+                const nombre = campo(li, 'Presentacion').value;
+                return p.presentaciones.find(x => x.nombre === nombre) ?? { nombre: '', factor: 1, precio: p.precio };
+            }
+            const unidadDe = (li, p) => presentacionDe(li).nombre || p.unidad;
+
             function stockZona(productoId, zonaId) {
                 return productoPorId.get(productoId)?.zonas.find(z => z.id === zonaId)?.cantidad ?? 0;
             }
 
-            // Lo pedido de un producto en una zona, sumando todas las filas del carrito
+            // Lo pedido de un producto en una zona, en unidades base, sumando todas las filas del carrito
             function pedidoEnZona(productoId, zonaId) {
                 return lineas()
                     .filter(li => Number(li.dataset.producto) === productoId && zonaDe(li) === zonaId)
-                    .reduce((s, li) => s + (cantidadDe(li) || 0), 0);
+                    .reduce((s, li) => s + (cantidadDe(li) || 0) * presentacionDe(li).factor, 0);
             }
 
             function disponible(p) {
@@ -281,8 +307,8 @@
                     boton.querySelector('.vn-opcion-nombre').textContent = p.nombre;
                     boton.querySelector('.vn-opcion-precio').textContent = soles(p.precio);
                     const libre = disponible(p);
-                    boton.querySelector('.vn-opcion-meta').textContent = `${p.codigo} · ${libre > 0 ? `quedan ${libre}` : 'todo en la venta'}`;
-                    boton.setAttribute('aria-label', `Agregar ${p.nombre}, ${soles(p.precio)}, quedan ${libre}`);
+                    boton.querySelector('.vn-opcion-meta').textContent = `${p.codigo} · ${libre > 0 ? `quedan ${describir(p, libre)}` : 'todo en la venta'}`;
+                    boton.setAttribute('aria-label', `Agregar ${p.nombre}, ${soles(p.precio)}, quedan ${describir(p, libre)}`);
                     boton.addEventListener('click', () => agregarProducto(p.id));
                     li.append(boton);
                     return li;
@@ -316,14 +342,14 @@
                 const p = productoPorId.get(id);
                 const existentes = lineas().filter(li => Number(li.dataset.producto) === id);
 
-                // Ya está en la venta: suma uno en la fila cuya zona aún tiene stock
-                const conLugar = existentes.find(li => stockZona(id, zonaDe(li)) - pedidoEnZona(id, zonaDe(li)) > 0);
+                // Ya está en la venta: suma uno (de su presentación) en la fila cuya zona aún tiene stock para eso
+                const conLugar = existentes.find(li => stockZona(id, zonaDe(li)) - pedidoEnZona(id, zonaDe(li)) >= presentacionDe(li).factor);
                 if (conLugar) {
                     const input = campo(conLugar, 'Cantidad');
                     input.value = (parseInt(input.value, 10) || 0) + 1;
                     actualizar();
                     destacar(conLugar);
-                    anunciar(`${p.nombre}: ${input.value}.`);
+                    anunciar(`${p.nombre}: ${cantidadTexto(Number(input.value), unidadDe(conLugar, p))}.`);
                     return;
                 }
 
@@ -339,7 +365,7 @@
                 anunciar(`${p.nombre} agregado.`);
             }
 
-            function crearLinea(p, zonaId, cantidad, precio) {
+            function crearLinea(p, zonaId, cantidad, precio, presentacion) {
                 const n = ++secuencia;
                 const li = document.createElement('li');
                 li.className = 'vn-linea';
@@ -352,6 +378,11 @@
                         </div>
                         <button type="button" class="cp-icono-btn peligro" data-accion="quitar"><i class="bi bi-trash" aria-hidden="true"></i></button>
                     </div>
+                    ${p.presentaciones.length ? `
+                    <div class="vn-f vn-f-presentacion">
+                        <label for="pres${n}">Vende por</label>
+                        <select id="pres${n}" data-campo="Presentacion"></select>
+                    </div>` : '<input type="hidden" data-campo="Presentacion" value="" />'}
                     <div class="vn-linea-campos">
                         <div class="vn-f">
                             <label for="zona${n}">Sacar de</label>
@@ -381,11 +412,23 @@
                     <input type="hidden" data-campo="ProductoId" />`;
 
                 li.querySelector('.vn-linea-nombre').textContent = p.nombre;
-                li.querySelector('.vn-linea-cod').textContent = `${p.codigo} · precio de lista ${soles(p.precio)}`;
+                li.querySelector('.vn-linea-cod').textContent = `${p.codigo} · precio de lista ${soles(p.precio)} por ${p.unidad}`;
                 li.querySelector('[data-accion="quitar"]').setAttribute('aria-label', `Quitar ${p.nombre}`);
 
+                const selPresentacion = campo(li, 'Presentacion');
+                if (selPresentacion.tagName === 'SELECT') {
+                    selPresentacion.add(new Option(`${p.unidad} · ${soles(p.precio)}`, ''));
+                    p.presentaciones.forEach(x => selPresentacion.add(new Option(`${x.nombre} de ${cantidadTexto(x.factor, p.unidad)} · ${soles(x.precio)}`, x.nombre)));
+                    selPresentacion.value = presentacion ?? '';
+                    // Al cambiar de presentación se pone su precio de lista
+                    selPresentacion.addEventListener('change', () => {
+                        campo(li, 'Precio').value = Number(presentacionDe(li).precio).toFixed(2);
+                        actualizar();
+                    });
+                }
+
                 const selZona = campo(li, 'UbicacionId');
-                p.zonas.forEach(z => selZona.add(new Option(`${z.codigo} · hay ${z.cantidad}`, z.id)));
+                p.zonas.forEach(z => selZona.add(new Option(`${z.codigo} · hay ${describir(p, z.cantidad)}`, z.id)));
                 selZona.value = zonaId;
                 campo(li, 'Cantidad').value = cantidad;
                 campo(li, 'Precio').value = Number(precio).toFixed(2);
@@ -450,6 +493,7 @@
                     let error = null;
                     let campoError = null;
 
+                    const presentacion = presentacionDe(li);
                     const pedido = pedidoEnZona(productoId, zonaId);
                     const hay = stockZona(productoId, zonaId);
                     const codigoZona = p.zonas.find(z => z.id === zonaId)?.codigo ?? '';
@@ -457,7 +501,8 @@
                         error = 'La cantidad debe ser 1 o más.';
                         campoError = inputCant;
                     } else if (pedido > hay) {
-                        error = `Solo hay ${hay} en ${codigoZona}` + (pedido !== cantidad ? ` (en la venta suman ${pedido}).` : '.');
+                        error = `Solo hay ${describir(p, hay)} en ${codigoZona}`
+                            + (pedido !== cantidad * presentacion.factor ? ` (en la venta suman ${describir(p, pedido)}).` : '.');
                         campoError = inputCant;
                     } else if (isNaN(precio) || precio < 0 || !decimalesOk(precio)) {
                         error = 'El precio debe ser 0 o más, con máximo 2 decimales.';
@@ -470,10 +515,11 @@
                     if (error) {
                         aviso.textContent = error;
                         problema ??= { mensaje: `${p.nombre}: ${error}`, elemento: campoError };
-                    } else if (redondear(precio) !== redondear(p.precio)) {
-                        aviso.textContent = `Precio cambiado (lista ${soles(p.precio)}).`;
                     } else {
-                        aviso.textContent = '';
+                        // En bolsa, caja o pack se muestra cuánto sale en unidades base
+                        const equivale = presentacion.factor > 1 ? `= ${cantidadTexto(cantidad * presentacion.factor, p.unidad)}` : '';
+                        const cambiado = redondear(precio) !== redondear(presentacion.precio) ? `Precio cambiado (lista ${soles(presentacion.precio)}).` : '';
+                        aviso.textContent = [equivale, cambiado].filter(Boolean).join(' · ');
                     }
 
                     const importe = error ? 0 : redondear(cantidad * precio);
@@ -671,6 +717,10 @@
                 const nombre = document.getElementById('cliNombre');
                 (nombre.value ? document.getElementById('cliDoc') : nombre).focus();
             });
+            // Si se cerró sin elegir (X o Cancelar), el foco vuelve al botón que lo abrió, no al inicio de la página
+            modalCliente.addEventListener('hidden.bs.modal', () => {
+                if (!clienteConDatos) document.getElementById('btnNuevoCliente').focus();
+            });
 
             // ===== Registrar =====
             form.addEventListener('submit', e => {
@@ -707,7 +757,8 @@
                 const p = productoPorId.get(item.productoId);
                 if (!p) continue;
                 const zona = p.zonas.find(z => z.id === item.ubicacionId) ?? p.zonas[0];
-                crearLinea(p, zona.id, item.cantidad > 0 ? item.cantidad : 1, item.precio ?? p.precio);
+                const presentacion = p.presentaciones.find(x => x.nombre === item.presentacion);
+                crearLinea(p, zona.id, item.cantidad > 0 ? item.cantidad : 1, item.precio ?? presentacion?.precio ?? p.precio, presentacion?.nombre);
             }
             const clientePrevio = clientes.find(c => c.id === Number(inputClienteId.value) && c.id !== clienteGeneralId);
             if (clientePrevio) {

@@ -1,6 +1,7 @@
 using GestionAlmacen_Golocentro.Data;
 using GestionAlmacen_Golocentro.Helpers;
 using GestionAlmacen_Golocentro.Models;
+using GestionAlmacen_Golocentro.Services;
 using GestionAlmacen_Golocentro.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -60,8 +61,18 @@ namespace GestionAlmacen_Golocentro.Controllers
                         || p.Alerta.Any()))
                 .ToListAsync();
 
+            var ids = filas.Select(f => f.Id).ToList();
+            var presentaciones = (await _context.ProductoPresentacions
+                    .Where(pp => ids.Contains(pp.IdProducto))
+                    .OrderBy(pp => pp.Factor)
+                    .Select(pp => new { pp.IdProducto, pp.Nombre, pp.Factor, pp.Precio })
+                    .ToListAsync())
+                .GroupBy(pp => pp.IdProducto)
+                .ToDictionary(g => g.Key, g => g.Select(pp => new PresentacionVenta(pp.Nombre, pp.Factor, pp.Precio)).ToList());
+
             return View(new ProductoListaViewModel
             {
+                Presentaciones = presentaciones,
                 Busqueda = q,
                 Tipo = tipo,
                 Tipos = await _context.Productos.Select(p => p.Tipo).Distinct().OrderBy(t => t).ToListAsync(),
@@ -132,7 +143,12 @@ namespace GestionAlmacen_Golocentro.Controllers
                 PrecioUnitario = p.PrecioUnitario,
                 StockMinimo = p.StockMinimo,
                 FechaVencimiento = p.FechaVencimiento,
-                Lote = p.Lote
+                Lote = p.Lote,
+                Presentaciones = await _context.ProductoPresentacions
+                    .Where(pp => pp.IdProducto == id)
+                    .OrderBy(pp => pp.Factor)
+                    .Select(pp => new PresentacionFormViewModel { Id = pp.IdPresentacion, Nombre = pp.Nombre, Factor = pp.Factor, Precio = pp.Precio })
+                    .ToListAsync()
             });
         }
 
@@ -141,7 +157,7 @@ namespace GestionAlmacen_Golocentro.Controllers
         [Authorize(Roles = "duena,encargada")]
         public async Task<IActionResult> Editar(int id, ProductoFormViewModel model)
         {
-            var producto = await _context.Productos.FindAsync(id);
+            var producto = await _context.Productos.Include(p => p.ProductoPresentacions).FirstOrDefaultAsync(p => p.IdProducto == id);
             if (producto == null)
                 return NotFound();
 
@@ -150,7 +166,7 @@ namespace GestionAlmacen_Golocentro.Controllers
             if (!ModelState.IsValid)
                 return await Formulario(model);
 
-            Copiar(model, producto);
+            Copiar(model, producto, conVencimiento: !await VencimientoProducto.SaleDeEntradasAsync(_context, id));
             if (!await GuardarAsync())
                 return await Formulario(model);
 
@@ -215,6 +231,11 @@ namespace GestionAlmacen_Golocentro.Controllers
                     .Select(z => new StockZonaItem(z.IdUbicacion, z.CodigoEstante, z.Sede, z.CantidadActual))
                     .ToList());
 
+            var presentaciones = (await _context.ProductoPresentacions
+                    .Select(pp => new { pp.IdProducto, pp.Nombre, pp.Factor })
+                    .ToListAsync())
+                .ToLookup(pp => pp.IdProducto, pp => (pp.Nombre, pp.Factor));
+
             var hoy = DateOnly.FromDateTime(DateTime.Today);
             var productos = (await _context.Productos
                     .OrderBy(p => p.Nombre)
@@ -224,9 +245,13 @@ namespace GestionAlmacen_Golocentro.Controllers
                 {
                     var enZonas = zonas.GetValueOrDefault(p.IdProducto) ?? new();
                     var stock = enZonas.Sum(z => z.Cantidad);
+                    // Con presentaciones, el stock también se ve como "2 cajas y 6 unidades"
+                    var enPresentaciones = presentaciones[p.IdProducto].Any(x => stock >= x.Factor)
+                        ? Presentaciones.Describir(stock, p.UnidadMedida, presentaciones[p.IdProducto])
+                        : null;
                     return new StockProductoItem(p.IdProducto, p.Codigo, p.Nombre, p.Tipo, p.UnidadMedida, stock, p.StockMinimo,
                         EstadoStock.De(stock, p.StockMinimo), p.FechaVencimiento,
-                        p.FechaVencimiento is DateOnly vence ? vence.DayNumber - hoy.DayNumber : null, enZonas);
+                        p.FechaVencimiento is DateOnly vence ? vence.DayNumber - hoy.DayNumber : null, enZonas, enPresentaciones);
                 })
                 .ToList();
 
@@ -248,6 +273,12 @@ namespace GestionAlmacen_Golocentro.Controllers
         {
             model.TiposExistentes = await _context.Productos.Select(p => p.Tipo).Distinct().OrderBy(t => t).ToListAsync();
             model.UnidadesExistentes = await _context.Productos.Select(p => p.UnidadMedida).Distinct().OrderBy(u => u).ToListAsync();
+            if (model.Id is int id && await VencimientoProducto.SaleDeEntradasAsync(_context, id))
+            {
+                model.VencimientoPorEntradas = true;
+                var actual = await _context.Productos.Where(p => p.IdProducto == id).Select(p => new { p.FechaVencimiento, p.Lote }).SingleAsync();
+                (model.FechaVencimiento, model.Lote) = (actual.FechaVencimiento, actual.Lote);
+            }
             return View("Formulario", model);
         }
 
@@ -274,6 +305,14 @@ namespace GestionAlmacen_Golocentro.Controllers
             model.Tipo = model.Tipo?.Trim();
             model.UnidadMedida = model.UnidadMedida?.Trim();
             model.Lote = string.IsNullOrWhiteSpace(model.Lote) ? null : model.Lote.Trim();
+            model.Presentaciones = model.Presentaciones
+                .Where(f => !Presentaciones.EstaVacia(new Presentaciones.Fila(f.Nombre, f.Factor, f.Precio)))
+                .ToList();
+            foreach (var f in model.Presentaciones)
+                f.Nombre = f.Nombre?.Trim();
+            var filas = model.Presentaciones.Select(f => new Presentaciones.Fila(f.Nombre, f.Factor, f.Precio)).ToList();
+            foreach (var (i, campo, mensaje) in Presentaciones.Validar(model.UnidadMedida, filas))
+                ModelState.AddModelError($"Presentaciones[{i}].{campo}", mensaje);
 
             // precio_unitario es numeric(10,2): con más decimales la BD redondearía sin avisar
             if (model.PrecioUnitario is decimal precio && decimal.Round(precio, 2) != precio)
@@ -291,7 +330,7 @@ namespace GestionAlmacen_Golocentro.Controllers
         }
 
         [NonAction]
-        private static void Copiar(ProductoFormViewModel model, Producto producto)
+        private static void Copiar(ProductoFormViewModel model, Producto producto, bool conVencimiento = true)
         {
             producto.Nombre = model.Nombre!;
             producto.Codigo = model.Codigo!;
@@ -299,8 +338,35 @@ namespace GestionAlmacen_Golocentro.Controllers
             producto.UnidadMedida = model.UnidadMedida!;
             producto.PrecioUnitario = model.PrecioUnitario!.Value;
             producto.StockMinimo = model.StockMinimo!.Value;
+            SincronizarPresentaciones(model.Presentaciones, producto);
+            // Si el vencimiento sale de las entradas, no se pisa con lo del formulario
+            if (!conVencimiento)
+                return;
             producto.FechaVencimiento = model.FechaVencimiento;
             producto.Lote = model.Lote;
+        }
+
+        // Las presentaciones del formulario reemplazan a las del producto: se actualizan las que siguen (por Id),
+        // se agregan las nuevas y se quitan las que ya no están. Las ventas pasadas no cambian: guardan su presentación.
+        [NonAction]
+        private static void SincronizarPresentaciones(List<PresentacionFormViewModel> filas, Producto producto)
+        {
+            var quedan = filas.Where(f => f.Id != null).Select(f => f.Id!.Value).ToHashSet();
+            foreach (var quitada in producto.ProductoPresentacions.Where(pp => !quedan.Contains(pp.IdPresentacion)).ToList())
+                producto.ProductoPresentacions.Remove(quitada);
+
+            foreach (var f in filas)
+            {
+                var pp = f.Id is int id ? producto.ProductoPresentacions.FirstOrDefault(x => x.IdPresentacion == id) : null;
+                if (pp == null)
+                {
+                    pp = new ProductoPresentacion();
+                    producto.ProductoPresentacions.Add(pp);
+                }
+                pp.Nombre = f.Nombre!;
+                pp.Factor = f.Factor!.Value;
+                pp.Precio = f.Precio!.Value;
+            }
         }
 
         // Si otro usuario registró el mismo código entre la validación y el guardado

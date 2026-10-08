@@ -1,0 +1,204 @@
+@using System.Globalization
+@using GestionAlmacen_Golocentro.ViewModels
+@model ReporteComparativoViewModel
+@{
+    ViewData["Title"] = "Reporte comparativo";
+    var inv = CultureInfo.InvariantCulture;
+    string Soles(decimal n) => "S/ " + n.ToString("N2", inv);
+    string Valor(decimal n, bool moneda) => moneda ? Soles(n) : n.ToString("N0", inv);
+    var f = Model.Filtro;
+    var a = Model.Anterior;
+
+    var mejorMes = Model.PorMes.OrderByDescending(p => p.Total).FirstOrDefault();
+    var descripcionMeses = mejorMes == null || mejorMes.Total == 0
+        ? "Sin ventas en los últimos 12 meses."
+        : $"Ventas de los últimos 12 meses: el mayor fue {mejorMes.EtiquetaLarga} con {Soles(mejorMes.Total)}. El detalle está en la tabla que sigue al gráfico.";
+}
+
+@await Html.PartialAsync("_EstilosReporte")
+
+<style>
+    /* Variación contra el periodo anterior: flecha + signo + texto, nunca solo el color */
+    .rp-var {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 14px;
+        font-weight: 600;
+        white-space: nowrap;
+        color: var(--g-muted);
+    }
+
+        .rp-var.sube {
+            color: var(--g-teal);
+        }
+
+        .rp-var.baja {
+            color: var(--g-danger-text);
+        }
+
+    .rp-kpi .rp-var {
+        margin-top: 4px;
+    }
+
+    .rp-antes {
+        font-size: 13px;
+        color: var(--g-muted);
+    }
+
+    .rp-puesto {
+        font-weight: 700;
+        color: var(--g-navy);
+    }
+</style>
+
+@functions {
+    // Variación con flecha y texto para lectores de pantalla; "nuevo" si antes no hubo nada
+    static Microsoft.AspNetCore.Html.IHtmlContent Variacion(Comparado c)
+    {
+        var inv = CultureInfo.InvariantCulture;
+        if (c.Variacion is not decimal v)
+            return new Microsoft.AspNetCore.Html.HtmlString(c.Actual > 0
+                ? "<span class=\"rp-var\" title=\"En el periodo anterior no hubo\"><i class=\"bi bi-stars\" aria-hidden=\"true\"></i> nuevo</span>"
+                : "<span class=\"rp-var\">—</span>");
+        var pct = Math.Abs(v * 100).ToString("0.0", inv) + " %";
+        var (clase, icono, texto) = v > 0 ? ("sube", "bi-arrow-up-right", "más") : v < 0 ? ("baja", "bi-arrow-down-right", "menos") : ("", "bi-dash", "igual");
+        var signo = v > 0 ? "+" : v < 0 ? "−" : "";
+        return new Microsoft.AspNetCore.Html.HtmlString(
+            $"<span class=\"rp-var {clase}\"><i class=\"bi {icono}\" aria-hidden=\"true\"></i> {signo}{pct}<span class=\"visually-hidden\"> {texto} que el periodo anterior</span></span>");
+    }
+}
+
+<div class="cp-page rp-page">
+    <a class="cp-volver" asp-action="Index"><i class="bi bi-arrow-left" aria-hidden="true"></i> Reportes</a>
+    <div class="cp-header">
+        <div>
+            <h1><i class="bi bi-arrow-left-right" aria-hidden="true"></i> Reporte comparativo</h1>
+            <p>@f.SedeNombre · @f.Periodo comparado con @a.Periodo</p>
+        </div>
+    </div>
+
+    @await Html.PartialAsync("_Filtro", f)
+
+    <div class="rp-kpis">
+        @foreach (var i in Model.Indicadores)
+        {
+            <div class="rp-kpi @(i == Model.Indicadores[0] ? "principal" : null)">
+                <div class="rp-kpi-etiqueta">@i.Nombre</div>
+                <div class="rp-kpi-valor">@Valor(i.Valor.Actual, i.EsMoneda)</div>
+                <div class="rp-kpi-sub">antes: @Valor(i.Valor.Anterior, i.EsMoneda)</div>
+                @Variacion(i.Valor)
+            </div>
+        }
+    </div>
+
+    <section class="rp-seccion" aria-labelledby="tituloMeses">
+        <div class="rp-seccion-cab">
+            <h2 id="tituloMeses">Ventas de los últimos 12 meses</h2>
+            <p>Total vendido en soles por mes, hasta @Model.PorMes.Last().EtiquetaLarga</p>
+        </div>
+        @if (Model.PorMes.All(m => m.Total == 0))
+        {
+            <div class="cp-vacio">
+                <i class="bi bi-bar-chart" aria-hidden="true"></i>
+                No hay ventas en los últimos 12 meses para graficar.
+            </div>
+        }
+        else
+        {
+            @await Html.PartialAsync("_GraficoBarras", new GraficoPeriodos(Model.PorMes, descripcionMeses, "por mes", "Mes"))
+        }
+    </section>
+
+    <section class="rp-seccion" aria-labelledby="tituloProductos">
+        <div class="rp-seccion-cab">
+            <h2 id="tituloProductos">Productos más vendidos</h2>
+            <p>Los 10 que más vendieron en el periodo, contra lo que vendieron en el anterior</p>
+        </div>
+        @if (Model.Productos.Count == 0)
+        {
+            <div class="cp-vacio">
+                <i class="bi bi-trophy" aria-hidden="true"></i>
+                No hay ventas en este periodo.
+            </div>
+        }
+        else
+        {
+            <div class="cp-tabla-wrap">
+                <table class="cp-tabla">
+                    <thead>
+                        <tr>
+                            <th scope="col">Puesto</th>
+                            <th scope="col">Producto</th>
+                            <th scope="col" class="rp-num">Cantidad</th>
+                            <th scope="col" class="rp-num">Importe</th>
+                            <th scope="col" class="rp-num">Importe antes</th>
+                            <th scope="col" class="rp-num">Variación</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in Model.Productos)
+                        {
+                            <tr>
+                                <td>
+                                    <span class="rp-puesto">@(p.Puesto)º</span>
+                                    <div class="rp-antes">@(p.PuestoAnterior is int pa ? $"antes {pa}º" : "antes sin ventas")</div>
+                                </td>
+                                <td>
+                                    <div class="cp-nombre">@p.Nombre</div>
+                                    <div class="cp-sub">@p.Codigo</div>
+                                </td>
+                                <td class="rp-num">
+                                    @Presentaciones.Cantidad((int)p.Cantidad.Actual, p.Unidad)
+                                    <div class="rp-antes">antes @p.Cantidad.Anterior.ToString("N0", inv)</div>
+                                </td>
+                                <td class="rp-num">@Soles(p.Importe.Actual)</td>
+                                <td class="rp-num">@Soles(p.Importe.Anterior)</td>
+                                <td class="rp-num">@Variacion(p.Importe)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+
+    @if (Model.Sedes.Count > 0)
+    {
+        <section class="rp-seccion" aria-labelledby="tituloSedes">
+            <div class="rp-seccion-cab">
+                <h2 id="tituloSedes">Sede contra sede</h2>
+                <p>Lo vendido por cada sede en el periodo y su variación contra el anterior</p>
+            </div>
+            <div class="cp-tabla-wrap">
+                <table class="cp-tabla">
+                    <thead>
+                        <tr>
+                            <th scope="col">Sede</th>
+                            <th scope="col" class="rp-num">Total</th>
+                            <th scope="col" class="rp-num">Total antes</th>
+                            <th scope="col" class="rp-num">Variación</th>
+                            <th scope="col" class="rp-num">Ventas</th>
+                            <th scope="col" class="rp-num">Ticket promedio</th>
+                            <th scope="col" class="rp-num">Unidades</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var s in Model.Sedes)
+                        {
+                            <tr>
+                                <td class="cp-nombre">@s.Sede</td>
+                                <td class="rp-num">@Soles(s.Total.Actual)</td>
+                                <td class="rp-num">@Soles(s.Total.Anterior)</td>
+                                <td class="rp-num">@Variacion(s.Total)</td>
+                                <td class="rp-num">@s.Ventas</td>
+                                <td class="rp-num">@Soles(s.Ticket)</td>
+                                <td class="rp-num">@s.Unidades.ToString("N0", inv)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    }
+</div>

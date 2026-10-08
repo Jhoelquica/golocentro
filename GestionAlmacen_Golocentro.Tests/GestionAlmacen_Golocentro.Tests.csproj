@@ -27,6 +27,8 @@
   <ItemGroup>
     <!-- El esquema real de la base (solo estructura): las pruebas de integración lo cargan en un PostgreSQL desechable -->
     <None Include="..\Database\esquema.sql" Link="Database\esquema.sql" CopyToOutputDirectory="PreserveNewest" />
+    <!-- El diseño general de las páginas: una prueba revisa su animación de entrada (UAT 06/10, T03 y T06) -->
+    <None Include="..\Views\Shared\_Layout.cshtml" Link="Vistas\_Layout.cshtml" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

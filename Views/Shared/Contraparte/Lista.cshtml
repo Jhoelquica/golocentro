@@ -135,13 +135,23 @@
                                     }
                                 </td>
                                 <td>
-                                    @if (t.TieneCelular && f.Documento == ClienteGeneral.RucDni)
+                                    @if (t == ContraparteTipo.Cliente && f.Documento == ClienteGeneral.RucDni)
                                     {
                                         <div class="cp-acciones"><span class="cp-sub">Por defecto en ventas</span></div>
                                     }
                                     else
                                     {
                                         <div class="cp-acciones">
+                                            @if (f.Celular is { Length: 9 } cel)
+                                            {
+                                                <a class="cp-icono-btn" href="https://wa.me/51@(cel)" target="_blank" rel="noopener"
+                                                   aria-label="Escribir por WhatsApp a @f.Nombre (se abre en otra pestaña)" title="WhatsApp">
+                                                    <i class="bi bi-whatsapp" aria-hidden="true"></i>
+                                                </a>
+                                                <a class="cp-icono-btn" href="tel:+51@(cel)" aria-label="Llamar a @f.Nombre" title="Llamar">
+                                                    <i class="bi bi-telephone" aria-hidden="true"></i>
+                                                </a>
+                                            }
                                             <a class="cp-icono-btn" asp-controller="@t.Controlador" asp-action="Editar" asp-route-id="@f.Id"
                                                aria-label="Editar @f.Nombre" title="Editar">
                                                 <i class="bi bi-pencil" aria-hidden="true"></i>

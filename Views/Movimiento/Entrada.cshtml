@@ -71,6 +71,18 @@
             min-width: 0;
         }
 
+    /* Contacto del proveedor elegido (si tiene celular) */
+    .en-contacto {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+    }
+
+        .en-contacto a {
+            flex: 1;
+            justify-content: center;
+        }
+
     .vn-card .cp-campo select {
         width: 100%;
         min-height: 44px;
@@ -171,7 +183,7 @@
                                     <option value="">Elige el proveedor</option>
                                     @foreach (var p in d.Proveedores)
                                     {
-                                        <option value="@p.Id" selected="@(Model.ProveedorId == p.Id)">@p.Nombre</option>
+                                        <option value="@p.Id" selected="@(Model.ProveedorId == p.Id)" data-celular="@p.Celular">@p.Nombre</option>
                                     }
                                 </select>
                                 @if (d.PuedeCrear)
@@ -180,6 +192,14 @@
                                         <i class="bi bi-plus-lg" aria-hidden="true"></i>
                                     </button>
                                 }
+                            </div>
+                            <div class="en-contacto" id="contactoProveedor" hidden>
+                                <a class="btn-g-outline" id="waProveedor" target="_blank" rel="noopener">
+                                    <i class="bi bi-whatsapp" aria-hidden="true"></i> WhatsApp
+                                </a>
+                                <a class="btn-g-outline" id="telProveedor">
+                                    <i class="bi bi-telephone" aria-hidden="true"></i> Llamar
+                                </a>
                             </div>
                             @if (Error("ProveedorId") is string eProv)
                             {
@@ -215,9 +235,9 @@
 
         @if (d.PuedeCrear)
         {
-            <div class="modal fade" id="modalProveedor" tabindex="-1" aria-labelledby="tituloModalProveedor" aria-hidden="true">
+            <div class="modal fade cp-modal-form" id="modalProveedor" tabindex="-1" aria-labelledby="tituloModalProveedor" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered">
-                    <div class="modal-content" style="border:none;border-radius:14px">
+                    <div class="modal-content">
                         <form id="formProveedor" novalidate>
                             <div class="modal-header">
                                 <h2 class="modal-title fs-5" id="tituloModalProveedor"><i class="bi bi-truck" aria-hidden="true"></i> Nuevo proveedor</h2>
@@ -237,10 +257,17 @@
                                     <div class="cp-ayuda" id="provRuc-ayuda">11 dígitos, solo números.</div>
                                     <div class="cp-error" id="provRuc-error"></div>
                                 </div>
-                                <div class="cp-campo mb-0">
+                                <div class="cp-campo">
                                     <label for="provContacto">Contacto <span class="cp-opcional">(opcional)</span></label>
                                     <input type="text" id="provContacto" name="Contacto" maxlength="100" autocomplete="off" data-campo="Contacto" />
                                     <div class="cp-error" id="provContacto-error"></div>
+                                </div>
+                                <div class="cp-campo mb-0">
+                                    <label for="provCelular">Celular <span class="cp-opcional">(opcional, para escribirle o llamarle)</span></label>
+                                    <input type="tel" id="provCelular" name="Celular" maxlength="9" inputmode="numeric" autocomplete="off"
+                                           data-campo="Celular" data-ayuda="provCelular-ayuda" aria-describedby="provCelular-ayuda" />
+                                    <div class="cp-ayuda" id="provCelular-ayuda">9 dígitos, empieza con 9.</div>
+                                    <div class="cp-error" id="provCelular-error"></div>
                                 </div>
                             </div>
                             <div class="modal-footer">
@@ -265,6 +292,8 @@
             const stock = @Json.Serialize(d.Stock);
             const variasSedes = @Json.Serialize(d.VariasSedes);
             const previos = @Json.Serialize(Model.Detalles);
+            // Hoy en la hora del servidor (Perú): el vencimiento no puede ser anterior
+            const hoyIso = '@DateTime.Today.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)';
 
             const productoPorId = new Map(productos.map(p => [p.id, p]));
             const zonaPorId = new Map(zonas.map(z => [z.id, z]));
@@ -291,6 +320,17 @@
             const MAX_RESULTADOS = 8;
             const lineas = () => [...carrito.children];
             const campo = (li, nombre) => li.querySelector(`[data-campo="${nombre}"]`);
+            // Presentación en que llegó la línea (caja, bolsa...): cuántas unidades base trae cada una
+            const factorDe = li => productoPorId.get(Number(li.dataset.producto))?.presentaciones
+                .find(x => x.nombre === campo(li, 'Presentacion').value)?.factor ?? 1;
+            function plural(u) {
+                if (!u || u.length <= 2 || /[. ]/.test(u)) return u;
+                const ultima = u.at(-1).toLowerCase();
+                if ('aeiouáéíóú'.includes(ultima)) return u + 's';
+                if (ultima === 'z') return u.slice(0, -1) + 'ces';
+                if ('dlnr'.includes(ultima)) return u + 'es';
+                return u + 's';
+            }
 
             const avisoLector = document.createElement('p');
             avisoLector.className = 'visually-hidden';
@@ -389,7 +429,7 @@
                 crearLinea(p, zonaPrevia, cantidadPrevia);
             }
 
-            function crearLinea(p, zonaPrevia, cantidadPrevia) {
+            function crearLinea(p, zonaPrevia, cantidadPrevia, vencePrevio, lotePrevio, presentacionPrevia) {
                 const n = ++secuencia;
                 const li = document.createElement('li');
                 li.className = 'vn-linea';
@@ -402,6 +442,11 @@
                         </div>
                         <button type="button" class="cp-icono-btn peligro" data-accion="quitar"><i class="bi bi-trash" aria-hidden="true"></i></button>
                     </div>
+                    ${p.presentaciones.length ? `
+                    <div class="vn-f vn-f-presentacion">
+                        <label for="pres${n}">Llegó en</label>
+                        <select id="pres${n}" data-campo="Presentacion"></select>
+                    </div>` : '<input type="hidden" data-campo="Presentacion" value="" />'}
                     <div class="vn-linea-campos en-campos">
                         <div class="vn-f">
                             <label for="zona${n}">Dejar en la zona</label>
@@ -415,6 +460,14 @@
                                 <button type="button" data-accion="mas" aria-label="Uno más"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
                             </div>
                         </div>
+                        <div class="vn-f">
+                            <label for="vence${n}">Vence <span class="cp-opcional">(opcional)</span></label>
+                            <input type="date" id="vence${n}" data-campo="FechaVencimiento" min="${hoyIso}" />
+                        </div>
+                        <div class="vn-f">
+                            <label for="lote${n}">Lote <span class="cp-opcional">(opcional)</span></label>
+                            <input type="text" id="lote${n}" data-campo="Lote" maxlength="50" autocomplete="off" />
+                        </div>
                     </div>
                     <p class="vn-linea-aviso" id="aviso${n}"></p>
                     <button type="button" class="en-otra-zona" data-accion="otra-zona">+ Repartir en otra zona</button>
@@ -425,6 +478,13 @@
                 li.querySelector('[data-accion="quitar"]').setAttribute('aria-label', `Quitar ${p.nombre}`);
                 campo(li, 'ProductoId').value = p.id;
 
+                const selPresentacion = campo(li, 'Presentacion');
+                if (selPresentacion.tagName === 'SELECT') {
+                    selPresentacion.add(new Option(p.unidad, ''));
+                    p.presentaciones.forEach(x => selPresentacion.add(new Option(`${x.nombre} de ${x.factor} ${x.factor === 1 ? p.unidad : plural(p.unidad)}`, x.nombre)));
+                    selPresentacion.value = presentacionPrevia ?? '';
+                }
+
                 const usadas = new Set(lineas().filter(x => Number(x.dataset.producto) === p.id).map(x => Number(campo(x, 'UbicacionId').value)));
                 const select = campo(li, 'UbicacionId');
                 const sugerencia = llenarZonas(select, p.id, usadas);
@@ -432,6 +492,8 @@
                 li.querySelector('.vn-linea-aviso').textContent = zonaPrevia ? '' : sugerencia.pista;
                 const inputCant = campo(li, 'Cantidad');
                 inputCant.value = cantidadPrevia ?? 1;
+                campo(li, 'FechaVencimiento').value = vencePrevio ?? '';
+                campo(li, 'Lote').value = lotePrevio ?? '';
 
                 carrito.append(li);
                 actualizar();
@@ -514,7 +576,10 @@
                     } else {
                         if (aviso.classList.contains('error')) aviso.textContent = '';
                         aviso.classList.remove('error');
-                        unidades += cantidad;
+                        // Llegó en cajas, bolsas o packs: el stock sube en unidades base
+                        const factor = factorDe(li);
+                        if (factor > 1) aviso.textContent = `= ${(cantidad * factor).toLocaleString('es-PE')} ${plural(p.unidad)}`;
+                        unidades += cantidad * factor;
                     }
                 }
 
@@ -550,10 +615,26 @@
                 btnRegistrar.disabled = true;
                 btnRegistrar.innerHTML = '<span class="cp-spinner" aria-hidden="true"></span> Registrando entrada…';
             });
+            // WhatsApp y Llamar del proveedor elegido, si tiene celular
+            const contactoProveedor = document.getElementById('contactoProveedor');
+            function mostrarContactoProveedor() {
+                const opcion = selectProveedor.selectedOptions[0];
+                const celular = opcion?.dataset.celular;
+                contactoProveedor.hidden = !celular;
+                if (!celular) return;
+                const waProveedor = document.getElementById('waProveedor');
+                const telProveedor = document.getElementById('telProveedor');
+                waProveedor.href = 'https://wa.me/51' + celular;
+                waProveedor.setAttribute('aria-label', `Escribir por WhatsApp a ${opcion.text} (se abre en otra pestaña)`);
+                telProveedor.href = 'tel:+51' + celular;
+                telProveedor.setAttribute('aria-label', `Llamar a ${opcion.text}`);
+            }
             selectProveedor.addEventListener('change', () => {
                 selectProveedor.setAttribute('aria-invalid', 'false');
                 if (motivo.textContent === 'Elige el proveedor.') motivo.textContent = '';
+                mostrarContactoProveedor();
             });
+            mostrarContactoProveedor();
             window.addEventListener('pageshow', e => {
                 if (!e.persisted) return;
                 btnRegistrar.disabled = false;
@@ -570,7 +651,7 @@
                     const nuevos = (await respuesta.json()).filter(p => !productoPorId.has(p.id));
                     if (!nuevos.length) return;
                     for (const p of nuevos) {
-                        const producto = { id: p.id, nombre: p.nombre, codigo: p.codigo, unidad: '' };
+                        const producto = { id: p.id, nombre: p.nombre, codigo: p.codigo, unidad: '', presentaciones: [] };
                         productos.push(producto);
                         productoPorId.set(p.id, producto);
                     }
@@ -640,7 +721,9 @@
                         const respuesta = await fetch('@Url.Action("CrearRapido", "Proveedor")', { method: 'POST', body: datos });
                         const resultado = await respuesta.json();
                         if (resultado.success) {
-                            selectProveedor.add(new Option(resultado.nombre, resultado.id, true, true));
+                            const opcion = new Option(resultado.nombre, resultado.id, true, true);
+                            if (resultado.celular) opcion.dataset.celular = resultado.celular;
+                            selectProveedor.add(opcion);
                             selectProveedor.dispatchEvent(new Event('change'));
                             bootstrap.Modal.getInstance(modalProveedor).hide();
                             anunciar(`Proveedor ${resultado.nombre} registrado y elegido.`);
@@ -656,12 +739,15 @@
                     }
                 });
                 modalProveedor.addEventListener('shown.bs.modal', () => document.getElementById('provNombre').focus());
+                // Al cerrar (guardado, X o Cancelar) el foco vuelve a la lista de proveedores, no al inicio de la página
+                modalProveedor.addEventListener('hidden.bs.modal', () => selectProveedor.focus());
             }
 
             // ===== Estado inicial (también al volver con errores del servidor) =====
             for (const d of previos) {
                 const p = productoPorId.get(d.productoId);
-                if (p) crearLinea(p, zonaPorId.has(d.ubicacionId) ? d.ubicacionId : undefined, d.cantidad > 0 ? d.cantidad : 1);
+                if (p) crearLinea(p, zonaPorId.has(d.ubicacionId) ? d.ubicacionId : undefined, d.cantidad > 0 ? d.cantidad : 1, d.fechaVencimiento, d.lote,
+                    p.presentaciones.some(x => x.nombre === d.presentacion) ? d.presentacion : undefined);
             }
             filtrarProductos();
             actualizar();

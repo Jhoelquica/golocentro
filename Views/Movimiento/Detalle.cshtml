@@ -237,9 +237,25 @@
                             <td>
                                 <div class="cp-nombre">@l.Producto</div>
                                 <div class="cp-sub">@l.Codigo</div>
+                                @if (l.Vence != null || l.Lote != null)
+                                {
+                                    <div class="cp-sub">
+                                        @(string.Join(" · ", new[] { l.Vence is DateOnly v ? "Vence " + v.ToString("dd/MM/yyyy", inv) : null, l.Lote != null ? "Lote " + l.Lote : null }.Where(x => x != null)))
+                                    </div>
+                                }
                             </td>
                             <td class="cp-doc">@l.Zona</td>
-                            <td class="md-num"><strong>@((Model.EsEntrada ? "+" : "−") + l.Cantidad)</strong> <span class="cp-sub">@l.Unidad</span></td>
+                            <td class="md-num">
+                                @if (l.Presentacion != null)
+                                {
+                                    <strong>@((Model.EsEntrada ? "+" : "−") + Presentaciones.Cantidad(l.Cantidad / l.Factor, l.Presentacion))</strong>
+                                    <span class="cp-sub">(@Presentaciones.Cantidad(l.Cantidad, l.Unidad))</span>
+                                }
+                                else
+                                {
+                                    <strong>@((Model.EsEntrada ? "+" : "−") + l.Cantidad)</strong> <span class="cp-sub">@l.Unidad</span>
+                                }
+                            </td>
                             <td class="md-num md-cambio">@l.StockAnterior → <strong>@l.StockDespues</strong></td>
                         </tr>
                     }

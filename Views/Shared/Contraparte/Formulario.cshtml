@@ -91,7 +91,7 @@
                        inputmode="numeric" autocomplete="tel-national"
                        aria-invalid="@(Error("Celular") != null ? "true" : null)"
                        aria-describedby="@Describe("Celular", "Celular-ayuda")" />
-                <p class="cp-ayuda" id="Celular-ayuda">9 dígitos, empieza con 9. Sirve para enviarle la nota de venta por WhatsApp.</p>
+                <p class="cp-ayuda" id="Celular-ayuda">@t.CelularAyuda</p>
                 @if (Error("Celular") is string errCelular)
                 {
                     <p class="cp-error" id="Celular-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @errCelular</p>

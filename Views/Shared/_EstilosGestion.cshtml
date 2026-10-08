@@ -582,4 +582,26 @@
             flex: 1;
             margin: 0;
         }
+
+    /* Modales con formulario (Nuevo cliente en Venta, Nuevo proveedor en Entrada): algo más anchos y con la letra
+       del resto del texto, 16 px; ayudas y errores a 14 px (UAT 06/10: la letra se veía pequeña). */
+    .cp-modal-form .modal-dialog {
+        max-width: 560px;
+    }
+
+    .cp-modal-form .modal-content {
+        border: none;
+        border-radius: 14px;
+    }
+
+    .cp-modal-form .cp-campo label,
+    .cp-modal-form .cp-campo input {
+        font-size: 16px;
+    }
+
+    .cp-modal-form .cp-opcional,
+    .cp-modal-form .cp-ayuda,
+    .cp-modal-form .cp-error {
+        font-size: 14px;
+    }
 </style>

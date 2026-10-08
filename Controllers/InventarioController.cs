@@ -1,6 +1,7 @@
 using GestionAlmacen_Golocentro.Data;
 using GestionAlmacen_Golocentro.Helpers;
 using GestionAlmacen_Golocentro.Models;
+using GestionAlmacen_Golocentro.Services;
 using GestionAlmacen_Golocentro.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -184,6 +185,8 @@ namespace GestionAlmacen_Golocentro.Controllers
                 return View(model);
             }
 
+            if (cambios > 0)
+                await VencimientoProducto.ActualizarAsync(_context, aGuardar.Select(l => l.ProductoId));
             var coinciden = aGuardar.Count - cambios;
             TempData["Exito"] = $"Conteo de {datos.ZonaCodigo} guardado: " +
                 (cambios == 0 ? "todo coincide con el sistema." :

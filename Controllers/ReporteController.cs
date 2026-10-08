@@ -153,16 +153,18 @@ namespace GestionAlmacen_Golocentro.Controllers
                     d.IdProductoNavigation.Nombre,
                     d.IdProductoNavigation.UnidadMedida,
                     d.Cantidad,
+                    d.Factor,
                     d.PrecioUnitarioSnapshot
                 })
                 .ToListAsync();
 
-            var importeTotal = lineas.Sum(l => decimal.Round(l.Cantidad * l.PrecioUnitarioSnapshot, 2));
+            // La cantidad está en unidades base; el precio, en la presentación vendida (bolsa, caja...)
+            var importeTotal = lineas.Sum(l => Presentaciones.Importe(l.Cantidad, l.Factor, l.PrecioUnitarioSnapshot));
             var filas = lineas
                 .GroupBy(l => l.IdProducto)
                 .Select(g =>
                 {
-                    var importe = g.Sum(l => decimal.Round(l.Cantidad * l.PrecioUnitarioSnapshot, 2));
+                    var importe = g.Sum(l => Presentaciones.Importe(l.Cantidad, l.Factor, l.PrecioUnitarioSnapshot));
                     var primero = g.First();
                     return new ProductoVendidoFila(primero.Codigo, primero.Nombre, primero.UnidadMedida, g.Sum(l => l.Cantidad), importe,
                         g.Select(l => l.IdMovimiento).Distinct().Count(), importeTotal == 0 ? 0 : importe / importeTotal);
@@ -194,6 +196,141 @@ namespace GestionAlmacen_Golocentro.Controllers
                 Totales = new object?[] { null, null, "Total", null, modelo.Unidades, modelo.Importe, filas.Count == 0 ? null : 1m, null }
             };
             return Excel("Productos más vendidos (importe antes de descuentos de la nota)", filtro, new[] { hoja }, "ProductosVendidos");
+        }
+
+        // ===== Comparativo (UAT 06/10): el periodo contra el anterior, ventas por mes, productos y sedes =====
+        private sealed record NotaComparada(int IdSede, DateTime Fecha, decimal Total);
+        private sealed record LineaVendida(int IdProducto, string Codigo, string Nombre, string Unidad, int Cantidad, int Factor, decimal Precio, int IdSede);
+
+        [NonAction]
+        private Task<List<NotaComparada>> NotasEmitidas(FiltroReporte filtro) =>
+            VentasDelPeriodo(filtro)
+                .Where(n => n.Estado == EstadoNota.Emitida)
+                .Select(n => new NotaComparada(n.IdMovimientoNavigation.IdSede, n.IdMovimientoNavigation.Fecha, n.Total))
+                .ToListAsync();
+
+        [NonAction]
+        private Task<List<LineaVendida>> LineasVendidas(FiltroReporte filtro) =>
+            _context.DetalleMovimientos
+                .Where(d => d.IdMovimientoNavigation.NotaVentum != null && d.IdMovimientoNavigation.NotaVentum.Estado == EstadoNota.Emitida)
+                .Where(d => d.IdMovimientoNavigation.Fecha >= filtro.Inicio && d.IdMovimientoNavigation.Fecha < filtro.Fin)
+                .Where(d => filtro.SedeId == null || d.IdMovimientoNavigation.IdSede == filtro.SedeId)
+                .Select(d => new LineaVendida(d.IdProducto, d.IdProductoNavigation.Codigo, d.IdProductoNavigation.Nombre,
+                    d.IdProductoNavigation.UnidadMedida, d.Cantidad, d.Factor, d.PrecioUnitarioSnapshot, d.IdMovimientoNavigation.IdSede))
+                .ToListAsync();
+
+        public async Task<IActionResult> Comparativo(DateOnly? desde, DateOnly? hasta, int? sede, string? formato)
+        {
+            var filtro = await Filtro(desde, hasta, sede, nameof(Comparativo));
+            var anterior = filtro.PeriodoAnterior();
+
+            var notas = await NotasEmitidas(filtro);
+            var notasAntes = await NotasEmitidas(anterior);
+            var lineas = await LineasVendidas(filtro);
+            var lineasAntes = await LineasVendidas(anterior);
+
+            static decimal Ticket(IReadOnlyCollection<NotaComparada> n) => n.Count == 0 ? 0 : decimal.Round(n.Sum(x => x.Total) / n.Count, 2);
+            // Importe a precio cobrado (la cantidad va en unidades base y el precio en la presentación vendida)
+            static List<(int Id, string Codigo, string Nombre, string Unidad, int Cantidad, decimal Importe)> Ranking(IEnumerable<LineaVendida> ls) =>
+                ls.GroupBy(l => l.IdProducto)
+                    .Select(g => (g.Key, g.First().Codigo, g.First().Nombre, g.First().Unidad, g.Sum(l => l.Cantidad),
+                        g.Sum(l => Presentaciones.Importe(l.Cantidad, l.Factor, l.Precio))))
+                    .OrderByDescending(x => x.Item6).ThenByDescending(x => x.Item5)
+                    .ToList();
+
+            var ranking = Ranking(lineas);
+            var rankingAntes = Ranking(lineasAntes);
+            var puestoAntes = rankingAntes.Select((x, i) => (x.Id, Puesto: i + 1)).ToDictionary(x => x.Id, x => x.Puesto);
+
+            var modelo = new ReporteComparativoViewModel
+            {
+                Filtro = filtro,
+                Anterior = anterior,
+                Indicadores = new()
+                {
+                    new("Total vendido", new(notas.Sum(n => n.Total), notasAntes.Sum(n => n.Total)), true),
+                    new("Ventas", new(notas.Count, notasAntes.Count), false),
+                    new("Ticket promedio", new(Ticket(notas), Ticket(notasAntes)), true),
+                    new("Unidades vendidas", new(lineas.Sum(l => l.Cantidad), lineasAntes.Sum(l => l.Cantidad)), false)
+                },
+                Productos = ranking.Take(10).Select((x, i) =>
+                {
+                    var antes = rankingAntes.FirstOrDefault(a => a.Id == x.Id);
+                    return new ProductoComparado(i + 1, puestoAntes.TryGetValue(x.Id, out var p) ? p : null, x.Codigo, x.Nombre, x.Unidad,
+                        new(x.Cantidad, antes.Cantidad), new(x.Importe, antes.Importe));
+                }).ToList()
+            };
+
+            // Ventas de los 12 meses que terminan en el mes de "hasta"
+            var es = Cultura.Peru;
+            var inicioMeses = new DateOnly(filtro.Hasta.Year, filtro.Hasta.Month, 1).AddMonths(-11);
+            var porMes = (await NotasEmitidas(new FiltroReporte { Desde = inicioMeses, Hasta = filtro.Hasta, SedeId = filtro.SedeId }))
+                .GroupBy(n => (n.Fecha.Year, n.Fecha.Month))
+                .ToDictionary(g => g.Key, g => (Ventas: g.Count(), Total: g.Sum(n => n.Total)));
+            for (var mes = inicioMeses; mes <= filtro.Hasta; mes = mes.AddMonths(1))
+            {
+                var v = porMes.GetValueOrDefault((mes.Year, mes.Month));
+                modelo.PorMes.Add(new VentaPorPeriodo(mes.ToString("MMM yy", es), mes.ToString("MMMM yyyy", es), v.Ventas, v.Total));
+            }
+
+            // Sede contra sede: solo cuando la dueña mira todas las sedes
+            if (filtro.SedeId == null && filtro.Sedes.Count > 1)
+                modelo.Sedes = filtro.Sedes.Select(s =>
+                {
+                    var deLaSede = notas.Where(n => n.IdSede == s.Id).ToList();
+                    return new SedeComparada(s.Nombre, new(deLaSede.Sum(n => n.Total), notasAntes.Where(n => n.IdSede == s.Id).Sum(n => n.Total)),
+                        deLaSede.Count, Ticket(deLaSede), lineas.Where(l => l.IdSede == s.Id).Sum(l => l.Cantidad));
+                }).ToList();
+
+            if (formato != "excel")
+                return View(modelo);
+
+            static object? Porcentaje(decimal? v) => v is decimal d ? decimal.Round(d * 100, 1) : "—";
+            var hojas = new List<HojaExcel>
+            {
+                new()
+                {
+                    Nombre = "Resumen",
+                    Columnas = new() { new("Indicador"), new(filtro.Periodo), new(anterior.Periodo), new("Variación %") },
+                    Filas = modelo.Indicadores.Select(i => new object?[] { i.Nombre, i.Valor.Actual, i.Valor.Anterior, Porcentaje(i.Valor.Variacion) }).ToList()
+                },
+                new()
+                {
+                    Nombre = "Por mes",
+                    Columnas = new() { new("Mes"), new("Ventas", FormatoColumna.Entero), new("Total", FormatoColumna.Moneda) },
+                    Filas = modelo.PorMes.Select(m => new object?[] { m.EtiquetaLarga, m.Ventas, m.Total }).ToList()
+                },
+                new()
+                {
+                    Nombre = "Productos",
+                    Columnas = new()
+                    {
+                        new("Puesto", FormatoColumna.Entero), new("Puesto antes"), new("Código"), new("Producto"), new("Unidad"),
+                        new("Cantidad", FormatoColumna.Entero), new("Cantidad antes", FormatoColumna.Entero),
+                        new("Importe", FormatoColumna.Moneda), new("Importe antes", FormatoColumna.Moneda), new("Variación %")
+                    },
+                    Filas = modelo.Productos.Select(p => new object?[]
+                    {
+                        p.Puesto, p.PuestoAnterior?.ToString() ?? "—", p.Codigo, p.Nombre, p.Unidad, (int)p.Cantidad.Actual, (int)p.Cantidad.Anterior,
+                        p.Importe.Actual, p.Importe.Anterior, Porcentaje(p.Importe.Variacion)
+                    }).ToList()
+                }
+            };
+            if (modelo.Sedes.Count > 0)
+                hojas.Add(new()
+                {
+                    Nombre = "Por sede",
+                    Columnas = new()
+                    {
+                        new("Sede"), new("Total", FormatoColumna.Moneda), new("Total antes", FormatoColumna.Moneda), new("Variación %"),
+                        new("Ventas", FormatoColumna.Entero), new("Ticket promedio", FormatoColumna.Moneda), new("Unidades", FormatoColumna.Entero)
+                    },
+                    Filas = modelo.Sedes.Select(s => new object?[]
+                    {
+                        s.Sede, s.Total.Actual, s.Total.Anterior, Porcentaje(s.Total.Variacion), s.Ventas, s.Ticket, s.Unidades
+                    }).ToList()
+                });
+            return Excel("Reporte comparativo", filtro, hojas, "Comparativo");
         }
 
         // ===== Entradas =====
@@ -432,7 +569,8 @@ namespace GestionAlmacen_Golocentro.Controllers
                     Comprobante = d.IdMovimientoNavigation.Observaciones,
                     Serie = d.IdMovimientoNavigation.NotaVentum != null ? d.IdMovimientoNavigation.NotaVentum.Serie : null,
                     Numero = d.IdMovimientoNavigation.NotaVentum != null ? (int?)d.IdMovimientoNavigation.NotaVentum.Numero : null,
-                    d.PrecioUnitarioSnapshot
+                    d.PrecioUnitarioSnapshot,
+                    d.Presentacion
                 })
                 .ToListAsync();
 
@@ -447,7 +585,7 @@ namespace GestionAlmacen_Golocentro.Controllers
                 else if (d.Serie != null)
                 {
                     eventos.Add((new MovimientoKardex(d.Fecha, TipoKardex.Venta, "Venta",
-                        VentaController.NumeroNota(d.Serie, d.Numero!.Value), $"{d.Cliente} · S/ {d.PrecioUnitarioSnapshot.ToString("0.00", Inv)} c/u",
+                        VentaController.NumeroNota(d.Serie, d.Numero!.Value), $"{d.Cliente} · S/ {d.PrecioUnitarioSnapshot.ToString("0.00", Inv)} {(d.Presentacion == null ? "c/u" : "por " + d.Presentacion)}",
                         d.Zona, null, d.Cantidad, 0, d.Usuario, d.Sede, Url.Action("Nota", "Venta", new { id = d.IdMovimiento })), 1));
                 }
                 else

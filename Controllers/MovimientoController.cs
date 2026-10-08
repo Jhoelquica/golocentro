@@ -15,6 +15,7 @@ namespace GestionAlmacen_Golocentro.Controllers
     {
         private const int TamanoPagina = 25;
         private const int MaxFactura = 50;
+        private const int MaxLote = 50;
         public const int MaxCantidadEntrada = 1_000_000;
         private const int MaxDiasLista = 92;
         private readonly AppDbContext _context;
@@ -185,9 +186,19 @@ namespace GestionAlmacen_Golocentro.Controllers
             var sedeUsuario = User.SedeId();
             var detalles = model.Detalles.Where(d => d.ProductoId > 0).ToList();
             model.NumeroFactura = string.IsNullOrWhiteSpace(model.NumeroFactura) ? null : model.NumeroFactura.Trim();
+            foreach (var d in detalles)
+            {
+                d.Lote = string.IsNullOrWhiteSpace(d.Lote) ? null : d.Lote.Trim();
+                d.Presentacion = string.IsNullOrWhiteSpace(d.Presentacion) ? null : d.Presentacion.Trim();
+            }
 
             int? sedeMovimiento = null;
             var precios = new Dictionary<int, decimal>();
+            var presentaciones = new Dictionary<(int, string), ProductoPresentacion>();
+            // Cada línea llega en la unidad base (factor 1) o en una presentación del producto (10 cajas de 12 packs)
+            ProductoPresentacion? PresentacionDe(DetalleEntradaViewModel d) =>
+                d.Presentacion != null && presentaciones.TryGetValue((d.ProductoId, d.Presentacion.ToLowerInvariant()), out var pp) ? pp : null;
+            int FactorDe(DetalleEntradaViewModel d) => PresentacionDe(d)?.Factor ?? 1;
             if (detalles.Count == 0)
             {
                 ModelState.AddModelError("", "Agrega al menos un producto que llegó.");
@@ -205,10 +216,20 @@ namespace GestionAlmacen_Golocentro.Controllers
                     .ToDictionaryAsync(p => p.IdProducto, p => p.PrecioUnitario);
                 if (precios.Count != idsProducto.Count)
                     ModelState.AddModelError("", "Uno de los productos ya no existe. Quítalo y vuelve a agregarlo.");
+                presentaciones = (await _context.ProductoPresentacions.Where(pp => idsProducto.Contains(pp.IdProducto)).ToListAsync())
+                    .GroupBy(pp => (pp.IdProducto, pp.Nombre.ToLowerInvariant()))
+                    .ToDictionary(g => g.Key, g => g.First());
+                if (detalles.Any(d => d.Presentacion != null && PresentacionDe(d) == null))
+                    ModelState.AddModelError("", "Una de las presentaciones elegidas ya no existe. Elige otra.");
                 if (detalles.Any(d => d.Cantidad < 1))
                     ModelState.AddModelError("", "Cada producto debe tener una cantidad de 1 o más.");
-                else if (detalles.Any(d => d.Cantidad > MaxCantidadEntrada))
+                else if (detalles.Any(d => (long)d.Cantidad * FactorDe(d) > MaxCantidadEntrada))
                     ModelState.AddModelError("", $"La cantidad de un producto no puede pasar de {MaxCantidadEntrada:N0} unidades por entrada.");
+                var hoy = DateOnly.FromDateTime(DateTime.Today);
+                if (detalles.Any(d => d.FechaVencimiento < hoy))
+                    ModelState.AddModelError("", "La fecha de vencimiento de un producto ya pasó. Revísala o déjala vacía.");
+                if (detalles.Any(d => d.Lote?.Length > MaxLote))
+                    ModelState.AddModelError("", $"El lote no puede pasar de {MaxLote} caracteres.");
             }
 
             if (model.ProveedorId == null || !await _context.Proveedores.AnyAsync(p => p.IdProveedor == model.ProveedorId))
@@ -249,15 +270,22 @@ namespace GestionAlmacen_Golocentro.Controllers
                     stocks[clave] = stock;
                 }
 
+                // Cantidad en unidades base (la que suma al stock), con la presentación en que llegó y su factor
+                var presentacion = PresentacionDe(d);
+                var cantidadBase = d.Cantidad * FactorDe(d);
                 movimiento.DetalleMovimientos.Add(new DetalleMovimiento
                 {
                     IdProducto = d.ProductoId,
                     IdUbicacion = d.UbicacionId,
-                    Cantidad = d.Cantidad,
-                    PrecioUnitarioSnapshot = precios[d.ProductoId],
-                    StockAnterior = stock.CantidadActual
+                    Cantidad = cantidadBase,
+                    Presentacion = presentacion?.Nombre,
+                    Factor = FactorDe(d),
+                    PrecioUnitarioSnapshot = presentacion?.Precio ?? precios[d.ProductoId],
+                    StockAnterior = stock.CantidadActual,
+                    FechaVencimiento = d.FechaVencimiento,
+                    Lote = d.Lote
                 });
-                stock.CantidadActual += d.Cantidad;
+                stock.CantidadActual += cantidadBase;
                 stock.UltimaActualizacion = ahora;
             }
 
@@ -276,8 +304,9 @@ namespace GestionAlmacen_Golocentro.Controllers
 
             if (model.Evidencia is { Length: > 0 })
                 await OperacionesAlmacen.GuardarEvidencia(_context, movimiento.IdMovimiento, model.Evidencia, "Entrada");
+            await VencimientoProducto.ActualizarAsync(_context, detalles.Select(d => d.ProductoId));
 
-            var unidades = detalles.Sum(d => d.Cantidad);
+            var unidades = detalles.Sum(d => d.Cantidad * FactorDe(d));
             TempData["Exito"] = $"Entrada registrada: {detalles.Count} {(detalles.Count == 1 ? "producto" : "productos")}, {unidades} {(unidades == 1 ? "unidad" : "unidades")}.";
             return RedirectToAction(nameof(Detalle), new { id = movimiento.IdMovimiento });
         }
@@ -308,7 +337,11 @@ namespace GestionAlmacen_Golocentro.Controllers
                             d.IdProductoNavigation.UnidadMedida,
                             Zona = d.IdUbicacionNavigation.CodigoEstante,
                             d.Cantidad,
-                            d.StockAnterior
+                            d.StockAnterior,
+                            d.FechaVencimiento,
+                            d.Lote,
+                            d.Presentacion,
+                            d.Factor
                         })
                         .ToList(),
                     Evidencias = m.Evidencia.OrderBy(e => e.Fecha).Select(e => new EvidenciaNota(e.UrlArchivo, e.Fecha)).ToList()
@@ -334,7 +367,7 @@ namespace GestionAlmacen_Golocentro.Controllers
                 Documento = string.IsNullOrWhiteSpace(mov.Observaciones) ? null : mov.Observaciones,
                 Lineas = mov.Lineas
                     .Select(l => new LineaDetalleMovimiento(l.Nombre, l.Codigo, l.UnidadMedida, l.Zona, l.Cantidad, l.StockAnterior,
-                        esEntrada ? l.StockAnterior + l.Cantidad : l.StockAnterior - l.Cantidad))
+                        esEntrada ? l.StockAnterior + l.Cantidad : l.StockAnterior - l.Cantidad, l.FechaVencimiento, l.Lote, l.Presentacion, l.Factor))
                     .ToList(),
                 Evidencias = mov.Evidencias
             });
@@ -375,10 +408,17 @@ namespace GestionAlmacen_Golocentro.Controllers
             var sedeId = User.SedeId();
             var datos = model.Datos;
 
-            datos.Productos = await _context.Productos
-                .OrderBy(p => p.Nombre)
-                .Select(p => new ProductoEntrada(p.IdProducto, p.Nombre, p.Codigo, p.UnidadMedida))
-                .ToListAsync();
+            var presentaciones = (await _context.ProductoPresentacions
+                    .OrderBy(pp => pp.Factor)
+                    .Select(pp => new { pp.IdProducto, pp.Nombre, pp.Factor, pp.Precio })
+                    .ToListAsync())
+                .ToLookup(pp => pp.IdProducto, pp => new PresentacionVenta(pp.Nombre, pp.Factor, pp.Precio));
+            datos.Productos = (await _context.Productos
+                    .OrderBy(p => p.Nombre)
+                    .Select(p => new { p.IdProducto, p.Nombre, p.Codigo, p.UnidadMedida })
+                    .ToListAsync())
+                .Select(p => new ProductoEntrada(p.IdProducto, p.Nombre, p.Codigo, p.UnidadMedida, presentaciones[p.IdProducto].ToList()))
+                .ToList();
 
             datos.Zonas = await _context.Ubicaciones
                 .Where(u => sedeId == null || u.IdSede == sedeId)
@@ -394,7 +434,7 @@ namespace GestionAlmacen_Golocentro.Controllers
 
             datos.Proveedores = await _context.Proveedores
                 .OrderBy(p => p.Nombre)
-                .Select(p => new ProveedorOpcion(p.IdProveedor, p.Nombre))
+                .Select(p => new ProveedorOpcion(p.IdProveedor, p.Nombre, p.Celular))
                 .ToListAsync();
 
             // Crear productos y proveedores es de dueña y encargada

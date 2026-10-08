@@ -630,7 +630,7 @@
                             <li>
                                 <div class="nv-item-desc">@l.Descripcion</div>
                                 <div class="nv-item-det">
-                                    <span>@l.Cantidad @l.Unidad × @Monto(l.PrecioUnitario)</span>
+                                    <span>@Presentaciones.Cantidad(l.Cantidad, l.Unidad) × @Monto(l.PrecioUnitario)</span>
                                     <span>@Monto(l.Importe)</span>
                                 </div>
                             </li>
@@ -766,7 +766,7 @@
                         <ul class="nv-devolucion">
                             @foreach (var l in Model.Lineas)
                             {
-                                <li><strong>@l.Cantidad @l.Unidad</strong> @l.Descripcion <span>a @l.Zona</span></li>
+                                <li><strong>@Presentaciones.Cantidad(l.Cantidad, l.Unidad)</strong> @l.Descripcion <span>a @l.Zona</span></li>
                             }
                         </ul>
                         <div class="cp-campo nv-campo-motivo">
