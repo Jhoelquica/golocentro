@@ -16,6 +16,7 @@ namespace GestionAlmacen_Golocentro.Controllers
     public class VentaController : Controller
     {
         private const string Serie = "NV01";
+        public const int MaxCantidadVenta = 1_000_000;
         private readonly AppDbContext _context;
 
         public VentaController(AppDbContext context)
@@ -101,9 +102,17 @@ namespace GestionAlmacen_Golocentro.Controllers
                 return RedirectToAction("Login", "Account");
 
             var items = model.Items.Where(i => i.ProductoId > 0).ToList();
+            foreach (var item in items)
+                item.Presentacion = string.IsNullOrWhiteSpace(item.Presentacion) ? null : item.Presentacion.Trim();
             int? sedeVenta = null;
-            var productos = new Dictionary<int, (string Nombre, decimal Precio)>();
+            var productos = new Dictionary<int, (string Nombre, decimal Precio, string Unidad)>();
+            var presentaciones = new Dictionary<(int, string), ProductoPresentacion>();
             var stocks = new Dictionary<(int, int), ProductoUbicacion>();
+
+            // Cada fila se vende en la unidad base (factor 1, precio de lista) o en una presentación del producto
+            ProductoPresentacion? PresentacionDe(VentaItem i) =>
+                i.Presentacion != null && presentaciones.TryGetValue((i.ProductoId, i.Presentacion.ToLowerInvariant()), out var pp) ? pp : null;
+            int FactorDe(VentaItem i) => PresentacionDe(i)?.Factor ?? 1;
 
             if (items.Count == 0)
             {
@@ -114,17 +123,24 @@ namespace GestionAlmacen_Golocentro.Controllers
                 var idsProducto = items.Select(i => i.ProductoId).Distinct().ToList();
                 productos = (await _context.Productos
                         .Where(p => idsProducto.Contains(p.IdProducto))
-                        .Select(p => new { p.IdProducto, p.Nombre, p.PrecioUnitario })
+                        .Select(p => new { p.IdProducto, p.Nombre, p.PrecioUnitario, p.UnidadMedida })
                         .ToListAsync())
-                    .ToDictionary(p => p.IdProducto, p => (p.Nombre, p.PrecioUnitario));
+                    .ToDictionary(p => p.IdProducto, p => (p.Nombre, p.PrecioUnitario, p.UnidadMedida));
                 if (productos.Count != idsProducto.Count)
                     ModelState.AddModelError("", "Uno de los productos de la venta ya no existe.");
+                presentaciones = (await _context.ProductoPresentacions.Where(pp => idsProducto.Contains(pp.IdProducto)).ToListAsync())
+                    .GroupBy(pp => (pp.IdProducto, pp.Nombre.ToLowerInvariant()))
+                    .ToDictionary(g => g.Key, g => g.First());
 
                 foreach (var item in items)
                 {
                     var nombre = productos.TryGetValue(item.ProductoId, out var p) ? p.Nombre : "un producto";
+                    if (item.Presentacion != null && PresentacionDe(item) == null)
+                        ModelState.AddModelError("", $"La presentación «{item.Presentacion}» de {nombre} ya no existe. Elige otra.");
                     if (item.Cantidad < 1)
                         ModelState.AddModelError("", $"La cantidad de {nombre} debe ser al menos 1.");
+                    else if (item.Cantidad > MaxCantidadVenta)
+                        ModelState.AddModelError("", $"La cantidad de {nombre} no puede pasar de {MaxCantidadVenta:N0}.");
                     if (item.Precio is decimal precio && (precio < 0 || decimal.Round(precio, 2) != precio))
                         ModelState.AddModelError("", $"El precio de {nombre} debe ser 0 o más, con máximo 2 decimales.");
                 }
@@ -134,16 +150,21 @@ namespace GestionAlmacen_Golocentro.Controllers
                     ModelState.AddModelError("", errorSede);
                 sedeVenta = sedeResuelta;
 
-                // Se valida la suma por producto+zona: dos filas iguales no deben pasar por separado
+                // Se valida la suma por producto+zona en unidades base: dos filas (una en bolsas y otra en tiras,
+                // por ejemplo) no deben pasar por separado
                 stocks = await OperacionesAlmacen.CargarStocks(_context, items.Select(i => (i.ProductoId, i.UbicacionId)));
                 foreach (var pedido in items.GroupBy(i => (i.ProductoId, i.UbicacionId)))
                 {
                     var disponible = stocks.TryGetValue(pedido.Key, out var fila) ? fila.CantidadActual : 0;
-                    var solicitado = pedido.Sum(i => i.Cantidad);
+                    var solicitado = pedido.Sum(i => (long)i.Cantidad * FactorDe(i));
                     if (solicitado > disponible)
                     {
                         var nombre = productos.TryGetValue(pedido.Key.ProductoId, out var p) ? p.Nombre : "un producto";
-                        ModelState.AddModelError("", $"No alcanza el stock de {nombre} en esa zona: hay {disponible}, pediste {solicitado}.");
+                        var delProducto = presentaciones.Values.Where(pp => pp.IdProducto == pedido.Key.ProductoId).Select(pp => (pp.Nombre, pp.Factor)).ToList();
+                        ModelState.AddModelError("", delProducto.Count == 0 || solicitado > int.MaxValue
+                            ? $"No alcanza el stock de {nombre} en esa zona: hay {disponible}, pediste {solicitado}."
+                            : $"No alcanza el stock de {nombre} en esa zona: hay {Presentaciones.Describir(disponible, p.Unidad, delProducto)}, " +
+                              $"pediste {Presentaciones.Describir((int)solicitado, p.Unidad, delProducto)}.");
                     }
                 }
             }
@@ -155,9 +176,10 @@ namespace GestionAlmacen_Golocentro.Controllers
             if (OperacionesAlmacen.ValidarEvidencia(model.Evidencia) is string errorFoto)
                 ModelState.AddModelError(nameof(model.Evidencia), errorFoto);
 
+            // Precio cobrado por presentación (o por unidad base); si viene vacío, el de lista
             var lineas = items
                 .Where(i => productos.ContainsKey(i.ProductoId))
-                .Select(i => (Item: i, Precio: i.Precio ?? productos[i.ProductoId].Precio))
+                .Select(i => (Item: i, Precio: i.Precio ?? PresentacionDe(i)?.Precio ?? productos[i.ProductoId].Precio))
                 .ToList();
             var subtotal = lineas.Sum(l => decimal.Round(l.Item.Cantidad * l.Precio, 2));
             var descuento = model.Descuento ?? 0;
@@ -183,18 +205,24 @@ namespace GestionAlmacen_Golocentro.Controllers
                 Observaciones = string.IsNullOrWhiteSpace(model.Observaciones) ? null : model.Observaciones.Trim()
             };
 
+            // La línea guarda la cantidad en unidades base (es la que mueve el stock), con qué presentación se vendió
+            // y su factor; el precio es el de esa presentación
             foreach (var (item, precio) in lineas)
             {
                 var stock = stocks[(item.ProductoId, item.UbicacionId)];
+                var presentacion = PresentacionDe(item);
+                var cantidadBase = item.Cantidad * FactorDe(item);
                 movimiento.DetalleMovimientos.Add(new DetalleMovimiento
                 {
                     IdProducto = item.ProductoId,
                     IdUbicacion = item.UbicacionId,
-                    Cantidad = item.Cantidad,
+                    Cantidad = cantidadBase,
+                    Presentacion = presentacion?.Nombre,
+                    Factor = FactorDe(item),
                     PrecioUnitarioSnapshot = precio,
                     StockAnterior = stock.CantidadActual
                 });
-                stock.CantidadActual -= item.Cantidad;
+                stock.CantidadActual -= cantidadBase;
                 stock.UltimaActualizacion = ahora;
             }
 
@@ -269,6 +297,8 @@ namespace GestionAlmacen_Golocentro.Controllers
                         .Select(d => new
                         {
                             d.Cantidad,
+                            d.Factor,
+                            d.Presentacion,
                             d.IdProductoNavigation.Nombre,
                             d.IdProductoNavigation.UnidadMedida,
                             d.PrecioUnitarioSnapshot,
@@ -304,8 +334,12 @@ namespace GestionAlmacen_Golocentro.Controllers
                 ClienteNombre = venta.Cliente?.Nombre ?? "Público en general",
                 ClienteDocumento = venta.Cliente?.RucDni,
                 ClienteCelular = venta.Cliente?.Celular,
+                // Vendido en bolsa, caja o pack: la nota muestra cuántas y de cuánto es cada una
                 Lineas = venta.Lineas
-                    .Select(l => new LineaNota(l.Cantidad, l.Nombre, l.UnidadMedida, l.PrecioUnitarioSnapshot, decimal.Round(l.Cantidad * l.PrecioUnitarioSnapshot, 2), l.Zona))
+                    .Select(l => new LineaNota(l.Cantidad / l.Factor,
+                        l.Presentacion == null ? l.Nombre : $"{l.Nombre} · {l.Presentacion} de {Presentaciones.Cantidad(l.Factor, l.UnidadMedida)}",
+                        l.Presentacion ?? l.UnidadMedida, l.PrecioUnitarioSnapshot,
+                        Presentaciones.Importe(l.Cantidad, l.Factor, l.PrecioUnitarioSnapshot), l.Zona))
                     .ToList(),
                 Subtotal = venta.Nota.Subtotal,
                 Descuento = venta.Nota.Descuento,
@@ -485,11 +519,20 @@ namespace GestionAlmacen_Golocentro.Controllers
                 })
                 .ToListAsync();
 
+            var idsConStock = stock.Select(s => s.IdProducto).Distinct().ToList();
+            var presentaciones = (await _context.ProductoPresentacions
+                    .Where(pp => idsConStock.Contains(pp.IdProducto))
+                    .OrderBy(pp => pp.Factor)
+                    .Select(pp => new { pp.IdProducto, pp.Nombre, pp.Factor, pp.Precio })
+                    .ToListAsync())
+                .ToLookup(pp => pp.IdProducto, pp => new PresentacionVenta(pp.Nombre, pp.Factor, pp.Precio));
+
             model.Datos.Productos = stock
                 .GroupBy(s => s.IdProducto)
                 .Select(g => new ProductoVenta(
                     g.Key, g.First().Nombre, g.First().Codigo, g.First().UnidadMedida, g.First().PrecioUnitario,
-                    g.OrderByDescending(s => s.CantidadActual).Select(s => new ZonaVenta(s.IdUbicacion, s.CodigoEstante, s.CantidadActual)).ToList()))
+                    g.OrderByDescending(s => s.CantidadActual).Select(s => new ZonaVenta(s.IdUbicacion, s.CodigoEstante, s.CantidadActual)).ToList(),
+                    presentaciones[g.Key].ToList()))
                 .OrderBy(p => p.Nombre)
                 .ToList();
 

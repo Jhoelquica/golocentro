@@ -153,16 +153,18 @@ namespace GestionAlmacen_Golocentro.Controllers
                     d.IdProductoNavigation.Nombre,
                     d.IdProductoNavigation.UnidadMedida,
                     d.Cantidad,
+                    d.Factor,
                     d.PrecioUnitarioSnapshot
                 })
                 .ToListAsync();
 
-            var importeTotal = lineas.Sum(l => decimal.Round(l.Cantidad * l.PrecioUnitarioSnapshot, 2));
+            // La cantidad está en unidades base; el precio, en la presentación vendida (bolsa, caja...)
+            var importeTotal = lineas.Sum(l => Presentaciones.Importe(l.Cantidad, l.Factor, l.PrecioUnitarioSnapshot));
             var filas = lineas
                 .GroupBy(l => l.IdProducto)
                 .Select(g =>
                 {
-                    var importe = g.Sum(l => decimal.Round(l.Cantidad * l.PrecioUnitarioSnapshot, 2));
+                    var importe = g.Sum(l => Presentaciones.Importe(l.Cantidad, l.Factor, l.PrecioUnitarioSnapshot));
                     var primero = g.First();
                     return new ProductoVendidoFila(primero.Codigo, primero.Nombre, primero.UnidadMedida, g.Sum(l => l.Cantidad), importe,
                         g.Select(l => l.IdMovimiento).Distinct().Count(), importeTotal == 0 ? 0 : importe / importeTotal);
@@ -432,7 +434,8 @@ namespace GestionAlmacen_Golocentro.Controllers
                     Comprobante = d.IdMovimientoNavigation.Observaciones,
                     Serie = d.IdMovimientoNavigation.NotaVentum != null ? d.IdMovimientoNavigation.NotaVentum.Serie : null,
                     Numero = d.IdMovimientoNavigation.NotaVentum != null ? (int?)d.IdMovimientoNavigation.NotaVentum.Numero : null,
-                    d.PrecioUnitarioSnapshot
+                    d.PrecioUnitarioSnapshot,
+                    d.Presentacion
                 })
                 .ToListAsync();
 
@@ -447,7 +450,7 @@ namespace GestionAlmacen_Golocentro.Controllers
                 else if (d.Serie != null)
                 {
                     eventos.Add((new MovimientoKardex(d.Fecha, TipoKardex.Venta, "Venta",
-                        VentaController.NumeroNota(d.Serie, d.Numero!.Value), $"{d.Cliente} · S/ {d.PrecioUnitarioSnapshot.ToString("0.00", Inv)} c/u",
+                        VentaController.NumeroNota(d.Serie, d.Numero!.Value), $"{d.Cliente} · S/ {d.PrecioUnitarioSnapshot.ToString("0.00", Inv)} {(d.Presentacion == null ? "c/u" : "por " + d.Presentacion)}",
                         d.Zona, null, d.Cantidad, 0, d.Usuario, d.Sede, Url.Action("Nota", "Venta", new { id = d.IdMovimiento })), 1));
                 }
                 else
