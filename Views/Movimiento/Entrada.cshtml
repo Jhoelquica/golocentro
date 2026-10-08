@@ -292,6 +292,8 @@
             const stock = @Json.Serialize(d.Stock);
             const variasSedes = @Json.Serialize(d.VariasSedes);
             const previos = @Json.Serialize(Model.Detalles);
+            // Hoy en la hora del servidor (Perú): el vencimiento no puede ser anterior
+            const hoyIso = '@DateTime.Today.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)';
 
             const productoPorId = new Map(productos.map(p => [p.id, p]));
             const zonaPorId = new Map(zonas.map(z => [z.id, z]));
@@ -416,7 +418,7 @@
                 crearLinea(p, zonaPrevia, cantidadPrevia);
             }
 
-            function crearLinea(p, zonaPrevia, cantidadPrevia) {
+            function crearLinea(p, zonaPrevia, cantidadPrevia, vencePrevio, lotePrevio) {
                 const n = ++secuencia;
                 const li = document.createElement('li');
                 li.className = 'vn-linea';
@@ -442,6 +444,14 @@
                                 <button type="button" data-accion="mas" aria-label="Uno más"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
                             </div>
                         </div>
+                        <div class="vn-f">
+                            <label for="vence${n}">Vence <span class="cp-opcional">(opcional)</span></label>
+                            <input type="date" id="vence${n}" data-campo="FechaVencimiento" min="${hoyIso}" />
+                        </div>
+                        <div class="vn-f">
+                            <label for="lote${n}">Lote <span class="cp-opcional">(opcional)</span></label>
+                            <input type="text" id="lote${n}" data-campo="Lote" maxlength="50" autocomplete="off" />
+                        </div>
                     </div>
                     <p class="vn-linea-aviso" id="aviso${n}"></p>
                     <button type="button" class="en-otra-zona" data-accion="otra-zona">+ Repartir en otra zona</button>
@@ -459,6 +469,8 @@
                 li.querySelector('.vn-linea-aviso').textContent = zonaPrevia ? '' : sugerencia.pista;
                 const inputCant = campo(li, 'Cantidad');
                 inputCant.value = cantidadPrevia ?? 1;
+                campo(li, 'FechaVencimiento').value = vencePrevio ?? '';
+                campo(li, 'Lote').value = lotePrevio ?? '';
 
                 carrito.append(li);
                 actualizar();
@@ -708,7 +720,7 @@
             // ===== Estado inicial (también al volver con errores del servidor) =====
             for (const d of previos) {
                 const p = productoPorId.get(d.productoId);
-                if (p) crearLinea(p, zonaPorId.has(d.ubicacionId) ? d.ubicacionId : undefined, d.cantidad > 0 ? d.cantidad : 1);
+                if (p) crearLinea(p, zonaPorId.has(d.ubicacionId) ? d.ubicacionId : undefined, d.cantidad > 0 ? d.cantidad : 1, d.fechaVencimiento, d.lote);
             }
             filtrarProductos();
             actualizar();

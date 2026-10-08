@@ -62,6 +62,10 @@ namespace GestionAlmacen_Golocentro.ViewModels
         [StringLength(50, ErrorMessage = "El lote no puede pasar de 50 caracteres.")]
         public string? Lote { get; set; }
 
+        // El vencimiento sale de las entradas (el más próximo de lo que queda en stock): se muestra sin editar
+        [BindNever, ValidateNever]
+        public bool VencimientoPorEntradas { get; set; }
+
         // "conteo" o "entrada" cuando se abre en otra pestaña desde esas pantallas
         public string? Desde { get; set; }
 

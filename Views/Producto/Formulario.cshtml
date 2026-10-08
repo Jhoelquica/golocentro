@@ -258,11 +258,15 @@
             <div class="pf-fila">
                 <div class="cp-campo">
                     <label for="FechaVencimiento">Fecha de vencimiento</label>
-                    <input id="FechaVencimiento" name="FechaVencimiento" type="date"
+                    <input id="FechaVencimiento" name="FechaVencimiento" type="date" readonly="@Model.VencimientoPorEntradas"
                            value="@Model.FechaVencimiento?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)"
                            aria-invalid="@(Error("FechaVencimiento") != null ? "true" : null)"
                            aria-describedby="@Describe("FechaVencimiento", "FechaVencimiento-ayuda")" />
-                    <p class="cp-ayuda" id="FechaVencimiento-ayuda">El sistema avisa cuando se acerque.</p>
+                    <p class="cp-ayuda" id="FechaVencimiento-ayuda">
+                        @(Model.VencimientoPorEntradas
+                            ? "Se toma de las entradas: es el vencimiento más próximo de la mercadería que queda en stock. Se registra en cada entrada."
+                            : "El sistema avisa cuando se acerque. Si registras el vencimiento en las entradas, se toma de ahí.")
+                    </p>
                     @if (Error("FechaVencimiento") is string eFecha)
                     {
                         <p class="cp-error" id="FechaVencimiento-error"><i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i> @eFecha</p>
@@ -271,7 +275,7 @@
 
                 <div class="cp-campo">
                     <label for="Lote">Lote</label>
-                    <input id="Lote" name="Lote" type="text" value="@Model.Lote" maxlength="50" autocomplete="off"
+                    <input id="Lote" name="Lote" type="text" value="@Model.Lote" maxlength="50" autocomplete="off" readonly="@Model.VencimientoPorEntradas"
                            aria-invalid="@(Error("Lote") != null ? "true" : null)"
                            aria-describedby="@Describe("Lote")" />
                     @if (Error("Lote") is string eLote)

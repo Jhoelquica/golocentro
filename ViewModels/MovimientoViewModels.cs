@@ -9,6 +9,10 @@ namespace GestionAlmacen_Golocentro.ViewModels
         public int ProductoId { get; set; }
         public int UbicacionId { get; set; }
         public int Cantidad { get; set; }
+
+        // Vencimiento y lote de esta mercadería (opcionales)
+        public DateOnly? FechaVencimiento { get; set; }
+        public string? Lote { get; set; }
     }
 
     public class MovimientoEntradaViewModel
@@ -81,7 +85,8 @@ namespace GestionAlmacen_Golocentro.ViewModels
     }
 
     // ===== Detalle de una entrada (o salida antigua) =====
-    public record LineaDetalleMovimiento(string Producto, string Codigo, string Unidad, string Zona, int Cantidad, int StockAnterior, int StockDespues);
+    public record LineaDetalleMovimiento(string Producto, string Codigo, string Unidad, string Zona, int Cantidad, int StockAnterior, int StockDespues,
+        DateOnly? Vence = null, string? Lote = null);
 
     public class MovimientoDetalleViewModel
     {

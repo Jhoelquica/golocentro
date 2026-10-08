@@ -242,6 +242,7 @@ namespace GestionAlmacen_Golocentro.Controllers
 
             if (model.Evidencia is { Length: > 0 })
                 await OperacionesAlmacen.GuardarEvidencia(_context, movimiento.IdMovimiento, model.Evidencia, "Salida");
+            await VencimientoProducto.ActualizarAsync(_context, movimiento.DetalleMovimientos.Select(d => d.IdProducto));
 
             TempData["Exito"] = $"Venta registrada: {NumeroNota(nota.Serie, nota.Numero)} por S/ {nota.Total:0.00}.";
             return RedirectToAction(nameof(Nota), new { id = movimiento.IdMovimiento });
@@ -399,6 +400,7 @@ namespace GestionAlmacen_Golocentro.Controllers
                 return RedirectToAction(nameof(Nota), new { id });
             }
             await transaccion.CommitAsync();
+            await VencimientoProducto.ActualizarAsync(_context, venta.Lineas.Select(l => l.IdProducto));
 
             TempData["Exito"] = $"Venta {numeroNota} anulada. Los productos volvieron al stock de sus zonas.";
             return RedirectToAction(nameof(Nota), new { id });

@@ -15,6 +15,7 @@ namespace GestionAlmacen_Golocentro.Controllers
     {
         private const int TamanoPagina = 25;
         private const int MaxFactura = 50;
+        private const int MaxLote = 50;
         public const int MaxCantidadEntrada = 1_000_000;
         private const int MaxDiasLista = 92;
         private readonly AppDbContext _context;
@@ -185,6 +186,8 @@ namespace GestionAlmacen_Golocentro.Controllers
             var sedeUsuario = User.SedeId();
             var detalles = model.Detalles.Where(d => d.ProductoId > 0).ToList();
             model.NumeroFactura = string.IsNullOrWhiteSpace(model.NumeroFactura) ? null : model.NumeroFactura.Trim();
+            foreach (var d in detalles)
+                d.Lote = string.IsNullOrWhiteSpace(d.Lote) ? null : d.Lote.Trim();
 
             int? sedeMovimiento = null;
             var precios = new Dictionary<int, decimal>();
@@ -209,6 +212,11 @@ namespace GestionAlmacen_Golocentro.Controllers
                     ModelState.AddModelError("", "Cada producto debe tener una cantidad de 1 o más.");
                 else if (detalles.Any(d => d.Cantidad > MaxCantidadEntrada))
                     ModelState.AddModelError("", $"La cantidad de un producto no puede pasar de {MaxCantidadEntrada:N0} unidades por entrada.");
+                var hoy = DateOnly.FromDateTime(DateTime.Today);
+                if (detalles.Any(d => d.FechaVencimiento < hoy))
+                    ModelState.AddModelError("", "La fecha de vencimiento de un producto ya pasó. Revísala o déjala vacía.");
+                if (detalles.Any(d => d.Lote?.Length > MaxLote))
+                    ModelState.AddModelError("", $"El lote no puede pasar de {MaxLote} caracteres.");
             }
 
             if (model.ProveedorId == null || !await _context.Proveedores.AnyAsync(p => p.IdProveedor == model.ProveedorId))
@@ -255,7 +263,9 @@ namespace GestionAlmacen_Golocentro.Controllers
                     IdUbicacion = d.UbicacionId,
                     Cantidad = d.Cantidad,
                     PrecioUnitarioSnapshot = precios[d.ProductoId],
-                    StockAnterior = stock.CantidadActual
+                    StockAnterior = stock.CantidadActual,
+                    FechaVencimiento = d.FechaVencimiento,
+                    Lote = d.Lote
                 });
                 stock.CantidadActual += d.Cantidad;
                 stock.UltimaActualizacion = ahora;
@@ -276,6 +286,7 @@ namespace GestionAlmacen_Golocentro.Controllers
 
             if (model.Evidencia is { Length: > 0 })
                 await OperacionesAlmacen.GuardarEvidencia(_context, movimiento.IdMovimiento, model.Evidencia, "Entrada");
+            await VencimientoProducto.ActualizarAsync(_context, detalles.Select(d => d.ProductoId));
 
             var unidades = detalles.Sum(d => d.Cantidad);
             TempData["Exito"] = $"Entrada registrada: {detalles.Count} {(detalles.Count == 1 ? "producto" : "productos")}, {unidades} {(unidades == 1 ? "unidad" : "unidades")}.";
@@ -308,7 +319,9 @@ namespace GestionAlmacen_Golocentro.Controllers
                             d.IdProductoNavigation.UnidadMedida,
                             Zona = d.IdUbicacionNavigation.CodigoEstante,
                             d.Cantidad,
-                            d.StockAnterior
+                            d.StockAnterior,
+                            d.FechaVencimiento,
+                            d.Lote
                         })
                         .ToList(),
                     Evidencias = m.Evidencia.OrderBy(e => e.Fecha).Select(e => new EvidenciaNota(e.UrlArchivo, e.Fecha)).ToList()
@@ -334,7 +347,7 @@ namespace GestionAlmacen_Golocentro.Controllers
                 Documento = string.IsNullOrWhiteSpace(mov.Observaciones) ? null : mov.Observaciones,
                 Lineas = mov.Lineas
                     .Select(l => new LineaDetalleMovimiento(l.Nombre, l.Codigo, l.UnidadMedida, l.Zona, l.Cantidad, l.StockAnterior,
-                        esEntrada ? l.StockAnterior + l.Cantidad : l.StockAnterior - l.Cantidad))
+                        esEntrada ? l.StockAnterior + l.Cantidad : l.StockAnterior - l.Cantidad, l.FechaVencimiento, l.Lote))
                     .ToList(),
                 Evidencias = mov.Evidencias
             });

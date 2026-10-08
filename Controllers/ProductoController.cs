@@ -1,6 +1,7 @@
 using GestionAlmacen_Golocentro.Data;
 using GestionAlmacen_Golocentro.Helpers;
 using GestionAlmacen_Golocentro.Models;
+using GestionAlmacen_Golocentro.Services;
 using GestionAlmacen_Golocentro.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -150,7 +151,7 @@ namespace GestionAlmacen_Golocentro.Controllers
             if (!ModelState.IsValid)
                 return await Formulario(model);
 
-            Copiar(model, producto);
+            Copiar(model, producto, conVencimiento: !await VencimientoProducto.SaleDeEntradasAsync(_context, id));
             if (!await GuardarAsync())
                 return await Formulario(model);
 
@@ -248,6 +249,12 @@ namespace GestionAlmacen_Golocentro.Controllers
         {
             model.TiposExistentes = await _context.Productos.Select(p => p.Tipo).Distinct().OrderBy(t => t).ToListAsync();
             model.UnidadesExistentes = await _context.Productos.Select(p => p.UnidadMedida).Distinct().OrderBy(u => u).ToListAsync();
+            if (model.Id is int id && await VencimientoProducto.SaleDeEntradasAsync(_context, id))
+            {
+                model.VencimientoPorEntradas = true;
+                var actual = await _context.Productos.Where(p => p.IdProducto == id).Select(p => new { p.FechaVencimiento, p.Lote }).SingleAsync();
+                (model.FechaVencimiento, model.Lote) = (actual.FechaVencimiento, actual.Lote);
+            }
             return View("Formulario", model);
         }
 
@@ -291,7 +298,7 @@ namespace GestionAlmacen_Golocentro.Controllers
         }
 
         [NonAction]
-        private static void Copiar(ProductoFormViewModel model, Producto producto)
+        private static void Copiar(ProductoFormViewModel model, Producto producto, bool conVencimiento = true)
         {
             producto.Nombre = model.Nombre!;
             producto.Codigo = model.Codigo!;
@@ -299,6 +306,9 @@ namespace GestionAlmacen_Golocentro.Controllers
             producto.UnidadMedida = model.UnidadMedida!;
             producto.PrecioUnitario = model.PrecioUnitario!.Value;
             producto.StockMinimo = model.StockMinimo!.Value;
+            // Si el vencimiento sale de las entradas, no se pisa con lo del formulario
+            if (!conVencimiento)
+                return;
             producto.FechaVencimiento = model.FechaVencimiento;
             producto.Lote = model.Lote;
         }
